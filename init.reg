@@ -1,0 +1,7 @@
+Windows Registry Editor Version 5.00
+
+; Run init script on boot
+; Note: can take bare .bat, but can’t take bare .ps1 (opens in notepad)
+; https://learn.microsoft.com/en-us/windows/win32/setupapi/run-and-runonce-registry-keys
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run]
+"servo ci init"="powershell C:\\init\\init.ps1"

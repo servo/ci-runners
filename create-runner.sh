@@ -1,0 +1,26 @@
+#!/usr/bin/env zsh
+# usage: create-runner.sh <base_vm> <base_snapshot>
+set -euo pipefail -o bsdecho
+script_dir=${0:a:h}
+base_vm=$1; shift
+base_snapshot=$base_vm@$1; shift
+export LIBVIRT_DEFAULT_URI=qemu:///system
+
+i=0; while zfs list -Ho volsize cuffs/$base_vm.$i > /dev/null 2>&1; do
+    i=$((i+1))
+done
+vm=$base_vm.$i
+>&2 printf '[*] Creating runner: %s\n' $vm
+
+zfs clone cuffs/{$base_snapshot,$vm}
+while ! test -e /dev/zvol/cuffs/$vm-part2; do
+    sleep 1
+done
+"$script_dir/mount-runner.sh" $vm "$script_dir/configure-runner.sh"
+
+virt-clone --preserve-data --check path_in_use=off -o $base_vm -n $vm -f /dev/zvol/cuffs/$vm
+virsh start $vm
+
+printf 'Ready to destroy? '
+read -r
+./destroy-runner.sh $base_vm $i
