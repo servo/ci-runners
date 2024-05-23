@@ -11,11 +11,5 @@ curl.exe -I https://github.com
 # Like `mach bootstrap`, but doesn’t require closing choco’s conhost window manually (servo#32342)
 choco install -y support\windows\chocolatey.config
 
-# Get the PowerShell refreshenv, because refreshenv.cmd won’t work
-# <https://stackoverflow.com/a/46760714>
-$env:ChocolateyInstall = Convert-Path "$((Get-Command choco).Path)\..\.."
-Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
-refreshenv
-
 .\mach bootstrap --skip-platform
 .\mach build --release

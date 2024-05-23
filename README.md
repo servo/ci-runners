@@ -25,7 +25,7 @@ To build the base vm:
 - Update base vm image: `./mount-runner.sh servo-windows2019 $PWD/configure-base.sh`
 - Take another snapshot: `zfs snapshot mypool/servo-windows2019@1-configure-base`
 - Boot base vm guest: `virsh start servo-windows2019`
-    - The guest will reboot once due to the .NET installation
+    - The guest will reboot twice, due to the .NET and MSVC installations
     - Once installed, shut down the guest: `shutdown /s /t 0`
 - Take another snapshot: `zfs snapshot mypool/servo-windows2019@2-ready`
 

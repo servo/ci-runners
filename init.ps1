@@ -53,7 +53,16 @@ if ($(C:\init\vswhere.exe -format value -property isComplete) -ne '1') {
         --add Microsoft.VisualStudio.Component.VC.ATL `
         --add Microsoft.VisualStudio.Component.VC.ATLMFC `
         --passive | Out-Default
+    # FIXME: rebooting here as a speculative fix for choco hanging during warm.ps1
+    shutdown /r /t 0
+    exit
 }
+
+# Get the PowerShell refreshenv, because refreshenv.cmd won’t work
+# <https://stackoverflow.com/a/46760714>
+$env:ChocolateyInstall = Convert-Path "$((Get-Command choco).Path)\..\.."
+Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
+refreshenv
 
 if (!(Test-Path C:\init\built_servo_once_successfully)) {
     C:\init\warm.ps1
