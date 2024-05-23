@@ -21,3 +21,7 @@ inject init "$script_dir/prejob.ps1"
 
 >&2 echo '[*] Injecting job.ps1'
 inject init "$script_dir/job.ps1"
+
+>&2 echo '[*] Injecting GitHub Actions config'
+> init/runner.ps1 echo 'C:\actions-runner\config.cmd --ephemeral --unattended --work ..\a --url https://github.com/servo/servo --name '"$vm"' --token AAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+>> init/runner.ps1 echo 'C:\actions-runner\run.cmd'

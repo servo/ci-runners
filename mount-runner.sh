@@ -7,5 +7,5 @@ export LIBVIRT_DEFAULT_URI=qemu:///system
 
 mount=$(mktemp -d)
 mount /dev/zvol/cuffs/$vm-part2 $mount
-( cd $mount; nix-shell -p hivex --run "$command $vm" || : )
+( cd $mount; nix-shell -p hivex unzip --run "$command $vm" || : )
 umount $mount

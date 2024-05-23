@@ -13,6 +13,7 @@ download "$cache_dir" https://download.visualstudio.microsoft.com/download/pr/2d
 download "$cache_dir" https://github.com/microsoft/vswhere/releases/download/3.1.7/vswhere.exe c54f3b7c9164ea9a0db8641e81ecdda80c2664ef5a47c4191406f848cc07c662
 download "$cache_dir" https://aka.ms/vs/17/release/vs_community.exe 0549b126ce2480056e9368815c2d6881f1319ddfd9f6a497706fe46ad220f1aa
 download "$cache_dir" https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe 193d6c727e18734edbf7303180657e96e9d5a08432002b4e6c5bbe77c60cb3e8
+download "$cache_dir" https://github.com/actions/runner/releases/download/v2.316.1/actions-runner-win-x64-2.316.1.zip e41debe4f0a83f66b28993eaf84dad944c8c82e2c9da81f56a850bc27fedd76b
 
 >&2 echo '[*] Enabling autologon'
 hivexregedit --merge --prefix 'HKEY_LOCAL_MACHINE\SOFTWARE' Windows/System32/config/SOFTWARE < "$script_dir/autologon.reg"
@@ -28,3 +29,8 @@ inject init "$cache_dir/ndp48-x86-x64-allos-enu.exe"
 inject init "$cache_dir/vswhere.exe"
 inject init "$cache_dir/vs_community.exe"
 inject init "$cache_dir/rustup-init.exe"
+
+>&2 echo '[*] Injecting GitHub Actions runner'
+# See also: <https://github.com/servo/servo/settings/actions/runners/new?arch=x64&os=win>
+mkdir -p actions-runner
+unzip -d actions-runner "$cache_dir/actions-runner-win-x64-2.316.1.zip"

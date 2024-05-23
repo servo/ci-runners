@@ -54,3 +54,7 @@ if ($(C:\init\vswhere.exe -format value -property isComplete) -ne '1') {
         --add Microsoft.VisualStudio.Component.VC.ATLMFC `
         --passive | Out-Default
 }
+
+if (Test-Path C:\init\runner.ps1) {
+    C:\init\runner.ps1
+}
