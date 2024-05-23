@@ -1,6 +1,9 @@
 # Out-Default makes the script wait for programs in the Windows subsystem to exit
 # https://stackoverflow.com/a/7272390
 
+# Disable Windows Defender, for better disk performance
+Set-MpPreference -DisableRealtimeMonitoring $True
+
 # Install VirtIO NIC driver (NetKVM)
 # Note: installer fails without negative side effects when rerun, so the check is just there to save time
 # https://stackoverflow.com/q/22496847
