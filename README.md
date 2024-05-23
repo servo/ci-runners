@@ -14,7 +14,8 @@ To build the base vm:
     - `virsh define windows2019.xml`
     - `virt-clone --preserve-data --check path_in_use=off -o servo-windows2019-init -n servo-windows2019 -f /dev/zvol/mypool/servo-windows2019`
     - `virsh undefine servo-windows2019-init`
-- Install Windows — both desktop experience and core are ok
+- Install Windows Server with desktop experience
+    - Core can build Servo, but trying to run it yields DeviceOpenFailed in surfman
     - Load disk driver from `E:\vioscsi\2k19\amd64`
     - Set password for Administrator to `servo2024!`
     - Once installed, shut down the guest: `shutdown /s /t 0`
