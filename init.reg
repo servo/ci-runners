@@ -5,3 +5,8 @@ Windows Registry Editor Version 5.00
 ; https://learn.microsoft.com/en-us/windows/win32/setupapi/run-and-runonce-registry-keys
 [HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run]
 "servo ci init"="powershell C:\\init\\init.ps1"
+
+; Don’t run Server Manager on boot
+; See also: <https://serverfault.com/a/402441>
+[HKEY_LOCAL_MACHINE\Software\Microsoft\ServerManager]
+"DoNotOpenServerManagerAtLogon"=dword:00000001
