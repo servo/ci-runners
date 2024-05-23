@@ -1,5 +1,6 @@
 #!/usr/bin/env zsh
-# usage: create-runner.sh <base_vm> <base_snapshot>
+# usage: create-runner.sh <base_vm> <base_snapshot> <runner_jitconfig_cmd>
+# runner_jitconfig_cmd should be a command like `sudo -iu delan $PWD/register-runner.sh`
 set -euo pipefail -o bsdecho
 script_dir=${0:a:h}
 base_vm=$1; shift
@@ -16,7 +17,10 @@ zfs clone cuffs/{$base_snapshot,$vm}
 while ! test -e /dev/zvol/cuffs/$vm-part2; do
     sleep 1
 done
-"$script_dir/mount-runner.sh" $vm "$script_dir/configure-runner.sh"
+
+runner_jitconfig=$(mktemp)
+> $runner_jitconfig "$@" $vm
+"$script_dir/mount-runner.sh" $vm "$script_dir/configure-runner.sh '$(cat $runner_jitconfig)'"
 
 virt-clone --preserve-data --check path_in_use=off -o $base_vm -n $vm -f /dev/zvol/cuffs/$vm
 virsh start $vm

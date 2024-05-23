@@ -32,5 +32,6 @@ inject init "$cache_dir/rustup-init.exe"
 
 >&2 echo '[*] Injecting GitHub Actions runner'
 # See also: <https://github.com/servo/servo/settings/actions/runners/new?arch=x64&os=win>
+rm -Rf actions-runner  # FIXME: necessary to avoid errors starting runner?
 mkdir -p actions-runner
 unzip -o -d actions-runner "$cache_dir/actions-runner-win-x64-2.316.1.zip"
