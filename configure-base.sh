@@ -24,6 +24,7 @@ hivexregedit --merge --prefix 'HKEY_LOCAL_MACHINE\SOFTWARE' Windows/System32/con
 >&2 echo '[*] Injecting init script and installers'
 mkdir -p init
 inject init "$script_dir/init.ps1"
+inject init "$script_dir/warm.ps1"
 inject init "$cache_dir/python-3.12.3-amd64.exe"
 inject init "$cache_dir/ndp48-x86-x64-allos-enu.exe"
 inject init "$cache_dir/vswhere.exe"
@@ -35,3 +36,13 @@ inject init "$cache_dir/rustup-init.exe"
 rm -Rf actions-runner  # FIXME: necessary to avoid errors starting runner?
 mkdir -p actions-runner
 unzip -o -d actions-runner "$cache_dir/actions-runner-win-x64-2.316.1.zip"
+
+>&2 echo '[*] Creating working directory for builds (C:\a)'
+mkdir -p a
+
+>&2 echo '[*] Injecting servo repo'
+mkdir -p a/servo
+inject a/servo /mnt/servo0/servo
+
+>&2 echo '[*] Injecting cargo cache'
+inject Users/Administrator /mnt/servo0/.cargo

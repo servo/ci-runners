@@ -4,6 +4,8 @@ GitHub Actions runners for Servo
 Windows runner
 --------------
 
+Runners created from this image preinstall all dependencies (including those specified in the main repo, like GStreamer and Chocolatey deps), preload the main repo, and prebuild Servo in the release profile.
+
 To build the base vm:
 
 - Download images into /var/lib/libvirt/images
@@ -21,27 +23,14 @@ To build the base vm:
     - Once installed, shut down the guest: `shutdown /s /t 0`
 - Take a snapshot: `zfs snapshot mypool/servo-windows2019@0-fresh-install`
 - Update base vm image: `./mount-runner.sh servo-windows2019 $PWD/configure-base.sh`
+- Take another snapshot: `zfs snapshot mypool/servo-windows2019@1-configure-base`
 - Boot base vm guest: `virsh start servo-windows2019`
     - The guest will reboot once due to the .NET installation
     - Once installed, shut down the guest: `shutdown /s /t 0`
-- Take another snapshot: `zfs snapshot mypool/servo-windows2019@1-configure-base`
+- Take another snapshot: `zfs snapshot mypool/servo-windows2019@2-ready`
 
 To clone and start a new runner:
 
 ```sh
-$ ./create-runner.sh servo-windows2019 1-configure-base
-```
-
-To build Servo in the runner:
-
-```cmd
-> powershell \init\prejob
-> powershell \init\job
-```
-
-If you get <samp>error: linker \`lld-link.exe\` not found</samp>:
-
-```cmd
-> refreshenv
-> powershell \init\prejob
+$ ./create-runner.sh servo-windows2019 2-ready sudo -iu delan $PWD/register-runner.sh
 ```

@@ -18,3 +18,4 @@ Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
 refreshenv
 
 .\mach bootstrap --skip-platform
+.\mach build --release

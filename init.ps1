@@ -55,6 +55,11 @@ if ($(C:\init\vswhere.exe -format value -property isComplete) -ne '1') {
         --passive | Out-Default
 }
 
+if (!(Test-Path C:\init\built_servo_once_successfully)) {
+    C:\init\warm.ps1
+    New-Item C:\init\built_servo_once_successfully
+}
+
 if (Test-Path C:\init\runner.ps1) {
     C:\init\runner.ps1
 }
