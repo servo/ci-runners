@@ -26,6 +26,7 @@ hivexregedit --merge --prefix 'HKEY_LOCAL_MACHINE\SYSTEM' Windows/System32/confi
 mkdir -p init
 inject init "$script_dir/init.ps1"
 inject init "$script_dir/warm.ps1"
+inject init "$script_dir/refreshenv.ps1"
 inject init "$cache_dir/python-3.12.3-amd64.exe"
 inject init "$cache_dir/ndp48-x86-x64-allos-enu.exe"
 inject init "$cache_dir/vswhere.exe"

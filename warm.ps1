@@ -10,6 +10,7 @@ curl.exe -I https://github.com
 
 # Like `mach bootstrap`, but doesn’t require closing choco’s conhost window manually (servo#32342)
 choco install -y support\windows\chocolatey.config
+. C:\init\refreshenv.ps1
 
 .\mach bootstrap --skip-platform
 .\mach build --release
