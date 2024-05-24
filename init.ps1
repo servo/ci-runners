@@ -11,6 +11,12 @@ if (!(Test-Path C:\Windows\System32\drivers\netkvm.sys)) {
     pnputil -i -a E:\NetKVM\2k19\amd64\netkvm.inf
 }
 
+# Install Git
+# Note: installer automatically uninstalls first if needed, so the check is just there to save time
+if (!(Test-Path 'C:\Program Files\Git\cmd\git.exe')) {
+    C:\init\Git-2.45.1-64-bit.exe /silent | Out-Default
+}
+
 # Install Python
 # Note: installer is idempotent, so the check is just there to save time
 if (!(Test-Path $env:LOCALAPPDATA\Programs\Python\Python312\python.exe)) {
