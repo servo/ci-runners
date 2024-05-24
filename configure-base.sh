@@ -19,6 +19,9 @@ download "$cache_dir" https://github.com/git-for-windows/git/releases/download/v
 >&2 echo '[*] Applying changes to SOFTWARE hive'
 hivexregedit --merge --prefix 'HKEY_LOCAL_MACHINE\SOFTWARE' Windows/System32/config/SOFTWARE < "$script_dir/software.reg"
 
+>&2 echo '[*] Applying changes to SYSTEM hive'
+hivexregedit --merge --prefix 'HKEY_LOCAL_MACHINE\SYSTEM' Windows/System32/config/SYSTEM < "$script_dir/system.reg"
+
 >&2 echo '[*] Injecting init script and installers'
 mkdir -p init
 inject init "$script_dir/init.ps1"

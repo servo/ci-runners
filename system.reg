@@ -1,0 +1,7 @@
+Windows Registry Editor Version 5.00
+
+; Treat hardware clock as UTC, to avoid API errors when host and guest time zones differ
+; See also: <https://superuser.com/a/975764>
+; Note: assumes CurrentControlSet is configured to point to ControlSet001 in HKLM\System\Select
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\TimeZoneInformation]
+"RealTimeIsUniversal"=hex(b):01,00,00,00,00,00,00,00
