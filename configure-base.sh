@@ -16,11 +16,8 @@ download "$cache_dir" https://static.rust-lang.org/rustup/dist/x86_64-pc-windows
 download "$cache_dir" https://github.com/actions/runner/releases/download/v2.316.1/actions-runner-win-x64-2.316.1.zip e41debe4f0a83f66b28993eaf84dad944c8c82e2c9da81f56a850bc27fedd76b
 download "$cache_dir" https://github.com/git-for-windows/git/releases/download/v2.45.1.windows.1/Git-2.45.1-64-bit.exe 1b2b58fb516495feb70353aa91da230be0a2b4aa01acc3bc047ee1fe4846bc4e
 
->&2 echo '[*] Enabling autologon'
-hivexregedit --merge --prefix 'HKEY_LOCAL_MACHINE\SOFTWARE' Windows/System32/config/SOFTWARE < "$script_dir/autologon.reg"
-
->&2 echo '[*] Registering init script in HKLM Run'
-hivexregedit --merge --prefix 'HKEY_LOCAL_MACHINE\SOFTWARE' Windows/System32/config/SOFTWARE < "$script_dir/init.reg"
+>&2 echo '[*] Applying changes to SOFTWARE hive'
+hivexregedit --merge --prefix 'HKEY_LOCAL_MACHINE\SOFTWARE' Windows/System32/config/SOFTWARE < "$script_dir/software.reg"
 
 >&2 echo '[*] Injecting init script and installers'
 mkdir -p init

@@ -1,5 +1,12 @@
 Windows Registry Editor Version 5.00
 
+; Enable autologon
+; https://learn.microsoft.com/en-us/troubleshoot/windows-server/user-profiles-and-logon/turn-on-automatic-logon
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon]
+"AutoAdminLogon"="1"
+"DefaultUserName"="Administrator"
+"DefaultPassword"="servo2024!"
+
 ; Run init script on boot
 ; Note: can take bare .bat, but can’t take bare .ps1 (opens in notepad)
 ; https://learn.microsoft.com/en-us/windows/win32/setupapi/run-and-runonce-registry-keys
