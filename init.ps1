@@ -76,6 +76,7 @@ refreshenv
 if (!(Test-Path C:\init\built_servo_once_successfully)) {
     C:\init\warm.ps1
     New-Item C:\init\built_servo_once_successfully
+    exit
 }
 
 if (Test-Path C:\init\runner.ps1) {
