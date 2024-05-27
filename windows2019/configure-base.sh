@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 # usage: configure-runner.sh
 set -euo pipefail -o bsdecho
-script_dir=${0:a:h}
+script_dir=${0:a:h}/..
 cache_dir=$script_dir/cache
 . "$script_dir/download.sh"
 . "$script_dir/inject.sh"
@@ -17,16 +17,16 @@ download "$cache_dir" https://github.com/actions/runner/releases/download/v2.316
 download "$cache_dir" https://github.com/git-for-windows/git/releases/download/v2.45.1.windows.1/Git-2.45.1-64-bit.exe 1b2b58fb516495feb70353aa91da230be0a2b4aa01acc3bc047ee1fe4846bc4e
 
 >&2 echo '[*] Applying changes to SOFTWARE hive'
-hivexregedit --merge --prefix 'HKEY_LOCAL_MACHINE\SOFTWARE' Windows/System32/config/SOFTWARE < "$script_dir/software.reg"
+hivexregedit --merge --prefix 'HKEY_LOCAL_MACHINE\SOFTWARE' Windows/System32/config/SOFTWARE < "$script_dir/windows2019/software.reg"
 
 >&2 echo '[*] Applying changes to SYSTEM hive'
-hivexregedit --merge --prefix 'HKEY_LOCAL_MACHINE\SYSTEM' Windows/System32/config/SYSTEM < "$script_dir/system.reg"
+hivexregedit --merge --prefix 'HKEY_LOCAL_MACHINE\SYSTEM' Windows/System32/config/SYSTEM < "$script_dir/windows2019/system.reg"
 
 >&2 echo '[*] Injecting init script and installers'
 mkdir -p init
-inject init "$script_dir/init.ps1"
-inject init "$script_dir/warm.ps1"
-inject init "$script_dir/refreshenv.ps1"
+inject init "$script_dir/windows2019/init.ps1"
+inject init "$script_dir/windows2019/warm.ps1"
+inject init "$script_dir/windows2019/refreshenv.ps1"
 inject init "$cache_dir/python-3.12.3-amd64.exe"
 inject init "$cache_dir/ndp48-x86-x64-allos-enu.exe"
 inject init "$cache_dir/vswhere.exe"
