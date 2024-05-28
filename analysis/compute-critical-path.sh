@@ -52,6 +52,9 @@ jq_program='
         }
     )
   | {
+      firsts: $firsts,
+      lasts: $lasts,
+      count: length,
       duration: map(.duration) | [add / length / 60, max / 60, min / 60],
       max_started_at: map(.max_started_at) | [add / length / 60, max / 60, min / 60],
       max_completed_at: map(.max_completed_at) | [add / length / 60, max / 60, min / 60],
