@@ -1,6 +1,12 @@
 # Out-Default makes the script wait for programs in the Windows subsystem to exit
 # https://stackoverflow.com/a/7272390
 
+# We need to run this on boot as Administrator, but the current user will only be Administrator on Windows Server,
+# and HKLM Run can’t run elevated commands. Instead register an elevated scheduled task. This is tricky to do with
+# a registry patch or `Register-ScheduledTask -xml`, because we would need to know the user’s SID and hostname.
+# Note: `schtasks /Create /F` is idempotent, keyed on task name (/TN)
+schtasks /Create /F /TN "servo ci init" /SC ONLOGON /RL HIGHEST /TR "powershell -NoExit C:\init\init.ps1"
+
 # Disable Windows Defender, for better disk performance
 Set-MpPreference -DisableRealtimeMonitoring $True
 

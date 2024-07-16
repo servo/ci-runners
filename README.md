@@ -65,6 +65,9 @@ To build the base vm:
 - Update base vm image: `./mount-runner.sh servo-windows10 $PWD/windows2019/configure-base.sh`
 - Take another snapshot: `zfs snapshot mypool/servo-windows10@2-configure-base`
 - Boot base vm guest: `virsh start servo-windows10`
+    - Open an elevated PowerShell: **Win**+**X**, **A**
+    - Allow running scripts: `Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Force`
+    - Run the init script once: `C:\init\init.ps1`
 
 Ubuntu runner
 -------------
