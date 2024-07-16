@@ -68,6 +68,14 @@ To build the base vm:
     - Open an elevated PowerShell: **Win**+**X**, **A**
     - Allow running scripts: `Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Force`
     - Run the init script once: `C:\init\init.ps1`
+    - Once installed, shut down the guest: `shutdown /s /t 0`
+- Take another snapshot: `zfs snapshot mypool/servo-windows10@3-ready`
+
+To clone and start a new runner:
+
+```sh
+$ ./create-runner.sh servo-windows10 3-ready $PWD/windows2019/configure-runner.sh sudo -iu delan $PWD/register-runner.sh '..\a' Windows
+```
 
 Ubuntu runner
 -------------
