@@ -1,16 +1,16 @@
 GitHub Actions runners for Servo
 ================================
 
-Windows runner
---------------
+Windows Server 2019 runner
+--------------------------
 
 Runners created from this image preinstall all dependencies (including those specified in the main repo, like GStreamer and Chocolatey deps), preload the main repo, and prebuild Servo in the release profile.
 
 To build the base vm:
 
 - Download images into /var/lib/libvirt/images
-    - Windows Server 2019: [17763.3650.221105-1748.rs5_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso](https://software-static.download.prss.microsoft.com/dbazure/988969d5-f34g-4e03-ac9d-1f9786c66749/17763.3650.221105-1748.rs5_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso)
-    - VirtIO drivers: [virtio-win-0.1.240.iso](https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.240-1/virtio-win-0.1.240.iso)
+    - Windows Server 2019: [17763.3650.221105-1748.rs5_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso](https://software-static.download.prss.microsoft.com/dbazure/988969d5-f34g-4e03-ac9d-1f9786c66749/17763.3650.221105-1748.rs5_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso) (sha256 = 6dae072e7f78f4ccab74a45341de0d6e2d45c39be25f1f5920a2ab4f51d7bcbb)
+    - VirtIO drivers: [virtio-win-0.1.240.iso](https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.240-1/virtio-win-0.1.240.iso) (sha256 = ebd48258668f7f78e026ed276c28a9d19d83e020ffa080ad69910dc86bbcbcc6)
 - Create zvol and libvirt guest with random UUID and MAC address
     - `zfs create -V 90G mypool/servo-windows2019`
     - `virsh define windows2019.xml`
@@ -34,6 +34,37 @@ To clone and start a new runner:
 ```sh
 $ ./create-runner.sh servo-windows2019 2-ready $PWD/windows2019/configure-runner.sh sudo -iu delan $PWD/register-runner.sh '..\a' Windows
 ```
+
+Windows 10 runner
+-----------------
+
+To build the base vm:
+
+- Download images into /var/lib/libvirt/images
+    - Windows 10 (multi-edition ISO), English (United States): [Win10_22H2_English_x64v1.iso](https://www.microsoft.com/en-us/software-download/windows10ISO) (sha256 = a6f470ca6d331eb353b815c043e327a347f594f37ff525f17764738fe812852e)
+    - VirtIO drivers: [virtio-win-0.1.240.iso](https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.240-1/virtio-win-0.1.240.iso) (sha256 = ebd48258668f7f78e026ed276c28a9d19d83e020ffa080ad69910dc86bbcbcc6)
+- Create zvol and libvirt guest with random UUID and MAC address
+    - `zfs create -V 90G mypool/servo-windows10`
+    - `virsh define windows10.xml`
+    - `virt-clone --preserve-data --check path_in_use=off -o servo-windows10-init -n servo-windows10 -f /dev/zvol/mypool/servo-windows10`
+    - `virsh undefine servo-windows10-init`
+- Install Windows 10 Pro
+    - Click “I don't have a product key”
+    - Load disk driver from `E:\vioscsi\w10\amd64`
+    - Shut down the guest when you see “Let’s start with region. Is this right?”: `virsh shutdown servo-windows10`
+- Take a snapshot: `zfs snapshot mypool/servo-windows10@0-fresh-install`
+- Boot base vm guest: `virsh start servo-windows10`
+    - Click “I don’t have internet”
+    - Click “Continue with limited setup”
+    - Set username to `servo`
+    - Leave password empty
+    - Turn off the six privacy settings
+    - Click “Not now” for Cortana
+    - Once installed, shut down the guest: `shutdown /s /t 0`
+- Take another snapshot: `zfs snapshot mypool/servo-windows10@1-oobe`
+- Update base vm image: `./mount-runner.sh servo-windows10 $PWD/windows2019/configure-base.sh`
+- Take another snapshot: `zfs snapshot mypool/servo-windows10@2-configure-base`
+- Boot base vm guest: `virsh start servo-windows10`
 
 Ubuntu runner
 -------------

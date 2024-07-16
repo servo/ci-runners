@@ -7,11 +7,65 @@ Windows Registry Editor Version 5.00
 "DefaultUserName"="Administrator"
 "DefaultPassword"="servo2024!"
 
-; Run init script on boot
+; Run init script on boot (Windows Server only)
 ; Note: can take bare .bat, but can’t take bare .ps1 (opens in notepad)
 ; https://learn.microsoft.com/en-us/windows/win32/setupapi/run-and-runonce-registry-keys
-[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run]
-"servo ci init"="powershell -NoExit C:\\init\\init.ps1"
+; [HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run]
+; "servo ci init"="powershell -NoExit -Command \"Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope CurrentUser; C:\\init\\init.ps1\""
+
+; Run init script on boot, using an elevated scheduled task in case we’re not logged in as Administrator
+; https://superuser.com/a/929227
+; https://superuser.com/a/1213207
+; https://www.windowscentral.com/how-export-and-import-scheduled-tasks-windows-10
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Schedule\TaskCache\Tree\servo ci init]
+"SD"=hex:01,00,04,80,88,00,00,00,98,00,00,00,00,00,00,00,14,00,00,00,02,00,74,\
+  00,04,00,00,00,00,10,18,00,9f,01,1f,00,01,02,00,00,00,00,00,05,20,00,00,00,\
+  20,02,00,00,00,10,14,00,9f,01,1f,00,01,01,00,00,00,00,00,05,12,00,00,00,00,\
+  10,18,00,ff,01,1f,00,01,02,00,00,00,00,00,05,20,00,00,00,20,02,00,00,00,00,\
+  24,00,89,00,12,00,01,05,00,00,00,00,00,05,15,00,00,00,3a,8c,17,ff,8b,83,39,\
+  e4,f9,51,a5,c4,e9,03,00,00,00,00,00,05,01,02,00,00,00,00,00,05,20,00,00,00,\
+  20,02,00,00,01,05,00,00,00,00,00,05,15,00,00,00,3a,8c,17,ff,8b,83,39,e4,f9,\
+  51,a5,c4,01,02,00,00
+"Id"="{03B362C7-F5DF-40E2-BB44-4DD86D48B447}"
+"Index"=dword:00000002
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Schedule\TaskCache\Tasks\{03B362C7-F5DF-40E2-BB44-4DD86D48B447}]
+"Path"="\\servo ci init"
+"Hash"=hex:88,5d,cf,27,8f,53,f7,94,44,3c,24,1b,24,0c,90,6d,4a,b2,70,3f,dc,84,\
+  e1,9a,6e,d4,b9,99,83,aa,8c,0b
+"Schema"=dword:00010002
+"Date"="2024-07-15T21:10:37.8764706"
+"Author"="DESKTOP-9BTE93I\\servo"
+"URI"="\\servo ci init"
+"Triggers"=hex:17,00,00,00,00,00,00,00,00,dd,37,e3,62,00,00,00,00,00,00,00,00,\
+  00,00,00,00,dd,37,e3,62,00,00,00,ff,ff,ff,ff,ff,ff,ff,ff,38,21,41,43,48,48,\
+  48,48,45,ba,08,87,48,48,48,48,0e,00,00,00,48,48,48,48,41,00,75,00,74,00,68,\
+  00,6f,00,72,00,00,00,48,48,00,00,00,00,48,48,48,48,00,48,48,48,48,48,48,48,\
+  00,48,48,48,48,48,48,48,01,00,00,00,48,48,48,48,1c,00,00,00,48,48,48,48,01,\
+  05,00,00,00,00,00,05,15,00,00,00,3a,8c,17,ff,8b,83,39,e4,f9,51,a5,c4,e9,03,\
+  00,00,48,48,48,48,2c,00,00,00,48,48,48,48,44,00,45,00,53,00,4b,00,54,00,4f,\
+  00,50,00,2d,00,39,00,42,00,54,00,45,00,39,00,33,00,49,00,5c,00,73,00,65,00,\
+  72,00,76,00,6f,00,00,00,48,48,48,48,2c,00,00,00,48,48,48,48,00,00,00,00,ff,\
+  ff,ff,ff,80,f4,03,00,ff,ff,ff,ff,07,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,00,00,00,00,00,00,00,00,00,00,48,48,48,48,aa,aa,00,00,00,00,00,\
+  00,00,dd,37,e3,62,00,00,00,00,00,00,00,00,00,00,00,00,dd,37,e3,62,00,00,00,\
+  ff,ff,ff,ff,ff,ff,ff,ff,00,00,00,00,ff,ff,ff,ff,00,00,00,00,00,00,00,00,00,\
+  00,00,00,00,02,00,00,01,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
+  00,00,48,48,48,48,00,48,48,48,48,48,48,48,00,48,48,48,48,48,48,48,01,00,00,\
+  00,48,48,48,48,1c,00,00,00,48,48,48,48,01,05,00,00,00,00,00,05,15,00,00,00,\
+  3a,8c,17,ff,8b,83,39,e4,f9,51,a5,c4,e9,03,00,00,48,48,48,48,2c,00,00,00,48,\
+  48,48,48,44,00,45,00,53,00,4b,00,54,00,4f,00,50,00,2d,00,39,00,42,00,54,00,\
+  45,00,39,00,33,00,49,00,5c,00,73,00,65,00,72,00,76,00,6f,00,00,00,48,48,48,\
+  48
+"Actions"=hex:03,00,0c,00,00,00,41,00,75,00,74,00,68,00,6f,00,72,00,66,66,00,\
+  00,00,00,14,00,00,00,70,00,6f,00,77,00,65,00,72,00,73,00,68,00,65,00,6c,00,\
+  6c,00,30,00,00,00,2d,00,4e,00,6f,00,45,00,78,00,69,00,74,00,20,00,43,00,3a,\
+  00,5c,00,69,00,6e,00,69,00,74,00,5c,00,69,00,6e,00,69,00,74,00,2e,00,70,00,\
+  73,00,31,00,00,00,00,00,00,00
+"DynamicInfo"=hex:03,00,00,00,1e,68,35,1d,36,d7,da,01,fa,64,a9,76,36,d7,da,01,\
+  00,00,00,00,00,00,00,00,8e,03,85,8f,36,d7,da,01
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Schedule\TaskCache\Logon\{03B362C7-F5DF-40E2-BB44-4DD86D48B447}]
 
 ; Don’t run Server Manager on boot
 ; See also: <https://serverfault.com/a/402441>
