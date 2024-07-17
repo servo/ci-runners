@@ -1,6 +1,6 @@
 #!/usr/bin/env zsh
-# usage: create-runner.sh <base_vm> <base_snapshot> <path/to/configure-runner.sh> <runner_jitconfig_cmd>
-# runner_jitconfig_cmd should be a command like `sudo -iu delan $PWD/register-runner.sh`
+# usage: create-runner.sh <base_vm> <base_snapshot> <path/to/configure-runner.sh> <runner_jitconfig_cmd [args ...]>
+# runner_jitconfig_cmd should be a command like `$PWD/register-runner.sh ../a Linux`
 set -euo pipefail -o bsdecho
 script_dir=${0:a:h}
 base_vm=$1; shift
