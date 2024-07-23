@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
-# usage: configure-runner.sh
-set -euo pipefail -o bsdecho
+# usage: configure-base.sh
 script_dir=${0:a:h}/..
+. "$script_dir/common.sh"
 cache_dir=$script_dir/cache
 . "$script_dir/download.sh"
 . "$script_dir/inject.sh"

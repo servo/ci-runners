@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 # usage: configure-runner.sh <runner_jitconfig> <vm>
-set -euo pipefail -o bsdecho
 script_dir=${0:a:h}/..
+. "$script_dir/common.sh"
 cache_dir=$script_dir/cache
 runner_jitconfig=$1; shift
 vm=$1; shift

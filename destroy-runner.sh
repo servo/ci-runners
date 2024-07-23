@@ -1,9 +1,9 @@
 #!/usr/bin/env zsh
 # usage: destroy-runner.sh <base_vm> <runner_number>
-set -euo pipefail -o bsdecho
+script_dir=${0:a:h}
+. "$script_dir/common.sh"
 base_vm=$1; shift
 vm=$base_vm.$1; shift
-export LIBVIRT_DEFAULT_URI=qemu:///system
 
 virsh destroy $vm || :
 virsh undefine $vm

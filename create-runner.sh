@@ -1,12 +1,11 @@
 #!/usr/bin/env zsh
 # usage: create-runner.sh <base_vm> <base_snapshot> <path/to/configure-runner.sh> <runner_jitconfig_cmd [args ...]>
 # runner_jitconfig_cmd should be a command like `$PWD/register-runner.sh ../a Linux`
-set -euo pipefail -o bsdecho
 script_dir=${0:a:h}
+. "$script_dir/common.sh"
 base_vm=$1; shift
 base_snapshot=$base_vm@$1; shift
 configure_runner=$1; shift
-export LIBVIRT_DEFAULT_URI=qemu:///system
 
 i=0; while zfs list -Ho volsize cuffs/$base_vm.$i > /dev/null 2>&1; do
     i=$((i+1))
