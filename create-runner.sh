@@ -13,7 +13,7 @@ done
 vm=$base_vm.$i
 >&2 printf '[*] Creating runner: %s\n' $vm
 
-zfs clone $SERVO_CI_ZFS_PREFIX/{$base_snapshot,$vm}
+zfs clone $SERVO_CI_ZFS_CLONE_PREFIX/$base_snapshot $SERVO_CI_ZFS_PREFIX/$vm
 while ! test -e /dev/zvol/$SERVO_CI_ZFS_PREFIX/$vm-part2; do
     sleep 1
 done
