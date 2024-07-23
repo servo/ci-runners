@@ -17,3 +17,102 @@ Windows Registry Editor Version 5.00
 ; See also: <https://serverfault.com/a/402441>
 [HKEY_LOCAL_MACHINE\Software\Microsoft\ServerManager]
 "DoNotOpenServerManagerAtLogon"=dword:00000001
+
+; Disable Windows Update
+; See also: <https://github.com/meetrevision/playbook/blob/24.06/src/Configuration/features/revision/registry/configure-windows-update-and-install.yml>
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows\WindowsUpdate]
+
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows\WindowsUpdate\AU]
+"NoAutoUpdate"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings]
+"FlightSettingsMaxPauseDays"=dword:00005269
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings]
+"PauseFeatureUpdatesStartTime"="2023-08-17T12:47:51Z"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings]
+"PauseFeatureUpdatesStartTime"="2038-01-19T03:14:07Z"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings]
+"PauseQualityUpdatesStartTime"="2023-08-17T12:47:51Z"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings]
+"PauseQualityUpdatesEndTime"="2038-01-19T03:14:07Z"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings]
+"PauseUpdatesStartTime"="2023-08-17T12:47:51Z"
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings]
+"PauseUpdatesExpiryTime"="2038-01-19T03:14:07Z"
+
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows\WindowsUpdate]
+"DisableDualScan"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows\WindowsUpdate]
+"ExcludeWUDriversInQualityUpdate"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows\WindowsUpdate]
+"AUPowerManagement"=dword:00000000
+
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows\WindowsUpdate]
+"SetAutoRestartNotificationDisable"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows\WindowsUpdate\AU]
+"IncludeRecommendedUpdates"=dword:00000000
+
+; Disable Windows Defender
+; See also: <https://github.com/meetrevision/playbook/blob/24.06/src/Configuration/features/revision/registry/configure-security.yml>
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows Defender]
+"ServiceKeepAlive"=dword:00000000
+
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows Defender]
+"AllowFastServiceStartup"=dword:00000000
+
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows Defender]
+"PUAProtection"=dword:00000000
+
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows Defender]
+"DisableRoutinelyTakingAction"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows Defender]
+"DisableAntiSpyware"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows Defender]
+"DisableAntiVirus"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Microsoft Antimalware]
+"DisableAntiSpyware"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Microsoft Antimalware]
+"DisableAntiVirus"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows Defender\Spynet]
+"DisableBlockAtFirstSeen"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows Defender\Spynet]
+"SpynetReporting"=dword:00000000
+
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows Defender\Spynet]
+"SubmitSamplesConsent"=dword:00000002
+
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows Defender\Real-Time Protection]
+"DisableOnAccessProtection"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows Defender\Real-Time Protection]
+"DisableIOAVProtection"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows Defender\Real-Time Protection]
+"DisableRealtimeMonitoring"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows Defender\Real-Time Protection]
+"DisableBehaviorMonitoring"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows Defender\Real-Time Protection]
+"DisableInformationProtectionControl"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows Defender\Real-Time Protection]
+"DisableIntrusionPreventionSystem"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows Defender\Real-Time Protection]
+"DisableScanOnRealtimeEnable"=dword:00000001

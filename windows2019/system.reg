@@ -5,3 +5,8 @@ Windows Registry Editor Version 5.00
 ; Note: assumes CurrentControlSet is configured to point to ControlSet001 in HKLM\System\Select
 [HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\TimeZoneInformation]
 "RealTimeIsUniversal"=hex(b):01,00,00,00,00,00,00,00
+
+; Disable Windows Update
+; See also: <https://github.com/meetrevision/playbook/blob/24.06/src/Configuration/features/revision/registry/configure-windows-update-and-install.yml>
+[HKEY_LOCAL_MACHINE\SYSTEM\Setup\UpgradeNotification]
+"UpgradeAvailable"=dword:00000000
