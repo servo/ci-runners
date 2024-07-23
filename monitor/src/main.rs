@@ -69,7 +69,7 @@ fn list_registered_runners_for_host() -> eyre::Result<Vec<ApiRunner>> {
 }
 
 fn list_runner_guests() -> eyre::Result<Vec<String>> {
-    let output = Command::new("../list-runner-guests.sh")
+    let output = Command::new("../list-libvirt-guests.sh")
         .stdout(Stdio::piped())
         .spawn()
         .unwrap()
@@ -79,6 +79,7 @@ fn list_runner_guests() -> eyre::Result<Vec<String>> {
         eyre::bail!("Command exited with status {}", output.status);
     }
 
+    // Output is not filtered by prefix, so we must filter it ourselves.
     let prefix = format!("{}-", env::var("SERVO_CI_LIBVIRT_PREFIX")?);
     let result = str::from_utf8(&output.stdout)
         .wrap_err("Failed to decode UTF-8")?
