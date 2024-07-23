@@ -21,7 +21,8 @@ done
 
 runner_jitconfig=$(mktemp)
 > $runner_jitconfig "$@" $vm
-"$script_dir/mount-runner.sh" $vm "$configure_runner '$(cat $runner_jitconfig)'"
+>&2 echo "Runner id is $(jq .runner.id $runner_jitconfig)"
+"$script_dir/mount-runner.sh" $vm "$configure_runner '$(jq .encoded_jit_config $runner_jitconfig)'"
 
 virt-clone --preserve-data --check path_in_use=off -o $base_vm -n $vm -f /dev/zvol/cuffs/$vm
 virsh start $vm
