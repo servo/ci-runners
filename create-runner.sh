@@ -21,7 +21,7 @@ done
 runner_jitconfig=$(mktemp)
 > $runner_jitconfig "$@" $vm
 >&2 echo "Runner id is $(jq .runner.id $runner_jitconfig)"
-"$script_dir/mount-runner.sh" $vm "$configure_runner '$(jq .encoded_jit_config $runner_jitconfig)'"
+"$script_dir/mount-runner.sh" $vm $configure_runner "$(jq .encoded_jit_config $runner_jitconfig)"
 
 libvirt_vm=$SERVO_CI_LIBVIRT_PREFIX-$vm
 virt-clone --preserve-data --check path_in_use=off -o $base_vm -n $libvirt_vm -f /dev/zvol/$SERVO_CI_ZFS_PREFIX/$vm
