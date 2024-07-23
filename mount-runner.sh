@@ -6,6 +6,6 @@ vm=$1; shift
 command=${1-zsh}
 
 mount=$(mktemp -d)
-mount /dev/zvol/cuffs/$vm-part2 $mount
+mount /dev/zvol/$SERVO_CI_ZFS_PREFIX/$vm-part2 $mount
 ( cd $mount; nix-shell -p hivex unzip --run "$command $vm" || : )
 umount $mount

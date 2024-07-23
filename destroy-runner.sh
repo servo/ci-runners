@@ -4,7 +4,8 @@ script_dir=${0:a:h}
 . "$script_dir/common.sh"
 base_vm=$1; shift
 vm=$base_vm.$1; shift
+libvirt_vm=$SERVO_CI_LIBVIRT_PREFIX-$vm
 
-virsh destroy $vm || :
-virsh undefine $vm
-zfs destroy -v cuffs/$vm
+virsh destroy $libvirt_vm || :
+virsh undefine $libvirt_vm || :
+zfs destroy -v $SERVO_CI_ZFS_PREFIX/$vm
