@@ -1,5 +1,6 @@
 mod data;
 mod id;
+mod profile;
 
 use core::str;
 use std::{
@@ -12,13 +13,8 @@ use dotenv::dotenv;
 use id::IdGen;
 use jane_eyre::eyre::{self, Context};
 use log::warn;
+use profile::Profile;
 use serde::Deserialize;
-
-struct Profile {
-    base_vm_name: String,
-    base_image_ds: String,
-    target_count: usize,
-}
 
 #[derive(Debug, Deserialize)]
 struct ApiRunner {
@@ -38,8 +34,9 @@ fn main() -> eyre::Result<()> {
     profiles.insert(
         "windows10".to_owned(),
         Profile {
+            configuration_name: "windows2019".to_owned(),
             base_vm_name: "servo-windows10".to_owned(),
-            base_image_ds: "cuffs/servo-windows10".to_owned(),
+            base_image_snapshot: "3-ready".to_owned(),
             target_count: 2,
         },
     );
@@ -53,9 +50,7 @@ fn main() -> eyre::Result<()> {
         IdGen::new_empty()
     });
 
-    dbg!(id_gen.next());
-    dbg!(id_gen.next());
-    dbg!(id_gen.next());
+    profiles["windows10"].create_runner(dbg!(id_gen.next()));
 
     Ok(())
 }

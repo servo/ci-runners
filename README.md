@@ -32,7 +32,7 @@ To build the base vm:
 To clone and start a new runner:
 
 ```sh
-$ ./create-runner.sh servo-windows2019 2-ready $PWD/windows2019/configure-runner.sh env GITHUB_TOKEN=$(gh auth token) $PWD/register-runner.sh '..\a' Windows
+$ ./create-runner.sh servo-windows2019 2-ready windows2019
 ```
 
 Windows 10 runner
@@ -76,7 +76,7 @@ To build the base vm:
 To clone and start a new runner:
 
 ```sh
-$ ./create-runner.sh servo-windows10 3-ready $PWD/windows2019/configure-runner.sh env GITHUB_TOKEN=$(gh auth token) $PWD/register-runner.sh '..\a' Windows
+$ ./create-runner.sh servo-windows10 3-ready windows2019
 ```
 
 Ubuntu runner
@@ -108,5 +108,5 @@ To build the base vm:
 To clone and start a new runner:
 
 ```sh
-$ ./create-runner.sh servo-ubuntu2204 2-ready $PWD/ubuntu2204/configure-runner.sh env GITHUB_TOKEN=$(gh auth token) $PWD/register-runner.sh ../a Linux
+$ ./create-runner.sh servo-ubuntu2204 2-ready ubuntu2204
 ```
