@@ -14,6 +14,7 @@ vm=$base_vm.$id
 
 runner_data=$SERVO_CI_MONITOR_DATA_PATH/$id
 mkdir $runner_data
+touch $runner_data/created-time
 
 zfs clone $SERVO_CI_ZFS_CLONE_PREFIX/$base_snapshot $SERVO_CI_ZFS_PREFIX/$vm
 while ! test -e /dev/zvol/$SERVO_CI_ZFS_PREFIX/$vm-part2; do

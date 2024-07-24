@@ -3,17 +3,18 @@ mod github;
 mod id;
 mod libvirt;
 mod profile;
+mod runner;
 mod zfs;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, thread::sleep, time::Duration};
 
 use dotenv::dotenv;
 use jane_eyre::eyre;
-use log::warn;
+use log::{info, warn};
 
 use crate::{
     github::list_registered_runners_for_host, id::IdGen, libvirt::list_runner_guests,
-    profile::Profile, zfs::list_runner_volumes,
+    profile::Profile, runner::Runners, zfs::list_runner_volumes,
 };
 
 fn main() -> eyre::Result<()> {
@@ -32,16 +33,26 @@ fn main() -> eyre::Result<()> {
         },
     );
 
-    dbg!(list_registered_runners_for_host()?);
-    dbg!(list_runner_guests()?);
-    dbg!(list_runner_volumes()?);
-
     let mut id_gen = IdGen::new_load().unwrap_or_else(|error| {
         warn!("{error}");
         IdGen::new_empty()
     });
 
-    profiles["windows10"].create_runner(dbg!(id_gen.next()));
+    // profiles["windows10"].create_runner(dbg!(id_gen.next()));
+
+    loop {
+        let registrations = dbg!(list_registered_runners_for_host()?);
+        let guests = dbg!(list_runner_guests()?);
+        let volumes = dbg!(list_runner_volumes()?);
+        info!(
+            "{} registrations, {} guests, {} volumes",
+            registrations.len(),
+            guests.len(),
+            volumes.len()
+        );
+        let runners = Runners::new(registrations, guests, volumes);
+        sleep(Duration::from_secs(5));
+    }
 
     Ok(())
 }
