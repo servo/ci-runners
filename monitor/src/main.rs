@@ -50,7 +50,11 @@ fn main() -> eyre::Result<()> {
             guests.len(),
             volumes.len()
         );
+
         let runners = Runners::new(registrations, guests, volumes);
+        for (_id, runner) in runners.iter() {
+            runner.log_info();
+        }
         sleep(Duration::from_secs(5));
     }
 

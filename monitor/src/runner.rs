@@ -1,23 +1,36 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
-    time::SystemTime,
+    time::{Duration, SystemTime},
 };
 
 use jane_eyre::eyre;
-use log::{trace, warn};
+use log::{info, trace, warn};
 
 use crate::{data::get_runner_data_path, github::ApiRunner};
 
+#[derive(Debug)]
 pub struct Runners {
     runners: BTreeMap<usize, Runner>,
 }
 
+/// State of a runner and its live resources.
+#[derive(Debug)]
 pub struct Runner {
+    id: usize,
     created_time: SystemTime,
     registration: Option<ApiRunner>,
     guest_name: Option<String>,
     volume_name: Option<String>,
+}
+
+#[derive(Debug)]
+pub enum Status {
+    Starting,
+    Idle,
+    Busy,
+    DoneOrUnregistered,
+    Invalid,
 }
 
 impl Runners {
@@ -83,6 +96,10 @@ impl Runners {
 
         Self { runners }
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&usize, &Runner)> {
+        self.runners.iter()
+    }
 }
 
 impl Runner {
@@ -95,10 +112,40 @@ impl Runner {
         trace!("[{id}] created_time = {created_time:?}");
 
         Ok(Self {
+            id,
             created_time,
             registration: None,
             guest_name: None,
             volume_name: None,
         })
+    }
+
+    pub fn log_info(&self) {
+        info!(
+            "[{}] status {:?}, age {:?}",
+            self.id,
+            self.status(),
+            self.age()
+        );
+    }
+
+    pub fn age(&self) -> eyre::Result<Duration> {
+        Ok(self.created_time.elapsed()?)
+    }
+
+    pub fn status(&self) -> Status {
+        if self.guest_name.is_none() || self.volume_name.is_none() {
+            return Status::Invalid;
+        };
+        let Some(registration) = &self.registration else {
+            return Status::DoneOrUnregistered;
+        };
+        if registration.busy {
+            return Status::Busy;
+        }
+        if registration.status == "online" {
+            return Status::Idle;
+        }
+        return Status::Starting;
     }
 }
