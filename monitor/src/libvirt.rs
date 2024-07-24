@@ -18,7 +18,7 @@ pub fn list_runner_guests() -> eyre::Result<Vec<String>> {
     }
 
     // Output is not filtered by prefix, so we must filter it ourselves.
-    let prefix = format!("{}-", env::var("SERVO_CI_LIBVIRT_PREFIX")?);
+    let prefix = libvirt_prefix();
     let result = str::from_utf8(&output.stdout)
         .wrap_err("Failed to decode UTF-8")?
         .split_terminator('\n')
@@ -26,4 +26,11 @@ pub fn list_runner_guests() -> eyre::Result<Vec<String>> {
         .map(str::to_owned);
 
     Ok(result.collect())
+}
+
+pub fn libvirt_prefix() -> String {
+    format!(
+        "{}-",
+        env::var("SERVO_CI_LIBVIRT_PREFIX").expect("SERVO_CI_LIBVIRT_PREFIX not defined!")
+    )
 }

@@ -24,7 +24,7 @@ fn main() -> eyre::Result<()> {
 
     let mut profiles = HashMap::new();
     profiles.insert(
-        "windows10".to_owned(),
+        "servo-windows10".to_owned(),
         Profile {
             configuration_name: "windows2019".to_owned(),
             base_vm_name: "servo-windows10".to_owned(),
@@ -38,7 +38,8 @@ fn main() -> eyre::Result<()> {
         IdGen::new_empty()
     });
 
-    // profiles["windows10"].create_runner(dbg!(id_gen.next()));
+    // profiles["servo-windows10"].create_runner(dbg!(id_gen.next()));
+    // profiles["servo-windows10"].create_runner(dbg!(id_gen.next()));
 
     loop {
         let registrations = dbg!(list_registered_runners_for_host()?);
@@ -54,6 +55,11 @@ fn main() -> eyre::Result<()> {
         let runners = Runners::new(registrations, guests, volumes);
         for (_id, runner) in runners.iter() {
             runner.log_info();
+        }
+        for (&id, runner) in runners.to_destroy() {
+            if let Some(profile) = profiles.get(runner.base_vm_name()) {
+                profile.destroy_runner(id);
+            }
         }
         sleep(Duration::from_secs(5));
     }

@@ -7,7 +7,7 @@ use std::{
 use jane_eyre::eyre;
 use log::{info, trace, warn};
 
-use crate::{data::get_runner_data_path, github::ApiRunner};
+use crate::{data::get_runner_data_path, github::ApiRunner, libvirt::libvirt_prefix};
 
 #[derive(Debug)]
 pub struct Runners {
@@ -24,7 +24,7 @@ pub struct Runner {
     volume_name: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Status {
     Starting,
     Idle,
@@ -100,6 +100,11 @@ impl Runners {
     pub fn iter(&self) -> impl Iterator<Item = (&usize, &Runner)> {
         self.runners.iter()
     }
+
+    pub fn to_destroy(&self) -> impl Iterator<Item = (&usize, &Runner)> {
+        self.iter()
+            .filter(|(_id, runner)| runner.status() == Status::DoneOrUnregistered)
+    }
 }
 
 impl Runner {
@@ -147,5 +152,40 @@ impl Runner {
             return Status::Idle;
         }
         return Status::Starting;
+    }
+
+    pub fn base_vm_name(&self) -> &str {
+        self.base_vm_name_from_registration()
+            .or_else(|| self.base_vm_name_from_guest_name())
+            .or_else(|| self.base_vm_name_from_volume_name())
+            .expect("Guaranteed by Runners::new")
+    }
+
+    fn base_vm_name_from_registration(&self) -> Option<&str> {
+        self.registration
+            .iter()
+            .flat_map(|registration| registration.name.rsplit_once('@'))
+            .flat_map(|(rest, _host)| rest.rsplit_once('.'))
+            .map(|(base, _id)| base)
+            .next()
+    }
+
+    fn base_vm_name_from_guest_name(&self) -> Option<&str> {
+        let prefix = libvirt_prefix();
+        self.guest_name
+            .iter()
+            .flat_map(|name| name.strip_prefix(&prefix))
+            .flat_map(|name| name.rsplit_once('.'))
+            .map(|(base, _id)| base)
+            .next()
+    }
+
+    fn base_vm_name_from_volume_name(&self) -> Option<&str> {
+        self.volume_name
+            .iter()
+            .flat_map(|path| path.rsplit_once('.'))
+            .flat_map(|(rest, _id)| rest.rsplit_once('/'))
+            .map(|(_rest, base)| base)
+            .next()
     }
 }
