@@ -3,4 +3,4 @@
 script_dir=${0:a:h}
 . "$script_dir/common.sh"
 
-virsh list --name
+virsh list --name --all
