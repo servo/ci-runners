@@ -1,3 +1,6 @@
+mod data;
+mod id;
+
 use core::str;
 use std::{
     collections::HashMap,
@@ -6,7 +9,9 @@ use std::{
 };
 
 use dotenv::dotenv;
+use id::IdGen;
 use jane_eyre::eyre::{self, Context};
+use log::warn;
 use serde::Deserialize;
 
 struct Profile {
@@ -26,6 +31,7 @@ struct ApiRunner {
 
 fn main() -> eyre::Result<()> {
     jane_eyre::install()?;
+    env_logger::init();
     dotenv().expect("Failed to load variables from .env");
 
     let mut profiles = HashMap::new();
@@ -41,6 +47,15 @@ fn main() -> eyre::Result<()> {
     dbg!(list_registered_runners_for_host()?);
     dbg!(list_runner_guests()?);
     dbg!(list_runner_volumes()?);
+
+    let mut id_gen = IdGen::new_load().unwrap_or_else(|error| {
+        warn!("{error}");
+        IdGen::new_empty()
+    });
+
+    dbg!(id_gen.next());
+    dbg!(id_gen.next());
+    dbg!(id_gen.next());
 
     Ok(())
 }

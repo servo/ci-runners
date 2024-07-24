@@ -1,3 +1,4 @@
 /cache/
+/monitor/data/
 /monitor/target/
 /.env
