@@ -26,7 +26,7 @@ pub struct Runner {
 
 #[derive(Debug, PartialEq)]
 pub enum Status {
-    Starting,
+    StartingOrCrashed,
     Idle,
     Busy,
     DoneOrUnregistered,
@@ -151,7 +151,7 @@ impl Runner {
         if registration.status == "online" {
             return Status::Idle;
         }
-        return Status::Starting;
+        return Status::StartingOrCrashed;
     }
 
     pub fn base_vm_name(&self) -> &str {
