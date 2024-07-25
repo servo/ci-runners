@@ -1,6 +1,24 @@
 GitHub Actions runners for Servo
 ================================
 
+This repo contains:
+
+- Templates for CI runner images
+    - `windows2019/*` is for **Windows Server 2019** and **Windows 10** runners
+    - `ubuntu2204/*` is for **Ubuntu 22.04** runners
+- Scripts for building CI runner images
+    - `*/configure-base.sh`
+    - `*/configure-runner.sh`
+- Scripts for creating and managing runners
+    - `create-runner.sh` creates and registers a new runner
+    - `destroy-runner.sh` destroys the libvirt guest and ZFS volume for a runner
+    - `register-runner.sh` registers a runner with the GitHub API
+    - `unregister-runner.sh` unregisters a runner with the GitHub API
+    - `mount-runner.sh` mounts the main filesystem of a runner on the host
+- A service that automates runner management
+    - `monitor` is the service
+    - `.env.example` contains the settings
+
 Windows Server 2019 runner
 --------------------------
 
