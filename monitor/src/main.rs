@@ -6,7 +6,7 @@ mod profile;
 mod runner;
 mod zfs;
 
-use std::{collections::HashMap, thread::sleep, time::Duration};
+use std::{collections::BTreeMap, thread::sleep, time::Duration};
 
 use dotenv::dotenv;
 use jane_eyre::eyre;
@@ -16,7 +16,7 @@ use crate::{
     github::list_registered_runners_for_host,
     id::IdGen,
     libvirt::list_runner_guests,
-    profile::Profile,
+    profile::{Profile, RunnerCounts},
     runner::{Runners, Status},
     zfs::list_runner_volumes,
 };
@@ -26,7 +26,7 @@ fn main() -> eyre::Result<()> {
     env_logger::init();
     dotenv().expect("Failed to load variables from .env");
 
-    let mut profiles = HashMap::new();
+    let mut profiles = BTreeMap::new();
     profiles.insert(
         "servo-windows10".to_owned(),
         Profile {
@@ -57,6 +57,23 @@ fn main() -> eyre::Result<()> {
         );
 
         let runners = Runners::new(registrations, guests, volumes);
+        let profile_runner_counts: BTreeMap<_, _> = profiles
+            .iter()
+            .map(|(key, profile)| (key, profile.runner_counts(&runners)))
+            .collect();
+        for (
+            key,
+            RunnerCounts {
+                target,
+                healthy,
+                idle,
+                busy,
+                excess_idle,
+            },
+        ) in profile_runner_counts
+        {
+            info!("profile {key}: {healthy}/{target} healthy runners ({idle} idle, {busy} busy, {excess_idle} excess idle)");
+        }
         for (_id, runner) in runners.iter() {
             runner.log_info();
         }
