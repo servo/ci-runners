@@ -17,8 +17,14 @@ mkdir $runner_data
 touch $runner_data/created-time
 
 zfs clone $SERVO_CI_ZFS_CLONE_PREFIX/$base_snapshot $SERVO_CI_ZFS_PREFIX/$vm
-while ! test -e /dev/zvol/$SERVO_CI_ZFS_PREFIX/$vm-part2; do
+partition_block_device=/dev/zvol/$SERVO_CI_ZFS_PREFIX/$vm-part2
+t=0; while ! test -e $partition_block_device; do
+    if [ $t -ge $SERVO_CI_ZVOL_BLOCK_DEVICE_TIMEOUT ]; then
+        >&2 printf '[!] Timed out waiting for block device: %s' $partition_block_device
+        exit 1
+    fi
     sleep 1
+    t=$((t+1))
 done
 
 if ! [ -n "${SERVO_CI_DONT_REGISTER_RUNNERS+set}" ]; then

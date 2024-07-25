@@ -17,7 +17,7 @@ use crate::{
     id::IdGen,
     libvirt::list_runner_guests,
     profile::{Profile, RunnerCounts},
-    runner::{Runners, Status},
+    runner::{start_timeout, Runners, Status},
     zfs::list_runner_volumes,
 };
 
@@ -91,7 +91,7 @@ fn main() -> eyre::Result<()> {
             runner.status() == Status::StartedOrCrashed
                 && runner
                     .age()
-                    .map_or(true, |age| age > Duration::from_secs(300))
+                    .map_or(true, |age| age > Duration::from_secs(start_timeout()))
         });
         let excess_idle_runners = profiles.iter().flat_map(|(_key, profile)| {
             profile
