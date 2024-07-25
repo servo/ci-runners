@@ -29,9 +29,9 @@ mkdir -p a
 
 >&2 echo '[*] Injecting servo repo'
 mkdir -p a/servo
-inject a/servo /mnt/servo0/servo
+inject a/servo "$SERVO_CI_MAIN_REPO_PATH"
 git -C a/servo/servo remote remove origin || :
 git -C a/servo/servo remote add origin https://github.com/servo/servo.git
 
 >&2 echo '[*] Injecting cargo cache'
-inject root /mnt/servo0/.cargo
+inject root "$SERVO_CI_DOT_CARGO_PATH"
