@@ -66,6 +66,14 @@ impl Profile {
             .filter(|(_id, runner)| runner.base_vm_name() == self.base_vm_name)
     }
 
+    pub fn idle_runners<'p, 'r: 'p>(
+        &'p self,
+        runners: &'r Runners,
+    ) -> impl Iterator<Item = (&'r usize, &'r Runner)> + 'p {
+        self.runners(runners)
+            .filter(|(_id, runner)| runner.status() == Status::Idle)
+    }
+
     pub fn runner_counts(&self, runners: &Runners) -> RunnerCounts {
         RunnerCounts {
             target: self.target_runner_count(),

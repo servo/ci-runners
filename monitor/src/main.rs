@@ -33,7 +33,7 @@ fn main() -> eyre::Result<()> {
             configuration_name: "windows2019".to_owned(),
             base_vm_name: "servo-windows10".to_owned(),
             base_image_snapshot: "3-ready".to_owned(),
-            target_count: 2,
+            target_count: 1,
         },
     );
 
@@ -94,9 +94,15 @@ fn main() -> eyre::Result<()> {
                     .age()
                     .map_or(true, |age| age > Duration::from_secs(300))
         });
+        let excess_idle_runners = profiles.iter().flat_map(|(_key, profile)| {
+            profile
+                .idle_runners(&runners)
+                .take(profile.excess_idle_runner_count(&runners))
+        });
         for (&id, runner) in invalid
             .chain(done_or_unregistered)
             .chain(started_or_crashed_and_too_old)
+            .chain(excess_idle_runners)
         {
             if runner.registration().is_some() {
                 if let Err(error) = runners.unregister_runner(id) {
