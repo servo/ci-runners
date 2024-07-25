@@ -61,9 +61,9 @@ fn main() -> eyre::Result<()> {
             runner.log_info();
         }
 
-        // Invalid => destroy and unregister
+        // Invalid => unregister and destroy
         // DoneOrUnregistered => destroy (no need to unregister)
-        // StartedOrCrashed and too old => destroy and unregister
+        // StartedOrCrashed and too old => unregister and destroy
         // Idle or Busy => bleed off excess Idle runners
         let invalid = runners
             .iter()
@@ -81,13 +81,13 @@ fn main() -> eyre::Result<()> {
             .chain(done_or_unregistered)
             .chain(started_or_crashed_and_too_old)
         {
-            if let Some(profile) = profiles.get(runner.base_vm_name()) {
-                profile.destroy_runner(id);
-            }
             if runner.registration().is_some() {
                 if let Err(error) = runners.unregister_runner(id) {
                     warn!("Failed to unregister runner: {error}");
                 }
+            }
+            if let Some(profile) = profiles.get(runner.base_vm_name()) {
+                profile.destroy_runner(id);
             }
         }
 
