@@ -1,5 +1,6 @@
 use std::process::Command;
 
+use jane_eyre::eyre;
 use log::info;
 
 pub struct Profile {
@@ -28,16 +29,21 @@ impl Profile {
             .unwrap();
     }
 
-    pub fn destroy_runner(&self, id: usize) {
+    pub fn destroy_runner(&self, id: usize) -> eyre::Result<()> {
         info!(
             "Destroying runner {id} with base vm name {}",
             self.base_vm_name
         );
-        Command::new("../destroy-runner.sh")
+        let exit_status = Command::new("../destroy-runner.sh")
             .args([&self.base_vm_name, &id.to_string()])
             .spawn()
             .unwrap()
             .wait()
             .unwrap();
+        if exit_status.success() {
+            return Ok(());
+        } else {
+            eyre::bail!("Command exited with status {}", exit_status);
+        }
     }
 }

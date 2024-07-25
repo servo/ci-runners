@@ -87,7 +87,9 @@ fn main() -> eyre::Result<()> {
                 }
             }
             if let Some(profile) = profiles.get(runner.base_vm_name()) {
-                profile.destroy_runner(id);
+                if let Err(error) = profile.destroy_runner(id) {
+                    warn!("Failed to destroy runner: {error}");
+                }
             }
         }
 
