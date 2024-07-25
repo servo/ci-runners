@@ -10,7 +10,7 @@ use std::{collections::BTreeMap, thread::sleep, time::Duration};
 
 use dotenv::dotenv;
 use jane_eyre::eyre;
-use log::{info, warn};
+use log::{info, trace, warn};
 
 use crate::{
     github::list_registered_runners_for_host,
@@ -43,9 +43,12 @@ fn main() -> eyre::Result<()> {
     });
 
     loop {
-        let registrations = dbg!(list_registered_runners_for_host()?);
-        let guests = dbg!(list_runner_guests()?);
-        let volumes = dbg!(list_runner_volumes()?);
+        let registrations = list_registered_runners_for_host()?;
+        let guests = list_runner_guests()?;
+        let volumes = list_runner_volumes()?;
+        trace!("registrations = {:?}", registrations);
+        trace!("guests = {:?}", guests);
+        trace!("volumes = {:?}", volumes);
         info!(
             "{} registrations, {} guests, {} volumes",
             registrations.len(),
