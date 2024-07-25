@@ -33,7 +33,7 @@ fn main() -> eyre::Result<()> {
             configuration_name: "windows2019".to_owned(),
             base_vm_name: "servo-windows10".to_owned(),
             base_image_snapshot: "3-ready".to_owned(),
-            target_count: 1,
+            target_count: 2,
         },
     );
 
@@ -41,9 +41,6 @@ fn main() -> eyre::Result<()> {
         warn!("{error}");
         IdGen::new_empty()
     });
-
-    // profiles["servo-windows10"].create_runner(dbg!(id_gen.next()));
-    // profiles["servo-windows10"].create_runner(dbg!(id_gen.next()));
 
     loop {
         let registrations = dbg!(list_registered_runners_for_host()?);
@@ -66,13 +63,15 @@ fn main() -> eyre::Result<()> {
             RunnerCounts {
                 target,
                 healthy,
+                started_or_crashed,
                 idle,
                 busy,
                 excess_idle,
+                wanted,
             },
         ) in profile_runner_counts
         {
-            info!("profile {key}: {healthy}/{target} healthy runners ({idle} idle, {busy} busy, {excess_idle} excess idle)");
+            info!("profile {key}: {healthy}/{target} healthy runners ({busy} busy, {idle} idle, {started_or_crashed} started or crashed, {excess_idle} excess idle, {wanted} wanted)");
         }
         for (_id, runner) in runners.iter() {
             runner.log_info();
@@ -116,9 +115,18 @@ fn main() -> eyre::Result<()> {
             }
         }
 
-        // TODO: <https://serverfault.com/questions/523350> ?
-        sleep(Duration::from_secs(10));
-    }
+        let profile_wanted_counts = profiles
+            .iter()
+            .map(|(_key, profile)| (profile, profile.wanted_runner_count(&runners)));
+        for (profile, wanted_count) in profile_wanted_counts {
+            for _ in 0..wanted_count {
+                if let Err(error) = profile.create_runner(id_gen.next()) {
+                    warn!("Failed to create runner: {error}");
+                }
+            }
+        }
 
-    Ok(())
+        // TODO: <https://serverfault.com/questions/523350> ?
+        sleep(Duration::from_secs(5));
+    }
 }

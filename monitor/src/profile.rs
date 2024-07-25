@@ -15,18 +15,20 @@ pub struct Profile {
 pub struct RunnerCounts {
     pub target: usize,
     pub healthy: usize,
+    pub started_or_crashed: usize,
     pub idle: usize,
     pub busy: usize,
     pub excess_idle: usize,
+    pub wanted: usize,
 }
 
 impl Profile {
-    pub fn create_runner(&self, id: usize) {
+    pub fn create_runner(&self, id: usize) -> eyre::Result<()> {
         info!(
             "Creating runner {id} with base vm name {}",
             self.base_vm_name
         );
-        Command::new("../create-runner.sh")
+        let exit_status = Command::new("../create-runner.sh")
             .args([
                 &id.to_string(),
                 &self.base_vm_name,
@@ -37,6 +39,11 @@ impl Profile {
             .unwrap()
             .wait()
             .unwrap();
+        if exit_status.success() {
+            return Ok(());
+        } else {
+            eyre::bail!("Command exited with status {}", exit_status);
+        }
     }
 
     pub fn destroy_runner(&self, id: usize) -> eyre::Result<()> {
@@ -78,9 +85,11 @@ impl Profile {
         RunnerCounts {
             target: self.target_runner_count(),
             healthy: self.healthy_runner_count(runners),
+            started_or_crashed: self.started_or_crashed_runner_count(runners),
             idle: self.idle_runner_count(runners),
             busy: self.busy_runner_count(runners),
             excess_idle: self.excess_idle_runner_count(runners),
+            wanted: self.wanted_runner_count(runners),
         }
     }
 
@@ -89,7 +98,15 @@ impl Profile {
     }
 
     pub fn healthy_runner_count(&self, runners: &Runners) -> usize {
-        self.idle_runner_count(runners) + self.busy_runner_count(runners)
+        self.started_or_crashed_runner_count(runners)
+            + self.idle_runner_count(runners)
+            + self.busy_runner_count(runners)
+    }
+
+    pub fn started_or_crashed_runner_count(&self, runners: &Runners) -> usize {
+        self.runners(runners)
+            .filter(|(_id, runner)| runner.status() == Status::StartedOrCrashed)
+            .count()
     }
 
     pub fn idle_runner_count(&self, runners: &Runners) -> usize {
@@ -114,5 +131,14 @@ impl Profile {
 
         // But we can only destroy idle runners, since busy runners have work to do.
         excess.min(self.idle_runner_count(runners))
+    }
+
+    pub fn wanted_runner_count(&self, runners: &Runners) -> usize {
+        // Healthy runners below the target count are wanted runners.
+        if self.target_runner_count() > self.healthy_runner_count(runners) {
+            self.target_runner_count() - self.healthy_runner_count(runners)
+        } else {
+            0
+        }
     }
 }
