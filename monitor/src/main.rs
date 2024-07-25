@@ -13,8 +13,12 @@ use jane_eyre::eyre;
 use log::{info, warn};
 
 use crate::{
-    github::list_registered_runners_for_host, id::IdGen, libvirt::list_runner_guests,
-    profile::Profile, runner::Runners, zfs::list_runner_volumes,
+    github::list_registered_runners_for_host,
+    id::IdGen,
+    libvirt::list_runner_guests,
+    profile::Profile,
+    runner::{Runners, Status},
+    zfs::list_runner_volumes,
 };
 
 fn main() -> eyre::Result<()> {
@@ -56,12 +60,39 @@ fn main() -> eyre::Result<()> {
         for (_id, runner) in runners.iter() {
             runner.log_info();
         }
-        for (&id, runner) in runners.to_destroy() {
+
+        // Invalid => destroy and unregister
+        // DoneOrUnregistered => destroy (no need to unregister)
+        // StartedOrCrashed and too old => destroy and unregister
+        // Idle or Busy => bleed off excess Idle runners
+        let invalid = runners
+            .iter()
+            .filter(|(_id, runner)| runner.status() == Status::Invalid);
+        let done_or_unregistered = runners
+            .iter()
+            .filter(|(_id, runner)| runner.status() == Status::DoneOrUnregistered);
+        let started_or_crashed_and_too_old = runners.iter().filter(|(_id, runner)| {
+            runner.status() == Status::StartedOrCrashed
+                && runner
+                    .age()
+                    .map_or(true, |age| age > Duration::from_secs(300))
+        });
+        for (&id, runner) in invalid
+            .chain(done_or_unregistered)
+            .chain(started_or_crashed_and_too_old)
+        {
             if let Some(profile) = profiles.get(runner.base_vm_name()) {
                 profile.destroy_runner(id);
             }
+            if runner.registration().is_some() {
+                if let Err(error) = runners.unregister_runner(id) {
+                    warn!("Failed to unregister runner: {error}");
+                }
+            }
         }
-        sleep(Duration::from_secs(5));
+
+        // TODO: <https://serverfault.com/questions/523350> ?
+        sleep(Duration::from_secs(10));
     }
 
     Ok(())

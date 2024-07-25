@@ -1,10 +1,11 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     fs,
+    process::Command,
     time::{Duration, SystemTime},
 };
 
-use jane_eyre::eyre;
+use jane_eyre::eyre::{self, bail};
 use log::{info, trace, warn};
 
 use crate::{data::get_runner_data_path, github::ApiRunner, libvirt::libvirt_prefix};
@@ -26,11 +27,11 @@ pub struct Runner {
 
 #[derive(Debug, PartialEq)]
 pub enum Status {
-    StartingOrCrashed,
+    Invalid,
+    StartedOrCrashed,
     Idle,
     Busy,
     DoneOrUnregistered,
-    Invalid,
 }
 
 impl Runners {
@@ -101,9 +102,29 @@ impl Runners {
         self.runners.iter()
     }
 
-    pub fn to_destroy(&self) -> impl Iterator<Item = (&usize, &Runner)> {
-        self.iter()
-            .filter(|(_id, runner)| runner.status() == Status::DoneOrUnregistered)
+    pub fn unregister_runner(&self, id: usize) -> eyre::Result<()> {
+        let Some(registration) = self
+            .runners
+            .get(&id)
+            .and_then(|runner| runner.registration())
+        else {
+            bail!("Tried to unregister an unregistered runner");
+        };
+        info!(
+            "Unregistering runner {id} with GitHub API runner id {}",
+            registration.id
+        );
+        let exit_status = Command::new("../unregister-runner.sh")
+            .arg(&registration.id.to_string())
+            .spawn()
+            .unwrap()
+            .wait()
+            .unwrap();
+        if exit_status.success() {
+            return Ok(());
+        } else {
+            eyre::bail!("Command exited with status {}", exit_status);
+        }
     }
 }
 
@@ -123,6 +144,10 @@ impl Runner {
             guest_name: None,
             volume_name: None,
         })
+    }
+
+    pub fn registration(&self) -> Option<&ApiRunner> {
+        self.registration.as_ref()
     }
 
     pub fn log_info(&self) {
@@ -151,7 +176,7 @@ impl Runner {
         if registration.status == "online" {
             return Status::Idle;
         }
-        return Status::StartingOrCrashed;
+        return Status::StartedOrCrashed;
     }
 
     pub fn base_vm_name(&self) -> &str {
