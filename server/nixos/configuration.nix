@@ -16,7 +16,11 @@
 
   # Use GRUB instead of systemd-boot, so we can mirror the ESP across both disks.
   boot.loader.grub.mirroredBoots = [
-    { path = "/boot0"; devices = ["/dev/disk/by-partlabel/ci0.esp0"]; }
+    # One of them has to be /boot, which seems to be a GRUB or NixOS bug.
+    # If we have /boot0 and /boot1, with an optional symlink from /boot to /boot0,
+    # we generate a /boot0/grub/grub.cfg with “search --set=drive1 --label ci0”,
+    # which makes no sense and does not work.
+    { path = "/boot"; devices = ["/dev/disk/by-partlabel/ci0.esp0"]; }
     { path = "/boot1"; devices = ["/dev/disk/by-partlabel/ci0.esp1"]; }
   ];
 

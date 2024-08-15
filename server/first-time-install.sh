@@ -50,12 +50,16 @@ zpool create -t "$hostname" -o ashift=12 -O mountpoint=none -O acltype=posixacl 
 zfs create -o mountpoint=legacy "$hostname/root"
 mkdir -p "/mnt/$hostname"
 mount -t zfs "$hostname/root" "/mnt/$hostname"
-ln -s boot0 "/mnt/$hostname/boot"
 
 i=0
 while [ $i -lt $# ]; do
-    mkdir "/mnt/$hostname/boot$i"
-    mount "/dev/disk/by-partlabel/${hostname}.esp$i" "/mnt/$hostname/boot$i"
+    if [ $i -gt 0 ]; then
+        boot_dir=/mnt/$hostname/boot$i
+    else
+        boot_dir=/mnt/$hostname/boot
+    fi
+    mkdir -p "$boot_dir"
+    mount "/dev/disk/by-partlabel/${hostname}.esp$i" "$boot_dir"
     i=$((i+1))
 done
 
