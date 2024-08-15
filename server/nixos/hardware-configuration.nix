@@ -18,7 +18,7 @@
       fsType = "zfs";
     };
 
-  fileSystems."/boot0" =
+  fileSystems."/boot" =
     { device = "/dev/disk/by-partlabel/ci0.esp0";
       fsType = "vfat";
       options = [ "fmask=0022" "dmask=0022" ];
