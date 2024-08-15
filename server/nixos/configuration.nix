@@ -17,6 +17,16 @@
   # Generate with: LC_ALL=C < /dev/urandom tr -dC 0-9A-F | head -c 8
   networking.hostId = "04AA04E2";
 
+  # <https://docs.hetzner.com/robot/dedicated-server/network/net-config-cent-os/#dedicated-root-servers-1>
+  networking.interfaces.eth0.ipv6.addresses = [ {
+    address = "2a01:4f9:3071:3063::2";
+    prefixLength = 64;
+  } ];
+  networking.defaultGateway6 = {
+    address = "fe80::1";
+    interface = "eth0";
+  };
+
   # First version of NixOS ever installed with this config.
   system.stateVersion = "24.11";
 
