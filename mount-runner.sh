@@ -10,6 +10,13 @@ else
 fi
 
 mount=$(mktemp -d)
-mount /dev/zvol/$SERVO_CI_ZFS_PREFIX/$vm-part2 $mount
+if [ -e /dev/zvol/$SERVO_CI_ZFS_PREFIX/$vm-part2 ]; then
+    mount /dev/zvol/$SERVO_CI_ZFS_PREFIX/$vm-part2 $mount
+elif [ -e /dev/zvol/$SERVO_CI_ZFS_CLONE_PREFIX/$vm-part2 ]; then
+    mount /dev/zvol/$SERVO_CI_ZFS_CLONE_PREFIX/$vm-part2 $mount
+else
+    >&2 echo "fatal: failed to find $vm-part2 in /dev/zvol/$SERVO_CI_ZFS_PREFIX or /dev/zvol/$SERVO_CI_ZFS_CLONE_PREFIX"
+    exit 1
+fi
 ( cd $mount; "$@" || : )
 umount $mount
