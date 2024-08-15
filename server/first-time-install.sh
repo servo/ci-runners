@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
-# usage: install-nixos.sh <hostname> <disk> [disk ...]
-# requires: sfdisk jq fgrep umount mount zpool zfs mkfs.vfat nixos-install
-if [ $# -lt 1 ]; then >&2 sed '2!d;2s/^# //;2q' "$0"; exit 1; fi
+# usage: first-time-install.sh <hostname> <disk> [disk ...]
+# requires: sfdisk jq fgrep umount mount zpool zfs mkfs.vfat
+if [ $# -lt 2 ]; then >&2 sed '2!d;2s/^# //;2q' "$0"; exit 1; fi
 set -xeuo pipefail -o bsdecho
 esp_size_MiB=1024
 swap_size_MiB=1024

@@ -1,7 +1,7 @@
 #!/usr/bin/env zsh
 # usage: install-or-reinstall.sh <path/to/nixos> <path/to/mnt>
-# requires: sfdisk jq fgrep umount mount zpool zfs mkfs.vfat nixos-install
-if [ $# -lt 1 ]; then >&2 sed '2!d;2s/^# //;2q' "$0"; exit 1; fi
+# requires: nixos-install
+if [ $# -lt 2 ]; then >&2 sed '2!d;2s/^# //;2q' "$0"; exit 1; fi
 set -xeuo pipefail -o bsdecho
 nixos_dir=$1
 mnt_dir=$2
