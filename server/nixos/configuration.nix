@@ -51,6 +51,8 @@
   # Don’t touch the NVRAM boot menu, in case we’re installing on a test machine.
   boot.loader.efi.canTouchEfiVariables = false;
 
+  boot.kernelParams = ["default_hugepagesz=1G" "hugepagesz=1G" "hugepages=96"];
+
   environment.systemPackages = with pkgs; [
     clang
     gh
