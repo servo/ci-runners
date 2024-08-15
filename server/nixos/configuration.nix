@@ -103,6 +103,7 @@
   # ];
   environment.systemPackages = with pkgs; [
     gh
+    git
     hivex
     jq
     rustup
