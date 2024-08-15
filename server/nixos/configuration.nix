@@ -59,6 +59,7 @@
     git
     hivex
     jq
+    ntfs3g
     rustup
     unzip
     vim
