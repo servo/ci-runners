@@ -8,10 +8,10 @@ swap_size_MiB=1024
 hostname=$1; shift
 
 # To test locally:
-# - truncate -s 20G 0
-# - truncate -s 20G 1
-# - sudo losetup -Pf --show 0
-# - sudo losetup -Pf --show 1
+# - truncate -s 20G disk0
+# - truncate -s 20G disk1
+# - sudo losetup -Pf --show disk0
+# - sudo losetup -Pf --show disk1
 # - sudo ./install-nixos.sh ci0 /dev/loopX /dev/loopY
 
 i=0
@@ -59,6 +59,4 @@ while [ $i -lt $# ]; do
     i=$((i+1))
 done
 
-mkdir "/mnt/$hostname/etc"
-cp -R nixos "/mnt/$hostname/etc"
-nixos-install --no-root-password --root "/mnt/$hostname"
+./install-or-reinstall.sh nixos "/mnt/$hostname"
