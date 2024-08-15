@@ -3,6 +3,8 @@ GitHub Actions runners for Servo
 
 This repo contains:
 
+- Server config and install scripts
+    - `server/nixos` is the NixOS config
 - Templates for CI runner images
     - `windows2019/*` is for **Windows Server 2019** and **Windows 10** runners
     - `ubuntu2204/*` is for **Ubuntu 22.04** runners
@@ -18,6 +20,72 @@ This repo contains:
 - A service that automates runner management
     - `monitor` is the service
     - `.env.example` contains the settings
+
+Setting up a server on Hetzner
+------------------------------
+
+Start the [rescue system](https://docs.hetzner.com/robot/dedicated-server/troubleshooting/hetzner-rescue-system/), then run the following:
+
+```
+$ git clone https://github.com/servo/ci-runners.git
+$ cd ci-runners/server
+$ apt install -y zsh
+$ ./start-nixos-installer.sh
+```
+
+Reconnect over SSH, then run the following:
+
+```
+$ nix-shell -p git zsh jq
+$ git clone https://github.com/servo/ci-runners.git
+$ cd ci-runners/server
+$ ./first-time-install.sh ci0 /dev/nvme{0,1}n1
+$ reboot
+```
+
+Reconnect over SSH again, then run the following:
+
+```
+$ git clone https://github.com/servo/ci-runners.git /config
+$ /config/server/update.sh /config/server/nixos
+```
+
+To set up libvirt:
+
+- Connect via virt-manager on another machine
+    - File > Add Connection…
+        - \> Hypervisor: QEMU/KVM
+        - \> Connect to remote host over SSH
+        - \> Username: root
+        - \> Hostname: ci0.servo.org
+        - \> Connect
+- Configure and start the “default” network for NAT
+    - Edit > Connection Details > Virtual Networks > default
+        - \> Autostart: On Boot
+        - \> Start Network
+
+To get a GITHUB_TOKEN for the monitor service:
+
+- [Create](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) a [fine-grained personal access token](https://github.com/settings/personal-access-tokens/new)
+    - Token name: `servo/ci-runners ci0`
+    - Expiration: **7 days**
+    - Resource owner: **servo**
+    - Repository access > All repositories
+    - Repository permissions > **Administration** > Access: **Read and write**
+    - Organization permissions > **Self-hosted runners** > Access: **Read and write**
+
+To set up the monitor service, run the following:
+
+```
+$ rustup default stable
+$ zfs create tank/base
+$ zfs create tank/ci
+$ git clone https://github.com/servo/servo.git ~/servo
+$ cp /config/.env.example /config/.env
+$ vim /config/.env
+$ cd /config
+$ RUST_LOG=debug cargo run
+```
 
 Windows Server 2019 runner
 --------------------------
