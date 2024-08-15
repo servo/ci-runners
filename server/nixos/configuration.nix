@@ -42,6 +42,7 @@
   boot.loader.efi.canTouchEfiVariables = false;
 
   environment.systemPackages = with pkgs; [
+    clang
     gh
     git
     hivex
@@ -49,9 +50,16 @@
     rustup
     unzip
     vim
+    virt-manager
     zsh
   ];
 
   services.openssh.enable = true;
   users.users.root.openssh.authorizedKeys.keys = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICBvkS7z2RAWzqRByRsHHB8PoCjXrnyHtjpdTxmOdcom delan@azabani.com/2016-07-18/Ed25519"];
+
+  virtualisation.libvirtd = {
+    enable = true;
+    qemu.runAsRoot = false;
+    onShutdown = "shutdown";
+  };
 }
