@@ -157,9 +157,9 @@
     <controller type='scsi' index='0' model='virtio-scsi'>
       <address type='pci' domain='0x0000' bus='0x07' slot='0x00' function='0x0'/>
     </controller>
-    <interface type='bridge'>
+    <interface type='network'>
       <mac address='52:54:00:af:68:a3'/>
-      <source bridge='bridge13'/>
+      <source network='default'/>
       <model type='virtio'/>
       <address type='pci' domain='0x0000' bus='0x01' slot='0x00' function='0x0'/>
     </interface>
