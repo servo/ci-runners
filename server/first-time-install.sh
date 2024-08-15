@@ -41,7 +41,11 @@ for disk_dev; do
     sfdisk -J "$disk_dev" | jq -er '.partitiontable.partitions[0].node' | read esp_dev
     sfdisk -J "$disk_dev" | jq -er '.partitiontable.partitions[1].node' | read swap_dev
     sfdisk -J "$disk_dev" | jq -er '.partitiontable.partitions[2].node' | read tank_dev
-    mkfs.vfat -F 32 "$esp_dev"
+
+    # If you run mkfs.fat in a nix-shell, the default volume id will be 12CE-A600 every time,
+    # which interacts poorly with things that rely on fs uuids like GRUB’s “search --uuid”.
+    # This is because nix-shell sets SOURCE_DATE_EPOCH and mkfs.fat uses that verbatim.
+    ( unset SOURCE_DATE_EPOCH; mkfs.fat -F 32 "$esp_dev" )
 
     i=$((i+1))
 done
