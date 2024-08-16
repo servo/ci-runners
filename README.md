@@ -171,7 +171,7 @@ Ubuntu runner
 To build the base vm:
 
 - Download images into /var/lib/libvirt/images
-    - Ubuntu Server 22.04.4: [ubuntu-22.04.4-live-server-amd64.iso](http://mirror.internode.on.net/pub/ubuntu/releases/22.04.4/ubuntu-22.04.4-live-server-amd64.iso)
+    - Ubuntu Server 22.04.4: [ubuntu-22.04.4-live-server-amd64.iso](http://mirror.internode.on.net/pub/ubuntu/releases/22.04.4/ubuntu-22.04.4-live-server-amd64.iso) (sha256 = 45f873de9f8cb637345d6e66a583762730bbea30277ef7b32c9c3bd6700a32b2)
 - Create zvol and libvirt guest with random UUID and MAC address
     - `zfs create -V 90G mypool/base/servo-ubuntu2204`
     - `virsh define ubuntu2204.xml`
