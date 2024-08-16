@@ -37,6 +37,16 @@ fn main() -> eyre::Result<()> {
             target_count: 2,
         },
     );
+    profiles.insert(
+        "servo-ubuntu2204".to_owned(),
+        Profile {
+            configuration_name: "ubuntu2204".to_owned(),
+            base_vm_name: "servo-ubuntu2204".to_owned(),
+            base_image_snapshot: "2-ready".to_owned(),
+            github_runner_label: "self-hosted-ubuntu2204".to_owned(),
+            target_count: 2,
+        },
+    );
 
     let mut id_gen = IdGen::new_load().unwrap_or_else(|error| {
         warn!("{error}");
