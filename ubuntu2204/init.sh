@@ -20,7 +20,7 @@ sudo apt install -y xvfb
 
 if ! [ -e /init/built_servo_once_successfully ]; then
     cd /a/servo/servo
-    ./mach bootstrap
+    ./mach bootstrap --force
     ./mach build --release
     touch /init/built_servo_once_successfully
 fi

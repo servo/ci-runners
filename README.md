@@ -181,14 +181,20 @@ To build the base vm:
     - Uncheck “Set up this disk as an LVM group”
     - Use hostname `servo-ubuntu2204`
     - Use credentials `servo` and `servo2024!`
-    - Check “Install OpenSSH server”
-    - Uncheck “Allow password authentication over SSH”
-    - Once installed, shut down the guest
+    - If we want SSH access for debugging…
+        - Check “Install OpenSSH server”
+        - Provide a SSH public key
+        - Uncheck “Allow password authentication over SSH”
+    - …otherwise, uncheck “Install OpenSSH server”
+    - Once installed, choose “Reboot now”
+    - Press Enter when prompted about the installation medium (no need to eject)
+    - Once rebooted, shut down the guest
 - Take a snapshot: `zfs snapshot mypool/base/servo-ubuntu2204@0-fresh-install`
 - Update base vm image: `./mount-runner.sh servo-ubuntu2204 $PWD/ubuntu2204/configure-base.sh`
 - Take another snapshot: `zfs snapshot mypool/base/servo-ubuntu2204@1-configure-base`
 - Boot base vm guest: `virsh start servo-ubuntu2204`
-    - Once installed, shut down the guest
+    - Once installed, log in and check that rc.local succeeded: `journalctl -b`
+    - If the init script succeeded, shut down the guest
 - Take another snapshot: `zfs snapshot mypool/base/servo-ubuntu2204@2-ready`
 
 To clone and start a new runner:
