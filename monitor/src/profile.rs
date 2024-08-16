@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::{env, process::Command};
 
 use jane_eyre::eyre;
 use log::info;
@@ -94,7 +94,10 @@ impl Profile {
     }
 
     pub fn target_runner_count(&self) -> usize {
-        self.target_count
+        match env::var("SERVO_CI_DONT_CREATE_RUNNERS") {
+            Ok(_) => 0,
+            Err(_) => self.target_count,
+        }
     }
 
     pub fn healthy_runner_count(&self, runners: &Runners) -> usize {
