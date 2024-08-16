@@ -9,6 +9,7 @@ pub struct Profile {
     pub configuration_name: String,
     pub base_vm_name: String,
     pub base_image_snapshot: String,
+    pub github_runner_label: String,
     pub target_count: usize,
 }
 
@@ -34,6 +35,7 @@ impl Profile {
                 &self.base_vm_name,
                 &self.base_image_snapshot,
                 &self.configuration_name,
+                &self.github_runner_label,
             ])
             .spawn()
             .unwrap()

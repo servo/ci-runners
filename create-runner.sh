@@ -1,11 +1,12 @@
 #!/usr/bin/env zsh
-# usage: create-runner.sh <id> <base_vm> <base_snapshot> <configuration_name>
+# usage: create-runner.sh <id> <base_vm> <base_snapshot> <configuration_name> <github_runner_label>
 script_dir=${0:a:h}
 . "$script_dir/common.sh"
 id=$1; shift
 base_vm=$1; shift
 base_snapshot=$base_vm@$1; shift
 configuration_name=$1; shift
+github_runner_label=$1; shift
 configure_runner=$script_dir/$configuration_name/configure-runner.sh
 register_runner=$script_dir/$configuration_name/register-runner.sh
 
@@ -28,7 +29,7 @@ t=0; while ! test -e $partition_block_device; do
 done
 
 if ! [ -n "${SERVO_CI_DONT_REGISTER_RUNNERS+set}" ]; then
-    $register_runner $vm > $runner_data/github-api-registration
+    $register_runner "$github_runner_label" $vm > $runner_data/github-api-registration
     >&2 echo "GitHub API runner id is $(jq .runner.id $runner_data/github-api-registration)"
     runner_jitconfig=$(jq .encoded_jit_config $runner_data/github-api-registration)
 else

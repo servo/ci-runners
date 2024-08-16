@@ -33,6 +33,7 @@ fn main() -> eyre::Result<()> {
             configuration_name: "windows2019".to_owned(),
             base_vm_name: "servo-windows10".to_owned(),
             base_image_snapshot: "3-ready".to_owned(),
+            github_runner_label: "self-hosted-windows10".to_owned(),
             target_count: 2,
         },
     );
