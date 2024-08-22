@@ -13,6 +13,23 @@ pub struct ApiRunner {
     pub name: String,
     pub os: String,
     pub status: String,
+    pub labels: Vec<ApiRunnerLabel>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ApiRunnerLabel {
+    pub name: String,
+}
+
+impl ApiRunner {
+    pub fn labels(&self) -> impl Iterator<Item = &str> {
+        self.labels.iter().map(|label| label.name.as_str())
+    }
+
+    pub fn label_with_key(&self, key: &str) -> Option<&str> {
+        self.labels()
+            .find_map(|label| label.strip_prefix(&format!("{key}:")))
+    }
 }
 
 fn list_registered_runners() -> eyre::Result<Vec<ApiRunner>> {

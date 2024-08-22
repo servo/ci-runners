@@ -17,7 +17,7 @@ use crate::{
     id::IdGen,
     libvirt::list_runner_guests,
     profile::{Profile, RunnerCounts},
-    runner::{start_timeout, Runners, Status},
+    runner::{reserve_timeout, start_timeout, Runners, Status},
     zfs::list_runner_volumes,
 };
 
@@ -94,6 +94,7 @@ fn main() -> eyre::Result<()> {
         // Invalid => unregister and destroy
         // DoneOrUnregistered => destroy (no need to unregister)
         // StartedOrCrashed and too old => unregister and destroy
+        // Reserved for too long => unregister and destroy
         // Idle or Busy => bleed off excess Idle runners
         let invalid = runners
             .iter()
@@ -107,6 +108,16 @@ fn main() -> eyre::Result<()> {
                     .age()
                     .map_or(true, |age| age > Duration::from_secs(start_timeout()))
         });
+        let reserved_for_too_long = runners.iter().filter(|(_id, runner)| {
+            runner.status() == Status::Reserved
+                && runner
+                    .reserved_since()
+                    .ok()
+                    .flatten()
+                    .map_or(true, |duration| {
+                        duration > Duration::from_secs(reserve_timeout())
+                    })
+        });
         let excess_idle_runners = profiles.iter().flat_map(|(_key, profile)| {
             profile
                 .idle_runners(&runners)
@@ -115,6 +126,7 @@ fn main() -> eyre::Result<()> {
         for (&id, runner) in invalid
             .chain(done_or_unregistered)
             .chain(started_or_crashed_and_too_old)
+            .chain(reserved_for_too_long)
             .chain(excess_idle_runners)
         {
             if runner.registration().is_some() {

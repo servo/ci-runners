@@ -2,7 +2,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     env, fs,
     process::Command,
-    time::{Duration, SystemTime},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use jane_eyre::eyre::{self, bail};
@@ -30,6 +30,7 @@ pub enum Status {
     Invalid,
     StartedOrCrashed,
     Idle,
+    Reserved,
     Busy,
     DoneOrUnregistered,
 }
@@ -152,15 +153,28 @@ impl Runner {
 
     pub fn log_info(&self) {
         info!(
-            "[{}] status {:?}, age {:?}",
+            "[{}] status {:?}, age {:?}, reserved for {:?}",
             self.id,
             self.status(),
-            self.age()
+            self.age(),
+            self.reserved_since(),
         );
     }
 
     pub fn age(&self) -> eyre::Result<Duration> {
         Ok(self.created_time.elapsed()?)
+    }
+
+    pub fn reserved_since(&self) -> eyre::Result<Option<Duration>> {
+        if let Some(registration) = &self.registration {
+            if let Some(reserved_since) = registration.label_with_key("reserved-since") {
+                let reserved_since = reserved_since.parse::<u64>()?;
+                let reserved_since = UNIX_EPOCH + Duration::from_secs(reserved_since);
+                return Ok(Some(reserved_since.elapsed()?));
+            }
+        }
+
+        Ok(None)
     }
 
     pub fn status(&self) -> Status {
@@ -172,6 +186,9 @@ impl Runner {
         };
         if registration.busy {
             return Status::Busy;
+        }
+        if registration.label_with_key("reserved-for").is_some() {
+            return Status::Reserved;
         }
         if registration.status == "online" {
             return Status::Idle;
@@ -220,4 +237,11 @@ pub fn start_timeout() -> u64 {
         .expect("SERVO_CI_MONITOR_START_TIMEOUT not defined!")
         .parse()
         .expect("Failed to parse SERVO_CI_MONITOR_START_TIMEOUT")
+}
+
+pub fn reserve_timeout() -> u64 {
+    env::var("SERVO_CI_MONITOR_RESERVE_TIMEOUT")
+        .expect("SERVO_CI_MONITOR_RESERVE_TIMEOUT not defined!")
+        .parse()
+        .expect("Failed to parse SERVO_CI_MONITOR_RESERVE_TIMEOUT")
 }
