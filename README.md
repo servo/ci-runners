@@ -98,15 +98,15 @@ To build the base vm:
     - Windows 10 (multi-edition ISO), English (United States): [Win10_22H2_English_x64v1.iso](https://www.microsoft.com/en-us/software-download/windows10ISO) (sha256 = a6f470ca6d331eb353b815c043e327a347f594f37ff525f17764738fe812852e)
     - VirtIO drivers: [virtio-win-0.1.240.iso](https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.240-1/virtio-win-0.1.240.iso) (sha256 = ebd48258668f7f78e026ed276c28a9d19d83e020ffa080ad69910dc86bbcbcc6)
 - Create zvol and libvirt guest with random UUID and MAC address
-    - `zfs create -V 90G mypool/base/servo-windows10`
+    - `zfs create -V 90G tank/base/servo-windows10`
     - `virsh define windows10.xml`
-    - `virt-clone --preserve-data --check path_in_use=off -o servo-windows10-init -n servo-windows10 -f /dev/zvol/mypool/base/servo-windows10`
+    - `virt-clone --preserve-data --check path_in_use=off -o servo-windows10-init -n servo-windows10 -f /dev/zvol/tank/base/servo-windows10`
     - `virsh undefine servo-windows10-init`
 - Install Windows 10 Pro
     - Click “I don't have a product key”
     - Load disk driver from `E:\vioscsi\w10\amd64`
     - Shut down the guest when you see “Let’s start with region. Is this right?”: `virsh shutdown servo-windows10`
-- Take a snapshot: `zfs snapshot mypool/base/servo-windows10@0-fresh-install`
+- Take a snapshot: `zfs snapshot tank/base/servo-windows10@0-fresh-install`
 - Boot base vm guest: `virsh start servo-windows10`
     - Click “I don’t have internet”
     - Click “Continue with limited setup”
@@ -115,15 +115,15 @@ To build the base vm:
     - Turn off the six privacy settings
     - Click “Not now” for Cortana
     - Once installed, shut down the guest: `shutdown /s /t 0`
-- Take another snapshot: `zfs snapshot mypool/base/servo-windows10@1-oobe`
+- Take another snapshot: `zfs snapshot tank/base/servo-windows10@1-oobe`
 - Update base vm image: `./mount-runner.sh servo-windows10 $PWD/windows10/configure-base.sh`
-- Take another snapshot: `zfs snapshot mypool/base/servo-windows10@2-configure-base`
+- Take another snapshot: `zfs snapshot tank/base/servo-windows10@2-configure-base`
 - Boot base vm guest: `virsh start servo-windows10`
     - Open an elevated PowerShell: **Win**+**X**, **A**
     - Allow running scripts: `Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Force`
     - Run the init script once: `C:\init\init.ps1`
     - Once installed, shut down the guest: `shutdown /s /t 0`
-- Take another snapshot: `zfs snapshot mypool/base/servo-windows10@3-ready`
+- Take another snapshot: `zfs snapshot tank/base/servo-windows10@3-ready`
 
 To clone and start a new runner:
 
@@ -139,9 +139,9 @@ To build the base vm:
 - Download images into /var/lib/libvirt/images
     - Ubuntu Server 22.04.4: [ubuntu-22.04.4-live-server-amd64.iso](http://mirror.internode.on.net/pub/ubuntu/releases/22.04.4/ubuntu-22.04.4-live-server-amd64.iso) (sha256 = 45f873de9f8cb637345d6e66a583762730bbea30277ef7b32c9c3bd6700a32b2)
 - Create zvol and libvirt guest with random UUID and MAC address
-    - `zfs create -V 90G mypool/base/servo-ubuntu2204`
+    - `zfs create -V 90G tank/base/servo-ubuntu2204`
     - `virsh define ubuntu2204.xml`
-    - `virt-clone --preserve-data --check path_in_use=off -o servo-ubuntu2204-init -n servo-ubuntu2204 -f /dev/zvol/mypool/base/servo-ubuntu2204`
+    - `virt-clone --preserve-data --check path_in_use=off -o servo-ubuntu2204-init -n servo-ubuntu2204 -f /dev/zvol/tank/base/servo-ubuntu2204`
     - `virsh undefine servo-ubuntu2204-init`
 - Install Ubuntu
     - Uncheck “Set up this disk as an LVM group”
@@ -155,13 +155,13 @@ To build the base vm:
     - Once installed, choose “Reboot now”
     - Press Enter when prompted about the installation medium (no need to eject)
     - Once rebooted, shut down the guest
-- Take a snapshot: `zfs snapshot mypool/base/servo-ubuntu2204@0-fresh-install`
+- Take a snapshot: `zfs snapshot tank/base/servo-ubuntu2204@0-fresh-install`
 - Update base vm image: `./mount-runner.sh servo-ubuntu2204 $PWD/ubuntu2204/configure-base.sh`
-- Take another snapshot: `zfs snapshot mypool/base/servo-ubuntu2204@1-configure-base`
+- Take another snapshot: `zfs snapshot tank/base/servo-ubuntu2204@1-configure-base`
 - Boot base vm guest: `virsh start servo-ubuntu2204`
     - Once installed, log in and check that rc.local succeeded: `journalctl -b`
     - If the init script succeeded, shut down the guest
-- Take another snapshot: `zfs snapshot mypool/base/servo-ubuntu2204@2-ready`
+- Take another snapshot: `zfs snapshot tank/base/servo-ubuntu2204@2-ready`
 
 To clone and start a new runner:
 
