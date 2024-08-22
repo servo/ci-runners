@@ -1,12 +1,15 @@
 use std::{
     env,
+    fmt::Debug,
     process::{Command, Stdio},
+    time::{Duration, Instant},
 };
 
 use jane_eyre::eyre::{self, Context};
+use log::trace;
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct ApiRunner {
     pub id: usize,
     pub busy: bool,
@@ -16,7 +19,7 @@ pub struct ApiRunner {
     pub labels: Vec<ApiRunnerLabel>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct ApiRunnerLabel {
     pub name: String,
 }
@@ -29,6 +32,46 @@ impl ApiRunner {
     pub fn label_with_key(&self, key: &str) -> Option<&str> {
         self.labels()
             .find_map(|label| label.strip_prefix(&format!("{key}:")))
+    }
+}
+
+/// Caches responses for a while, to avoid hitting REST API rate limits.
+#[derive(Debug, Default)]
+pub struct Cache<Response> {
+    inner: Option<CacheData<Response>>,
+}
+
+#[derive(Debug)]
+struct CacheData<Response> {
+    response: Response,
+    cached_at: Instant,
+}
+
+impl<Response: Clone + Debug> Cache<Response> {
+    pub fn get(&mut self, miss: impl FnOnce() -> eyre::Result<Response>) -> eyre::Result<Response> {
+        if let Some(cached) = &mut self.inner {
+            let age = Instant::now().duration_since(cached.cached_at);
+            if age < api_cache_timeout() {
+                trace!("Cache hit ({age:?} seconds old): {:?}", cached.response);
+                return Ok(cached.response.clone());
+            } else {
+                trace!("Cache expired ({age:?} seconds old)");
+                self.invalidate();
+            }
+        }
+
+        trace!("Cache miss");
+        let response = miss()?;
+        self.inner = Some(CacheData {
+            response: response.clone(),
+            cached_at: Instant::now(),
+        });
+
+        Ok(response)
+    }
+
+    pub fn invalidate(&mut self) {
+        self.inner.take();
     }
 }
 
@@ -53,4 +96,13 @@ pub fn list_registered_runners_for_host() -> eyre::Result<Vec<ApiRunner>> {
         .filter(|runner| runner.name.ends_with(&suffix));
 
     Ok(result.collect())
+}
+
+fn api_cache_timeout() -> Duration {
+    let result = env::var("SERVO_CI_API_CACHE_TIMEOUT")
+        .expect("SERVO_CI_API_CACHE_TIMEOUT not defined!")
+        .parse()
+        .expect("Failed to parse SERVO_CI_API_CACHE_TIMEOUT");
+
+    Duration::from_secs(result)
 }

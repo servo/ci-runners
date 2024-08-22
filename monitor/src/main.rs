@@ -13,7 +13,7 @@ use jane_eyre::eyre;
 use log::{info, trace, warn};
 
 use crate::{
-    github::list_registered_runners_for_host,
+    github::{list_registered_runners_for_host, Cache},
     id::IdGen,
     libvirt::list_runner_guests,
     profile::{Profile, RunnerCounts},
@@ -53,8 +53,10 @@ fn main() -> eyre::Result<()> {
         IdGen::new_empty()
     });
 
+    let mut registrations_cache = Cache::default();
+
     loop {
-        let registrations = list_registered_runners_for_host()?;
+        let registrations = registrations_cache.get(|| list_registered_runners_for_host())?;
         let guests = list_runner_guests()?;
         let volumes = list_runner_volumes()?;
         trace!("registrations = {:?}", registrations);
@@ -139,6 +141,7 @@ fn main() -> eyre::Result<()> {
                     warn!("Failed to destroy runner: {error}");
                 }
             }
+            registrations_cache.invalidate();
         }
 
         let profile_wanted_counts = profiles
@@ -149,6 +152,7 @@ fn main() -> eyre::Result<()> {
                 if let Err(error) = profile.create_runner(id_gen.next()) {
                     warn!("Failed to create runner: {error}");
                 }
+                registrations_cache.invalidate();
             }
         }
 
