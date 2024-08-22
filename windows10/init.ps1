@@ -29,9 +29,9 @@ if (!(Test-Path $env:LOCALAPPDATA\Programs\Python\Python310\python.exe)) {
     C:\init\python-3.10.11-amd64.exe /passive | Out-Default
 }
 
-# Install rustup and Rust 1.74
+# Install rustup and Rust 1.80.1
 if (!(Test-Path C:\Users\Administrator\.rustup)) {
-    C:\init\rustup-init.exe --default-toolchain 1.74 -y --quiet
+    C:\init\rustup-init.exe --default-toolchain 1.80.1 -y --quiet
 }
 
 # Install .NET 4.8 for Chocolatey

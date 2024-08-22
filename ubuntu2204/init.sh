@@ -3,9 +3,9 @@ set -euo pipefail
 
 apt install -y git curl python3-pip python3-venv
 
-# Install rustup and Rust 1.74
+# Install rustup and Rust 1.80.1
 if ! [ -e /root/.rustup ]; then
-    /init/rustup-init.sh --default-toolchain 1.74 -y --quiet
+    /init/rustup-init.sh --default-toolchain 1.80.1 -y --quiet
 fi
 
 # ~/.cargo/env requires HOME to be set
