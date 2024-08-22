@@ -33,7 +33,7 @@ fn main() -> eyre::Result<()> {
             configuration_name: "windows2019".to_owned(),
             base_vm_name: "servo-windows10".to_owned(),
             base_image_snapshot: "3-ready".to_owned(),
-            github_runner_label: "self-hosted-windows10".to_owned(),
+            github_runner_label: "self-hosted-image:windows10".to_owned(),
             target_count: 2,
         },
     );
@@ -43,7 +43,7 @@ fn main() -> eyre::Result<()> {
             configuration_name: "ubuntu2204".to_owned(),
             base_vm_name: "servo-ubuntu2204".to_owned(),
             base_image_snapshot: "2-ready".to_owned(),
-            github_runner_label: "self-hosted-ubuntu2204".to_owned(),
+            github_runner_label: "self-hosted-image:ubuntu2204".to_owned(),
             target_count: 2,
         },
     );
