@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
+apt update
 apt install -y git curl python3-pip python3-venv
 
 # Install rustup and Rust 1.80.1
