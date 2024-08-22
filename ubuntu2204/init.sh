@@ -1,8 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 
-apt update
-apt install -y git curl python3-pip python3-venv
+# Install bootstrap tools, but only if one or more are not already installed.
+# Update the package lists first, to avoid failures when rebaking old images.
+set -- git curl python3-pip python3-venv
+if ! dpkg -s "$@" > /dev/null 2>&1; then
+    apt update
+    apt install -y "$@"
+fi
 
 # Install rustup and Rust 1.80.1
 if ! [ -e /root/.rustup ]; then
