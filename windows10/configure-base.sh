@@ -17,16 +17,16 @@ download "$cache_dir" https://github.com/actions/runner/releases/download/v2.319
 download "$cache_dir" https://github.com/git-for-windows/git/releases/download/v2.45.1.windows.1/Git-2.45.1-64-bit.exe 1b2b58fb516495feb70353aa91da230be0a2b4aa01acc3bc047ee1fe4846bc4e
 
 >&2 echo '[*] Applying changes to SOFTWARE hive'
-hivexregedit --merge --prefix 'HKEY_LOCAL_MACHINE\SOFTWARE' Windows/System32/config/SOFTWARE < "$script_dir/windows2019/software.reg"
+hivexregedit --merge --prefix 'HKEY_LOCAL_MACHINE\SOFTWARE' Windows/System32/config/SOFTWARE < "$script_dir/windows10/software.reg"
 
 >&2 echo '[*] Applying changes to SYSTEM hive'
-hivexregedit --merge --prefix 'HKEY_LOCAL_MACHINE\SYSTEM' Windows/System32/config/SYSTEM < "$script_dir/windows2019/system.reg"
+hivexregedit --merge --prefix 'HKEY_LOCAL_MACHINE\SYSTEM' Windows/System32/config/SYSTEM < "$script_dir/windows10/system.reg"
 
 >&2 echo '[*] Injecting init script and installers'
 mkdir -p init
-inject init "$script_dir/windows2019/init.ps1"
-inject init "$script_dir/windows2019/warm.ps1"
-inject init "$script_dir/windows2019/refreshenv.ps1"
+inject init "$script_dir/windows10/init.ps1"
+inject init "$script_dir/windows10/warm.ps1"
+inject init "$script_dir/windows10/refreshenv.ps1"
 inject init "$cache_dir/python-3.12.3-amd64.exe"
 inject init "$cache_dir/ndp48-x86-x64-allos-enu.exe"
 inject init "$cache_dir/vswhere.exe"

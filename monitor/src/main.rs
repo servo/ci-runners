@@ -30,7 +30,7 @@ fn main() -> eyre::Result<()> {
     profiles.insert(
         "servo-windows10".to_owned(),
         Profile {
-            configuration_name: "windows2019".to_owned(),
+            configuration_name: "windows10".to_owned(),
             base_vm_name: "servo-windows10".to_owned(),
             base_image_snapshot: "3-ready".to_owned(),
             github_runner_label: "self-hosted-image:windows10".to_owned(),

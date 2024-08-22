@@ -6,7 +6,7 @@ This repo contains:
 - Server config and install scripts
     - `server/nixos` is the NixOS config
 - Templates for CI runner images
-    - `windows2019/*` is for **Windows Server 2019** and **Windows 10** runners
+    - `windows10/*` is for **Windows 10** runners
     - `ubuntu2204/*` is for **Ubuntu 22.04** runners
 - Scripts for building CI runner images
     - `*/configure-base.sh`
@@ -87,40 +87,6 @@ $ cd /config
 $ RUST_LOG=debug cargo run
 ```
 
-Windows Server 2019 runner
---------------------------
-
-Runners created from this image preinstall all dependencies (including those specified in the main repo, like GStreamer and Chocolatey deps), preload the main repo, and prebuild Servo in the release profile.
-
-To build the base vm:
-
-- Download images into /var/lib/libvirt/images
-    - Windows Server 2019: [17763.3650.221105-1748.rs5_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso](https://software-static.download.prss.microsoft.com/dbazure/988969d5-f34g-4e03-ac9d-1f9786c66749/17763.3650.221105-1748.rs5_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso) (sha256 = 6dae072e7f78f4ccab74a45341de0d6e2d45c39be25f1f5920a2ab4f51d7bcbb)
-    - VirtIO drivers: [virtio-win-0.1.240.iso](https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.240-1/virtio-win-0.1.240.iso) (sha256 = ebd48258668f7f78e026ed276c28a9d19d83e020ffa080ad69910dc86bbcbcc6)
-- Create zvol and libvirt guest with random UUID and MAC address
-    - `zfs create -V 90G mypool/base/servo-windows2019`
-    - `virsh define windows2019.xml`
-    - `virt-clone --preserve-data --check path_in_use=off -o servo-windows2019-init -n servo-windows2019 -f /dev/zvol/mypool/base/servo-windows2019`
-    - `virsh undefine servo-windows2019-init`
-- Install Windows Server with desktop experience
-    - Core can build Servo, but trying to run it yields DeviceOpenFailed in surfman
-    - Load disk driver from `E:\vioscsi\2k19\amd64`
-    - Set password for Administrator to `servo2024!`
-    - Once installed, shut down the guest: `shutdown /s /t 0`
-- Take a snapshot: `zfs snapshot mypool/base/servo-windows2019@0-fresh-install`
-- Update base vm image: `./mount-runner.sh servo-windows2019 $PWD/windows2019/configure-base.sh`
-- Take another snapshot: `zfs snapshot mypool/base/servo-windows2019@1-configure-base`
-- Boot base vm guest: `virsh start servo-windows2019`
-    - The guest will reboot twice, due to the .NET and MSVC installations
-    - Once installed, shut down the guest: `shutdown /s /t 0`
-- Take another snapshot: `zfs snapshot mypool/base/servo-windows2019@2-ready`
-
-To clone and start a new runner:
-
-```sh
-$ ./create-runner.sh servo-windows2019 2-ready windows2019
-```
-
 Windows 10 runner
 -----------------
 
@@ -150,7 +116,7 @@ To build the base vm:
     - Click “Not now” for Cortana
     - Once installed, shut down the guest: `shutdown /s /t 0`
 - Take another snapshot: `zfs snapshot mypool/base/servo-windows10@1-oobe`
-- Update base vm image: `./mount-runner.sh servo-windows10 $PWD/windows2019/configure-base.sh`
+- Update base vm image: `./mount-runner.sh servo-windows10 $PWD/windows10/configure-base.sh`
 - Take another snapshot: `zfs snapshot mypool/base/servo-windows10@2-configure-base`
 - Boot base vm guest: `virsh start servo-windows10`
     - Open an elevated PowerShell: **Win**+**X**, **A**
@@ -162,7 +128,7 @@ To build the base vm:
 To clone and start a new runner:
 
 ```sh
-$ ./create-runner.sh servo-windows10 3-ready windows2019
+$ ./create-runner.sh servo-windows10 3-ready windows10
 ```
 
 Ubuntu runner
