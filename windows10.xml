@@ -1,5 +1,5 @@
 <domain type='kvm'>
-  <name>servo-windows10-init</name>
+  <name>servo-windows10.init</name>
   <uuid>53e546aa-4f5b-41e7-8761-07ad6c7b1dce</uuid>
   <metadata>
     <libosinfo:libosinfo xmlns:libosinfo="http://libosinfo.org/xmlns/libvirt/domain/1.0">
