@@ -6,7 +6,7 @@ mod profile;
 mod runner;
 mod zfs;
 
-use std::{collections::BTreeMap, thread::sleep, time::Duration};
+use std::{collections::BTreeMap, env, thread::sleep, time::Duration};
 
 use dotenv::dotenv;
 use jane_eyre::eyre;
@@ -153,6 +153,13 @@ fn main() -> eyre::Result<()> {
         }
 
         // TODO: <https://serverfault.com/questions/523350> ?
-        sleep(Duration::from_secs(5));
+        sleep(Duration::from_secs(poll_interval()));
     }
+}
+
+pub fn poll_interval() -> u64 {
+    env::var("SERVO_CI_MONITOR_POLL_INTERVAL")
+        .expect("SERVO_CI_MONITOR_POLL_INTERVAL not defined!")
+        .parse()
+        .expect("Failed to parse SERVO_CI_MONITOR_POLL_INTERVAL")
 }
