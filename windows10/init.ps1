@@ -25,8 +25,8 @@ if (!(Test-Path 'C:\Program Files\Git\cmd\git.exe')) {
 
 # Install Python
 # Note: installer is idempotent, so the check is just there to save time
-if (!(Test-Path $env:LOCALAPPDATA\Programs\Python\Python312\python.exe)) {
-    C:\init\python-3.12.3-amd64.exe /passive | Out-Default
+if (!(Test-Path $env:LOCALAPPDATA\Programs\Python\Python310\python.exe)) {
+    C:\init\python-3.10.11-amd64.exe /passive | Out-Default
 }
 
 # Install rustup and Rust 1.74
