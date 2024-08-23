@@ -61,6 +61,7 @@
     jq
     ntfs3g
     rustup
+    tmux
     unzip
     vim
     virt-manager
