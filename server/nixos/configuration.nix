@@ -77,4 +77,9 @@
     qemu.runAsRoot = false;
     onShutdown = "shutdown";
   };
+
+  services.fail2ban = {
+    enable = true;
+    ignoreIP = ["144.6.0.0/16" "2403:5808::/29"];
+  };
 }
