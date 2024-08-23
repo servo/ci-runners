@@ -5,6 +5,10 @@ cd C:\a\servo\servo
 # Note: “.exe” avoids Invoke-WebRequest alias
 curl.exe -I https://github.com
 
+# ntfs-3g seems to write symlinks like shell.nix → etc/shell.nix differently to
+# git, so reset the working tree to fix up any discrepancies.
+git reset --hard
+
 .\mach fetch
 .\mach bootstrap-gstreamer
 
