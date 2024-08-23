@@ -49,5 +49,10 @@ inject a/servo "$SERVO_CI_MAIN_REPO_PATH"
 git -C a/servo/servo remote remove origin || :
 git -C a/servo/servo remote add origin https://github.com/servo/servo.git
 
+# `git clone` would have set this if run directly on our Windows runners, and
+# not having it makes the working tree constantly look dirty to git, with files
+# that should have git mode 100755 actually having git mode 100644.
+git -C a/servo/servo config core.fileMode false
+
 >&2 echo '[*] Injecting cargo cache'
 inject Users/Administrator "$SERVO_CI_DOT_CARGO_PATH"
