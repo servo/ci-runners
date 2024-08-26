@@ -16,7 +16,7 @@ use crate::{
     github::{list_registered_runners_for_host, Cache},
     id::IdGen,
     libvirt::list_runner_guests,
-    profile::{Profile, RunnerCounts},
+    profile::{Profile, Profiles, RunnerCounts},
     runner::{reserve_timeout, start_timeout, Runners, Status},
     zfs::list_runner_volumes,
 };
@@ -26,9 +26,9 @@ fn main() -> eyre::Result<()> {
     env_logger::init();
     dotenv().expect("Failed to load variables from .env");
 
-    let mut profiles = BTreeMap::new();
+    let mut profiles = Profiles::default();
     profiles.insert(
-        "servo-windows10".to_owned(),
+        "servo-windows10",
         Profile {
             configuration_name: "windows10".to_owned(),
             base_vm_name: "servo-windows10".to_owned(),
@@ -38,7 +38,7 @@ fn main() -> eyre::Result<()> {
         },
     );
     profiles.insert(
-        "servo-ubuntu2204".to_owned(),
+        "servo-ubuntu2204",
         Profile {
             configuration_name: "ubuntu2204".to_owned(),
             base_vm_name: "servo-ubuntu2204".to_owned(),
