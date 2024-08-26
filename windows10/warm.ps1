@@ -17,6 +17,10 @@ choco install -y support\windows\chocolatey.config
 
 .\mach bootstrap --skip-platform
 
+# Save a copy of the environment variables that can break incremental builds, for debugging.
+echo "`$env:LIBCLANG_PATH in runner image = $env:LIBCLANG_PATH" > C:\init\incremental_build_debug.txt
+echo "`$env:PATH in runner image = $env:PATH" >> C:\init\incremental_build_debug.txt
+
 # Build the same way as a typical Windows build job, to allow for incremental builds.
 $env:RUSTUP_WINDOWS_PATH_ADD_BIN = 1
 .\mach build --use-crown --locked --release
