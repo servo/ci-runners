@@ -1,6 +1,8 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
-    env, fs,
+    env,
+    fmt::Debug,
+    fs,
     process::Command,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -152,13 +154,16 @@ impl Runner {
     }
 
     pub fn log_info(&self) {
+        fn fmt_option_debug<T: Debug>(x: Option<T>) -> String {
+            x.map_or("None".to_owned(), |x| format!("{:?}", x))
+        }
         info!(
-            "[{}] profile {}, status {:?}, age {:?}, reserved for {:?}",
+            "[{}] profile {}, status {:?}, age {}, reserved for {}",
             self.id,
             self.base_vm_name(),
             self.status(),
-            self.age(),
-            self.reserved_since(),
+            fmt_option_debug(self.age().ok()),
+            fmt_option_debug(self.reserved_since().ok().flatten()),
         );
     }
 
