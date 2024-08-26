@@ -153,8 +153,9 @@ impl Runner {
 
     pub fn log_info(&self) {
         info!(
-            "[{}] status {:?}, age {:?}, reserved for {:?}",
+            "[{}] profile {}, status {:?}, age {:?}, reserved for {:?}",
             self.id,
+            self.base_vm_name(),
             self.status(),
             self.age(),
             self.reserved_since(),
