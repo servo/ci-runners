@@ -58,6 +58,7 @@
     gh
     git
     hivex
+    htop
     jq
     ntfs3g
     rustup
