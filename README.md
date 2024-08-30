@@ -126,7 +126,6 @@ Then build the base image:
 - Take a snapshot: `zfs snapshot tank/base/servo-windows10.new@configure-base`
 - Boot temporary vm guest: `virsh start servo-windows10.new`
     - Open an elevated PowerShell: **Win**+**X**, **A**
-    - Allow running scripts: `Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Force`
     - Run the init script once: `C:\init\init.ps1`
     - Once installed, shut down the guest: `shutdown /s /t 0`
 - Take another snapshot: `zfs snapshot tank/base/servo-windows10.new@ready`

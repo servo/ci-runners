@@ -7,11 +7,9 @@ Windows Registry Editor Version 5.00
 "DefaultUserName"="Administrator"
 "DefaultPassword"="servo2024!"
 
-; Run init script on boot (Windows Server only)
-; Note: can take bare .bat, but can’t take bare .ps1 (opens in notepad)
-; https://learn.microsoft.com/en-us/windows/win32/setupapi/run-and-runonce-registry-keys
-; [HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Run]
-; "servo ci init"="powershell -NoExit -Command \"Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope CurrentUser; C:\\init\\init.ps1\""
+; Allow running PowerShell scripts
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\PowerShell\1\ShellIds\Microsoft.PowerShell]
+"ExecutionPolicy"="Unrestricted"
 
 ; Don’t run Server Manager on boot
 ; See also: <https://serverfault.com/a/402441>
