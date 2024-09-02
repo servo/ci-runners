@@ -7,6 +7,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use itertools::Itertools;
 use jane_eyre::eyre::{self, bail};
 use log::{info, trace, warn};
 
@@ -165,6 +166,15 @@ impl Runner {
             fmt_option_debug(self.age().ok()),
             fmt_option_debug(self.reserved_since().ok().flatten()),
         );
+        if let Some(registration) = self.registration() {
+            if !registration.labels.is_empty() {
+                info!(
+                    "[{}] - github labels: {}",
+                    self.id,
+                    registration.labels().join(","),
+                );
+            }
+        }
     }
 
     pub fn age(&self) -> eyre::Result<Duration> {
