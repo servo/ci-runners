@@ -6,11 +6,11 @@ use std::{
 
 use jane_eyre::eyre::{self, Context};
 use log::trace;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::SETTINGS;
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ApiRunner {
     pub id: usize,
     pub busy: bool,
@@ -19,7 +19,7 @@ pub struct ApiRunner {
     pub labels: Vec<ApiRunnerLabel>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ApiRunnerLabel {
     pub name: String,
 }

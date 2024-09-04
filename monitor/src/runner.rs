@@ -9,16 +9,17 @@ use std::{
 use itertools::Itertools;
 use jane_eyre::eyre::{self, bail};
 use log::{info, trace, warn};
+use serde::Serialize;
 
 use crate::{data::get_runner_data_path, github::ApiRunner, libvirt::libvirt_prefix};
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Runners {
     runners: BTreeMap<usize, Runner>,
 }
 
 /// State of a runner and its live resources.
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Runner {
     id: usize,
     created_time: SystemTime,

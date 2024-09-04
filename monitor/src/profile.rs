@@ -2,6 +2,7 @@ use std::{collections::BTreeMap, process::Command};
 
 use jane_eyre::eyre;
 use log::info;
+use serde::Serialize;
 
 use crate::{
     runner::{Runner, Runners, Status},
@@ -22,6 +23,7 @@ pub struct Profile {
     pub target_count: usize,
 }
 
+#[derive(Debug, Serialize)]
 pub struct RunnerCounts {
     pub target: usize,
     pub healthy: usize,

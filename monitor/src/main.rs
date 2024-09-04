@@ -7,17 +7,19 @@ mod runner;
 mod settings;
 mod zfs;
 
-use std::{
-    collections::BTreeMap,
-    net::IpAddr,
-    sync::LazyLock,
-    thread::{self, sleep},
-};
+use std::{collections::BTreeMap, net::IpAddr, sync::LazyLock, thread};
 
+use crossbeam_channel::{Receiver, Sender};
 use dotenv::dotenv;
+use http::StatusCode;
 use jane_eyre::eyre;
 use log::{info, trace, warn};
-use warp::Filter;
+use serde_json::json;
+use warp::{
+    reject::{self, Reject, Rejection},
+    reply::{self, Reply},
+    Filter,
+};
 
 use crate::{
     github::{list_registered_runners_for_host, Cache},
@@ -34,6 +36,28 @@ static SETTINGS: LazyLock<Settings> = LazyLock::new(|| {
     Settings::load()
 });
 
+#[derive(Debug)]
+enum Request {
+    /// GET `/` => `{"profile_runner_counts": {}, "runners": []}`
+    Status,
+}
+#[derive(Debug)]
+struct ChannelError(eyre::Report);
+impl Reject for ChannelError {}
+
+struct Channel<T> {
+    sender: Sender<T>,
+    receiver: Receiver<T>,
+}
+static REQUEST: LazyLock<Channel<Request>> = LazyLock::new(|| {
+    let (sender, receiver) = crossbeam_channel::bounded(1);
+    Channel { sender, receiver }
+});
+static RESPONSE: LazyLock<Channel<String>> = LazyLock::new(|| {
+    let (sender, receiver) = crossbeam_channel::bounded(1);
+    Channel { sender, receiver }
+});
+
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
     jane_eyre::install()?;
@@ -41,12 +65,23 @@ async fn main() -> eyre::Result<()> {
 
     thread::spawn(monitor_thread);
 
-    let routes = warp::any()
+    let status_route = warp::path!()
+        .and(warp::filters::method::get())
+        .and_then(|| async {
+            || -> eyre::Result<String> {
+                REQUEST.sender.send(Request::Status)?;
+                Ok(RESPONSE.receiver.recv()?)
+            }()
+            .map_err(|error| reject::custom(ChannelError(error)))
+        });
+
+    let routes = status_route;
+    let routes = routes
         .and(warp::filters::header::exact(
             "Authorization",
             &SETTINGS.monitor_api_token_authorization_value,
         ))
-        .map(|| "Hello, world!");
+        .recover(recover);
 
     warp::serve(routes)
         .run(("::1".parse::<IpAddr>()?, 8000))
@@ -55,6 +90,24 @@ async fn main() -> eyre::Result<()> {
     Ok(())
 }
 
+async fn recover(error: Rejection) -> Result<impl Reply, std::convert::Infallible> {
+    Ok(if let Some(error) = error.find::<ChannelError>() {
+        reply::with_status(
+            format!("Channel error: {}", error.0),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        )
+    } else {
+        reply::with_status(
+            format!("Internal error: {error:?}"),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        )
+    })
+}
+
+/// The monitor thread is our single source of truth.
+///
+/// It handles one [`Request`] at a time, polling for updated resources before
+/// each request, then sends one response to the API server for each request.
 fn monitor_thread() -> eyre::Result<()> {
     let mut profiles = Profiles::default();
     profiles.insert(
@@ -135,7 +188,7 @@ fn monitor_thread() -> eyre::Result<()> {
                 excess_idle,
                 wanted,
             },
-        ) in profile_runner_counts
+        ) in profile_runner_counts.iter()
         {
             info!("profile {key}: {healthy}/{target} healthy runners ({busy} busy, {idle} idle, {started_or_crashed} started or crashed, {excess_idle} excess idle, {wanted} wanted)");
         }
@@ -204,7 +257,38 @@ fn monitor_thread() -> eyre::Result<()> {
             }
         }
 
-        // TODO: <https://serverfault.com/questions/523350> ?
-        sleep(SETTINGS.monitor_poll_interval);
+        // Handle one request from the API.
+        if let Ok(request) = REQUEST
+            .receiver
+            .recv_timeout(SETTINGS.monitor_poll_interval)
+        {
+            info!("Received API request: {request:?}");
+
+            let response = match request {
+                Request::Status => {
+                    let runners = runners
+                        .iter()
+                        .map(|(id, runner)| {
+                            json!({
+                                "id": id,
+                                "runner": runner,
+                            })
+                        })
+                        .collect::<Vec<_>>();
+
+                    serde_json::to_string(&json!({
+                        "profile_runner_counts": &profile_runner_counts,
+                        "runners": &runners,
+                    }))?
+                }
+            };
+
+            RESPONSE
+                .sender
+                .send(response)
+                .expect("Failed to send Response to API thread");
+        } else {
+            info!("Did not receive an API request");
+        }
     }
 }
