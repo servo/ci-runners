@@ -41,8 +41,14 @@ enum Request {
     /// GET `/` => `{"profile_runner_counts": {}, "runners": []}`
     Status,
 
-    /// POST `/<profile>/<unique id>` => `...`
-    TakeRunner { profile: String, unique_id: String },
+    /// POST `/<profile>/<unique id>/<user>/<repo>/<run id>` => `{"id", "runner"}` | `null`
+    TakeRunner {
+        profile: String,
+        unique_id: String,
+        user: String,
+        repo: String,
+        run_id: String,
+    },
 }
 #[derive(Debug)]
 struct ChannelError(eyre::Report);
@@ -78,13 +84,17 @@ async fn main() -> eyre::Result<()> {
             .map_err(|error| reject::custom(ChannelError(error)))
         });
 
-    let take_runner_route = warp::path!(String / String)
+    let take_runner_route = warp::path!(String / String / String / String / String)
         .and(warp::filters::method::post())
-        .and_then(|profile, unique_id| async {
+        .and_then(|profile, unique_id, user, repo, run_id| async {
             || -> eyre::Result<String> {
-                REQUEST
-                    .sender
-                    .send(Request::TakeRunner { profile, unique_id })?;
+                REQUEST.sender.send(Request::TakeRunner {
+                    profile,
+                    unique_id,
+                    user,
+                    repo,
+                    run_id,
+                })?;
                 Ok(RESPONSE.receiver.recv()?)
             }()
             .map_err(|error| reject::custom(ChannelError(error)))
@@ -298,12 +308,21 @@ fn monitor_thread() -> eyre::Result<()> {
                     }))?
                 }
 
-                Request::TakeRunner { profile, unique_id } => {
+                Request::TakeRunner {
+                    profile,
+                    unique_id,
+                    user,
+                    repo,
+                    run_id,
+                } => {
                     if let Some((&id, runner)) = runners.iter().find(|(_, runner)| {
                         runner.status() == Status::Idle && runner.base_vm_name() == profile
                     }) {
                         registrations_cache.invalidate();
-                        if runners.reserve_runner(id, &unique_id).is_ok() {
+                        if runners
+                            .reserve_runner(id, &unique_id, &user, &repo, &run_id)
+                            .is_ok()
+                        {
                             serde_json::to_string(&json!({
                                 "id": id,
                                 "runner": runner,

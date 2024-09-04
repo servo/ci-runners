@@ -131,7 +131,14 @@ impl Runners {
         }
     }
 
-    pub fn reserve_runner(&self, id: usize, unique_id: &str) -> eyre::Result<()> {
+    pub fn reserve_runner(
+        &self,
+        id: usize,
+        unique_id: &str,
+        user: &str,
+        repo: &str,
+        run_id: &str,
+    ) -> eyre::Result<()> {
         let Some(runner) = self.runners.get(&id) else {
             bail!("No runner with id exists: {id}");
         };
@@ -145,6 +152,7 @@ impl Runners {
         let exit_status = Command::new("../reserve-runner.sh")
             .arg(&registration.id.to_string())
             .arg(unique_id)
+            .arg(format!("{user}/{repo}/actions/runners/{run_id}"))
             .spawn()
             .unwrap()
             .wait()
