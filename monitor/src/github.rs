@@ -15,7 +15,6 @@ pub struct ApiRunner {
     pub id: usize,
     pub busy: bool,
     pub name: String,
-    pub os: String,
     pub status: String,
     pub labels: Vec<ApiRunnerLabel>,
 }
