@@ -299,18 +299,13 @@ fn monitor_thread() -> eyre::Result<()> {
                 }
 
                 Request::TakeRunner { profile, unique_id } => {
-                    let runner_id = runners
-                        .iter()
-                        .find(|(_, runner)| {
-                            runner.status() == Status::Idle && runner.base_vm_name() == profile
-                        })
-                        .map(|(&id, _)| id);
-                    if let Some(runner_id) = runner_id {
-                        let mut runners = runners;
-                        if runners.reserve_runner(runner_id, &unique_id).is_ok() {
-                            let runner = runners.get(runner_id);
+                    if let Some((&id, runner)) = runners.iter().find(|(_, runner)| {
+                        runner.status() == Status::Idle && runner.base_vm_name() == profile
+                    }) {
+                        registrations_cache.invalidate();
+                        if runners.reserve_runner(id, &unique_id).is_ok() {
                             serde_json::to_string(&json!({
-                                "id": runner_id,
+                                "id": id,
                                 "runner": runner,
                             }))?
                         } else {
