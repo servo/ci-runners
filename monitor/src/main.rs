@@ -40,6 +40,9 @@ static SETTINGS: LazyLock<Settings> = LazyLock::new(|| {
 enum Request {
     /// GET `/` => `{"profile_runner_counts": {}, "runners": []}`
     Status,
+
+    /// POST `/<profile>` => `...`
+    TakeRunner { profile: String },
 }
 #[derive(Debug)]
 struct ChannelError(eyre::Report);
@@ -75,7 +78,17 @@ async fn main() -> eyre::Result<()> {
             .map_err(|error| reject::custom(ChannelError(error)))
         });
 
-    let routes = status_route;
+    let take_runner_route = warp::path!(String)
+        .and(warp::filters::method::post())
+        .and_then(|profile| async {
+            || -> eyre::Result<String> {
+                REQUEST.sender.send(Request::TakeRunner { profile })?;
+                Ok(RESPONSE.receiver.recv()?)
+            }()
+            .map_err(|error| reject::custom(ChannelError(error)))
+        });
+
+    let routes = status_route.or(take_runner_route);
     let routes = routes
         .and(warp::filters::header::exact(
             "Authorization",
@@ -280,6 +293,20 @@ fn monitor_thread() -> eyre::Result<()> {
                         "profile_runner_counts": &profile_runner_counts,
                         "runners": &runners,
                     }))?
+                }
+
+                Request::TakeRunner { profile } => {
+                    if let Some((id, runner)) = runners.iter().find(|(_id, runner)| {
+                        runner.status() == Status::Idle && runner.base_vm_name() == profile
+                    }) {
+                        // TODO: reserve the runner
+                        serde_json::to_string(&json!({
+                            "id": id,
+                            "runner": runner,
+                        }))?
+                    } else {
+                        serde_json::to_string(&Option::<()>::None)?
+                    }
                 }
             };
 
