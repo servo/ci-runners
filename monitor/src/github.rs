@@ -1,13 +1,14 @@
 use std::{
-    env,
     fmt::Debug,
     process::{Command, Stdio},
-    time::{Duration, Instant},
+    time::Instant,
 };
 
 use jane_eyre::eyre::{self, Context};
 use log::trace;
 use serde::Deserialize;
+
+use crate::SETTINGS;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ApiRunner {
@@ -51,7 +52,7 @@ impl<Response: Clone + Debug> Cache<Response> {
     pub fn get(&mut self, miss: impl FnOnce() -> eyre::Result<Response>) -> eyre::Result<Response> {
         if let Some(cached) = &mut self.inner {
             let age = Instant::now().duration_since(cached.cached_at);
-            if age < api_cache_timeout() {
+            if age < SETTINGS.api_cache_timeout {
                 trace!("Cache hit ({age:?} seconds old): {:?}", cached.response);
                 return Ok(cached.response.clone());
             } else {
@@ -90,19 +91,10 @@ fn list_registered_runners() -> eyre::Result<Vec<ApiRunner>> {
 }
 
 pub fn list_registered_runners_for_host() -> eyre::Result<Vec<ApiRunner>> {
-    let suffix = format!("@{}", env::var("SERVO_CI_GITHUB_API_SUFFIX")?);
+    let suffix = format!("@{}", SETTINGS.github_api_suffix);
     let result = list_registered_runners()?
         .into_iter()
         .filter(|runner| runner.name.ends_with(&suffix));
 
     Ok(result.collect())
-}
-
-fn api_cache_timeout() -> Duration {
-    let result = env::var("SERVO_CI_API_CACHE_TIMEOUT")
-        .expect("SERVO_CI_API_CACHE_TIMEOUT not defined!")
-        .parse()
-        .expect("Failed to parse SERVO_CI_API_CACHE_TIMEOUT");
-
-    Duration::from_secs(result)
 }

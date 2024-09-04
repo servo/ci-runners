@@ -1,6 +1,5 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
-    env,
     fmt::Debug,
     fs,
     process::Command,
@@ -246,18 +245,4 @@ impl Runner {
             .map(|(_rest, base)| base)
             .next()
     }
-}
-
-pub fn start_timeout() -> u64 {
-    env::var("SERVO_CI_MONITOR_START_TIMEOUT")
-        .expect("SERVO_CI_MONITOR_START_TIMEOUT not defined!")
-        .parse()
-        .expect("Failed to parse SERVO_CI_MONITOR_START_TIMEOUT")
-}
-
-pub fn reserve_timeout() -> u64 {
-    env::var("SERVO_CI_MONITOR_RESERVE_TIMEOUT")
-        .expect("SERVO_CI_MONITOR_RESERVE_TIMEOUT not defined!")
-        .parse()
-        .expect("Failed to parse SERVO_CI_MONITOR_RESERVE_TIMEOUT")
 }

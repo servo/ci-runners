@@ -4,9 +4,10 @@ mod id;
 mod libvirt;
 mod profile;
 mod runner;
+mod settings;
 mod zfs;
 
-use std::{collections::BTreeMap, env, thread::sleep, time::Duration};
+use std::{collections::BTreeMap, sync::LazyLock, thread::sleep};
 
 use dotenv::dotenv;
 use jane_eyre::eyre;
@@ -17,14 +18,19 @@ use crate::{
     id::IdGen,
     libvirt::list_runner_guests,
     profile::{Profile, Profiles, RunnerCounts},
-    runner::{reserve_timeout, start_timeout, Runners, Status},
+    runner::{Runners, Status},
+    settings::Settings,
     zfs::list_runner_volumes,
 };
+
+static SETTINGS: LazyLock<Settings> = LazyLock::new(|| {
+    dotenv().expect("Failed to load variables from .env");
+    Settings::load()
+});
 
 fn main() -> eyre::Result<()> {
     jane_eyre::install()?;
     env_logger::init();
-    dotenv().expect("Failed to load variables from .env");
 
     let mut profiles = Profiles::default();
     profiles.insert(
@@ -108,7 +114,7 @@ fn main() -> eyre::Result<()> {
             runner.status() == Status::StartedOrCrashed
                 && runner
                     .age()
-                    .map_or(true, |age| age > Duration::from_secs(start_timeout()))
+                    .map_or(true, |age| age > SETTINGS.monitor_start_timeout)
         });
         let reserved_for_too_long = runners.iter().filter(|(_id, runner)| {
             runner.status() == Status::Reserved
@@ -116,9 +122,7 @@ fn main() -> eyre::Result<()> {
                     .reserved_since()
                     .ok()
                     .flatten()
-                    .map_or(true, |duration| {
-                        duration > Duration::from_secs(reserve_timeout())
-                    })
+                    .map_or(true, |duration| duration > SETTINGS.monitor_reserve_timeout)
         });
         let excess_idle_runners = profiles.iter().flat_map(|(_key, profile)| {
             profile
@@ -157,13 +161,6 @@ fn main() -> eyre::Result<()> {
         }
 
         // TODO: <https://serverfault.com/questions/523350> ?
-        sleep(Duration::from_secs(poll_interval()));
+        sleep(SETTINGS.monitor_poll_interval);
     }
-}
-
-pub fn poll_interval() -> u64 {
-    env::var("SERVO_CI_MONITOR_POLL_INTERVAL")
-        .expect("SERVO_CI_MONITOR_POLL_INTERVAL not defined!")
-        .parse()
-        .expect("Failed to parse SERVO_CI_MONITOR_POLL_INTERVAL")
 }

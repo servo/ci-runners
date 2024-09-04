@@ -1,12 +1,14 @@
 use std::{
-    env, fs,
+    fs,
     path::{Path, PathBuf},
 };
 
 use jane_eyre::eyre;
 
+use crate::SETTINGS;
+
 pub fn get_data_path(path: impl AsRef<Path>) -> eyre::Result<PathBuf> {
-    let data = if let Ok(path) = env::var("SERVO_CI_MONITOR_DATA_PATH") {
+    let data = if let Some(path) = &SETTINGS.monitor_data_path {
         path.into()
     } else {
         PathBuf::from("./data")

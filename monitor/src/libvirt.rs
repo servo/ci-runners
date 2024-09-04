@@ -1,10 +1,9 @@
 use core::str;
-use std::{
-    env,
-    process::{Command, Stdio},
-};
+use std::process::{Command, Stdio};
 
 use jane_eyre::eyre::{self, Context};
+
+use crate::SETTINGS;
 
 pub fn list_runner_guests() -> eyre::Result<Vec<String>> {
     let output = Command::new("../list-libvirt-guests.sh")
@@ -29,8 +28,5 @@ pub fn list_runner_guests() -> eyre::Result<Vec<String>> {
 }
 
 pub fn libvirt_prefix() -> String {
-    format!(
-        "{}-",
-        env::var("SERVO_CI_LIBVIRT_PREFIX").expect("SERVO_CI_LIBVIRT_PREFIX not defined!")
-    )
+    format!("{}-", SETTINGS.libvirt_prefix)
 }

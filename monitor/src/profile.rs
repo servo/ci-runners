@@ -1,9 +1,12 @@
-use std::{collections::BTreeMap, env, process::Command};
+use std::{collections::BTreeMap, process::Command};
 
 use jane_eyre::eyre;
 use log::info;
 
-use crate::runner::{Runner, Runners, Status};
+use crate::{
+    runner::{Runner, Runners, Status},
+    SETTINGS,
+};
 
 #[derive(Debug, Default)]
 pub struct Profiles {
@@ -117,9 +120,10 @@ impl Profile {
     }
 
     pub fn target_runner_count(&self) -> usize {
-        match env::var("SERVO_CI_DONT_CREATE_RUNNERS") {
-            Ok(_) => 0,
-            Err(_) => self.target_count,
+        if SETTINGS.dont_create_runners {
+            0
+        } else {
+            self.target_count
         }
     }
 
