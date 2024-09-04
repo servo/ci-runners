@@ -7,11 +7,17 @@ mod runner;
 mod settings;
 mod zfs;
 
-use std::{collections::BTreeMap, sync::LazyLock, thread::sleep};
+use std::{
+    collections::BTreeMap,
+    net::IpAddr,
+    sync::LazyLock,
+    thread::{self, sleep},
+};
 
 use dotenv::dotenv;
 use jane_eyre::eyre;
 use log::{info, trace, warn};
+use warp::Filter;
 
 use crate::{
     github::{list_registered_runners_for_host, Cache},
@@ -28,10 +34,28 @@ static SETTINGS: LazyLock<Settings> = LazyLock::new(|| {
     Settings::load()
 });
 
-fn main() -> eyre::Result<()> {
+#[tokio::main]
+async fn main() -> eyre::Result<()> {
     jane_eyre::install()?;
     env_logger::init();
 
+    thread::spawn(monitor_thread);
+
+    let routes = warp::any()
+        .and(warp::filters::header::exact(
+            "Authorization",
+            &SETTINGS.monitor_api_token_authorization_value,
+        ))
+        .map(|| "Hello, world!");
+
+    warp::serve(routes)
+        .run(("::1".parse::<IpAddr>()?, 8000))
+        .await;
+
+    Ok(())
+}
+
+fn monitor_thread() -> eyre::Result<()> {
     let mut profiles = Profiles::default();
     profiles.insert(
         "servo-windows10",

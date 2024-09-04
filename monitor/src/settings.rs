@@ -4,6 +4,9 @@ use std::{
 };
 
 pub struct Settings {
+    // GITHUB_TOKEN not used
+    // LIBVIRT_DEFAULT_URI not used
+    pub monitor_api_token_authorization_value: String,
     // SERVO_CI_GITHUB_API_SCOPE not used
     pub github_api_suffix: String,
     pub libvirt_prefix: String,
@@ -23,7 +26,13 @@ pub struct Settings {
 
 impl Settings {
     pub fn load() -> Self {
+        let monitor_api_token = env_string("SERVO_CI_MONITOR_API_TOKEN");
+        if monitor_api_token == "ChangeMe" {
+            panic!("SERVO_CI_MONITOR_API_TOKEN must be changed!");
+        }
+
         Self {
+            monitor_api_token_authorization_value: format!("Bearer {monitor_api_token}"),
             github_api_suffix: env_string("SERVO_CI_GITHUB_API_SUFFIX"),
             libvirt_prefix: env_string("SERVO_CI_LIBVIRT_PREFIX"),
             zfs_prefix: env_string("SERVO_CI_ZFS_PREFIX"),
