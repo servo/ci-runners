@@ -199,13 +199,14 @@ fn monitor_thread() -> eyre::Result<()> {
                 healthy,
                 started_or_crashed,
                 idle,
+                reserved,
                 busy,
                 excess_idle,
                 wanted,
             },
         ) in profile_runner_counts.iter()
         {
-            info!("profile {key}: {healthy}/{target} healthy runners ({busy} busy, {idle} idle, {started_or_crashed} started or crashed, {excess_idle} excess idle, {wanted} wanted)");
+            info!("profile {key}: {healthy}/{target} healthy runners ({idle} idle, {reserved} reserved, {busy} busy, {started_or_crashed} started or crashed, {excess_idle} excess idle, {wanted} wanted)");
         }
         for (_id, runner) in runners.iter() {
             runner.log_info();

@@ -29,6 +29,7 @@ pub struct RunnerCounts {
     pub healthy: usize,
     pub started_or_crashed: usize,
     pub idle: usize,
+    pub reserved: usize,
     pub busy: usize,
     pub excess_idle: usize,
     pub wanted: usize,
@@ -115,6 +116,7 @@ impl Profile {
             healthy: self.healthy_runner_count(runners),
             started_or_crashed: self.started_or_crashed_runner_count(runners),
             idle: self.idle_runner_count(runners),
+            reserved: self.reserved_runner_count(runners),
             busy: self.busy_runner_count(runners),
             excess_idle: self.excess_idle_runner_count(runners),
             wanted: self.wanted_runner_count(runners),
@@ -132,6 +134,7 @@ impl Profile {
     pub fn healthy_runner_count(&self, runners: &Runners) -> usize {
         self.started_or_crashed_runner_count(runners)
             + self.idle_runner_count(runners)
+            + self.reserved_runner_count(runners)
             + self.busy_runner_count(runners)
     }
 
@@ -144,6 +147,12 @@ impl Profile {
     pub fn idle_runner_count(&self, runners: &Runners) -> usize {
         self.runners(runners)
             .filter(|(_id, runner)| runner.status() == Status::Idle)
+            .count()
+    }
+
+    pub fn reserved_runner_count(&self, runners: &Runners) -> usize {
+        self.runners(runners)
+            .filter(|(_id, runner)| runner.status() == Status::Reserved)
             .count()
     }
 
