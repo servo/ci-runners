@@ -41,8 +41,8 @@ enum Request {
     /// GET `/` => `{"profile_runner_counts": {}, "runners": []}`
     Status,
 
-    /// POST `/<profile>` => `...`
-    TakeRunner { profile: String },
+    /// POST `/<profile>/<unique id>` => `...`
+    TakeRunner { profile: String, unique_id: String },
 }
 #[derive(Debug)]
 struct ChannelError(eyre::Report);
@@ -78,11 +78,13 @@ async fn main() -> eyre::Result<()> {
             .map_err(|error| reject::custom(ChannelError(error)))
         });
 
-    let take_runner_route = warp::path!(String)
+    let take_runner_route = warp::path!(String / String)
         .and(warp::filters::method::post())
-        .and_then(|profile| async {
+        .and_then(|profile, unique_id| async {
             || -> eyre::Result<String> {
-                REQUEST.sender.send(Request::TakeRunner { profile })?;
+                REQUEST
+                    .sender
+                    .send(Request::TakeRunner { profile, unique_id })?;
                 Ok(RESPONSE.receiver.recv()?)
             }()
             .map_err(|error| reject::custom(ChannelError(error)))
@@ -295,16 +297,27 @@ fn monitor_thread() -> eyre::Result<()> {
                     }))?
                 }
 
-                Request::TakeRunner { profile } => {
-                    if let Some((id, runner)) = runners.iter().find(|(_id, runner)| {
-                        runner.status() == Status::Idle && runner.base_vm_name() == profile
-                    }) {
-                        // TODO: reserve the runner
-                        serde_json::to_string(&json!({
-                            "id": id,
-                            "runner": runner,
-                        }))?
+                Request::TakeRunner { profile, unique_id } => {
+                    let runner_id = runners
+                        .iter()
+                        .find(|(_, runner)| {
+                            runner.status() == Status::Idle && runner.base_vm_name() == profile
+                        })
+                        .map(|(&id, _)| id);
+                    if let Some(runner_id) = runner_id {
+                        let mut runners = runners;
+                        if runners.reserve_runner(runner_id, &unique_id).is_ok() {
+                            let runner = runners.get(runner_id);
+                            serde_json::to_string(&json!({
+                                "id": runner_id,
+                                "runner": runner,
+                            }))?
+                        } else {
+                            // TODO: send error when reservation fails
+                            serde_json::to_string(&Option::<()>::None)?
+                        }
                     } else {
+                        // TODO: send error when no runners available
                         serde_json::to_string(&Option::<()>::None)?
                     }
                 }

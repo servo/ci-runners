@@ -24,6 +24,11 @@ pub struct ApiRunnerLabel {
     pub name: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct PostLabelsResponse {
+    pub labels: Vec<ApiRunnerLabel>,
+}
+
 impl ApiRunner {
     pub fn labels(&self) -> impl Iterator<Item = &str> {
         self.labels.iter().map(|label| label.name.as_str())

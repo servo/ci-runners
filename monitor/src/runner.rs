@@ -2,16 +2,20 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Debug,
     fs,
-    process::Command,
+    process::{Command, Stdio},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use itertools::Itertools;
-use jane_eyre::eyre::{self, bail};
+use jane_eyre::eyre::{self, bail, Context};
 use log::{info, trace, warn};
 use serde::Serialize;
 
-use crate::{data::get_runner_data_path, github::ApiRunner, libvirt::libvirt_prefix};
+use crate::{
+    data::get_runner_data_path,
+    github::{ApiRunner, ApiRunnerLabel, PostLabelsResponse},
+    libvirt::libvirt_prefix,
+};
 
 #[derive(Debug, Serialize)]
 pub struct Runners {
@@ -106,6 +110,10 @@ impl Runners {
         self.runners.iter()
     }
 
+    pub fn get(&self, id: usize) -> Option<&Runner> {
+        self.runners.get(&id)
+    }
+
     pub fn unregister_runner(&self, id: usize) -> eyre::Result<()> {
         let Some(registration) = self
             .runners
@@ -129,6 +137,36 @@ impl Runners {
         } else {
             eyre::bail!("Command exited with status {}", exit_status);
         }
+    }
+
+    pub fn reserve_runner(&mut self, id: usize, unique_id: &str) -> eyre::Result<()> {
+        let Some(runner) = self.runners.get_mut(&id) else {
+            bail!("No runner with id exists: {id}");
+        };
+        let Some(registration) = runner.registration() else {
+            bail!("Tried to reserve an unregistered runner");
+        };
+        info!(
+            "Reserving runner {id} with GitHub API runner id {}",
+            registration.id
+        );
+        let output = Command::new("../reserve-runner.sh")
+            .arg(&registration.id.to_string())
+            .arg(unique_id)
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap()
+            .wait_with_output()
+            .unwrap();
+        if output.status.success() {
+            let response: PostLabelsResponse =
+                serde_json::from_slice(&output.stdout).wrap_err("Failed to parse JSON")?;
+            runner.mark_as_reserved(response.labels);
+        } else {
+            eyre::bail!("Command exited with status {}", output.status);
+        }
+
+        Ok(())
     }
 }
 
@@ -245,5 +283,14 @@ impl Runner {
             .flat_map(|(rest, _id)| rest.rsplit_once('/'))
             .map(|(_rest, base)| base)
             .next()
+    }
+
+    fn mark_as_reserved(&mut self, new_github_labels: Vec<ApiRunnerLabel>) {
+        assert_eq!(self.status(), Status::Idle);
+        let Some(registration) = &mut self.registration else {
+            unreachable!("Guaranteed by assert_eq!()")
+        };
+        registration.labels = new_github_labels;
+        assert_eq!(self.status(), Status::Reserved);
     }
 }
