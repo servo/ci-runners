@@ -44,13 +44,33 @@ fn main() -> eyre::Result<()> {
         },
     );
     profiles.insert(
+        "servo-windows10.new",
+        Profile {
+            configuration_name: "windows10".to_owned(),
+            base_vm_name: "servo-windows10.new".to_owned(),
+            base_image_snapshot: "ready".to_owned(),
+            github_runner_label: "self-hosted-image:windows10.new".to_owned(),
+            target_count: 0,
+        },
+    );
+    profiles.insert(
         "servo-ubuntu2204",
         Profile {
             configuration_name: "ubuntu2204".to_owned(),
             base_vm_name: "servo-ubuntu2204".to_owned(),
             base_image_snapshot: "ready".to_owned(),
             github_runner_label: "self-hosted-image:ubuntu2204".to_owned(),
-            target_count: 2,
+            target_count: 1,
+        },
+    );
+    profiles.insert(
+        "servo-ubuntu2204.new",
+        Profile {
+            configuration_name: "ubuntu2204".to_owned(),
+            base_vm_name: "servo-ubuntu2204.new".to_owned(),
+            base_image_snapshot: "ready".to_owned(),
+            github_runner_label: "self-hosted-image:ubuntu2204.new".to_owned(),
+            target_count: 0,
         },
     );
 
