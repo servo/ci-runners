@@ -87,4 +87,41 @@
     enable = true;
     ignoreIP = ["144.6.0.0/16" "2403:5808::/29"];
   };
+
+  security.acme = {
+    acceptTerms = true;
+    certs."ci0.servo.org" = {
+      email = "dazabani@igalia.com";
+      webroot = "/var/lib/acme/acme-challenge";
+    };
+  };
+  users.users.nginx.extraGroups = [ "acme" ];
+  services.nginx = {
+    enable = true;
+    # logError = "stderr notice";
+    recommendedProxySettings = true;
+    virtualHosts = let
+      proxy = {
+        extraConfig = ''
+            # https://github.com/curl/curl/issues/674
+            # https://trac.nginx.org/nginx/ticket/915
+            proxy_hide_header Upgrade;
+        '';
+      };
+      ssl = {
+        useACMEHost = "ci0.servo.org";
+        forceSSL = true;
+      };
+    in {
+      "\"\"" = {
+        locations."/" = proxy // {
+          proxyPass = "http://[::1]:8000";
+        };
+      } // ssl;
+    };
+  };
+
+  networking.firewall.allowedTCPPorts = [
+    80 443  # nginx
+  ];
 }
