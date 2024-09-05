@@ -1,0 +1,16 @@
+<network xmlns:dnsmasq="http://libvirt.org/schemas/network/dnsmasq/1.0">
+  <name>cinet</name>
+  <uuid>f606b6fd-b1e9-452f-a491-85ec319f34de</uuid>
+  <forward mode="nat"/>
+  <bridge name="cinet" stp="on" delay="0"/>
+  <mac address="52:54:00:c3:0f:3e"/>
+  <ip address="192.168.100.1" netmask="255.255.255.0">
+    <dhcp>
+      <range start="192.168.100.100" end="192.168.100.199"/>
+    </dhcp>
+  </ip>
+  <dnsmasq:options>
+    <!-- servo/ci-runners#2; <https://gitlab.com/libvirt/libvirt/-/issues/249> -->
+    <dnsmasq:option value="dhcp-ignore-clid"/>
+  </dnsmasq:options>
+</network>

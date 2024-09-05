@@ -50,20 +50,6 @@ $ git clone https://github.com/servo/ci-runners.git /config
 $ /config/server/update.sh /config/server/nixos
 ```
 
-To set up libvirt:
-
-- Connect via virt-manager on another machine
-    - File > Add Connection…
-        - \> Hypervisor: QEMU/KVM
-        - \> Connect to remote host over SSH
-        - \> Username: root
-        - \> Hostname: ci0.servo.org
-        - \> Connect
-- Configure and start the “default” network for NAT
-    - Edit > Connection Details > Virtual Networks > default
-        - \> Autostart: On Boot
-        - \> Start Network
-
 To get a GITHUB_TOKEN for the monitor service:
 
 - [Create](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) a [fine-grained personal access token](https://github.com/settings/personal-access-tokens/new)
@@ -77,9 +63,13 @@ To get a GITHUB_TOKEN for the monitor service:
 To set up the monitor service, run the following:
 
 ```
-$ rustup default stable
 $ zfs create tank/base
 $ zfs create tank/ci
+$ virsh net-define cinet.xml
+$ virsh net-autostart cinet
+$ virsh net-start cinet
+
+$ rustup default stable
 $ git clone https://github.com/servo/servo.git ~/servo
 $ cp /config/.env.example /config/.env
 $ vim /config/.env
