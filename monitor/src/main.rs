@@ -7,13 +7,15 @@ mod runner;
 mod settings;
 mod zfs;
 
-use std::{collections::BTreeMap, net::IpAddr, sync::LazyLock, thread};
+use std::{
+    collections::BTreeMap, net::IpAddr, process::exit, sync::LazyLock, thread, time::Duration,
+};
 
 use crossbeam_channel::{Receiver, Sender};
 use dotenv::dotenv;
 use http::StatusCode;
 use jane_eyre::eyre;
-use log::{info, trace, warn};
+use log::{error, info, trace, warn};
 use serde_json::json;
 use warp::{
     reject::{self, Reject, Rejection},
@@ -72,14 +74,34 @@ async fn main() -> eyre::Result<()> {
     jane_eyre::install()?;
     env_logger::init();
 
-    thread::spawn(monitor_thread);
+    tokio::task::spawn(async move {
+        let thread = thread::spawn(monitor_thread);
+        loop {
+            if thread.is_finished() {
+                match thread.join() {
+                    Ok(Ok(())) => {
+                        info!("Monitor thread exited");
+                        exit(0);
+                    }
+                    Ok(Err(report)) => error!("Monitor thread error: {report}"),
+                    Err(panic) => error!("Monitor thread panic: {panic:?}"),
+                };
+                exit(1);
+            }
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
+    });
 
     let status_route = warp::path!()
         .and(warp::filters::method::get())
         .and_then(|| async {
             || -> eyre::Result<String> {
-                REQUEST.sender.send(Request::Status)?;
-                Ok(RESPONSE.receiver.recv()?)
+                REQUEST
+                    .sender
+                    .send_timeout(Request::Status, SETTINGS.monitor_thread_send_timeout)?;
+                Ok(RESPONSE
+                    .receiver
+                    .recv_timeout(SETTINGS.monitor_thread_recv_timeout)?)
             }()
             .map_err(|error| reject::custom(ChannelError(error)))
         });
@@ -88,14 +110,19 @@ async fn main() -> eyre::Result<()> {
         .and(warp::filters::method::post())
         .and_then(|profile, unique_id, user, repo, run_id| async {
             || -> eyre::Result<String> {
-                REQUEST.sender.send(Request::TakeRunner {
-                    profile,
-                    unique_id,
-                    user,
-                    repo,
-                    run_id,
-                })?;
-                Ok(RESPONSE.receiver.recv()?)
+                REQUEST.sender.send_timeout(
+                    Request::TakeRunner {
+                        profile,
+                        unique_id,
+                        user,
+                        repo,
+                        run_id,
+                    },
+                    SETTINGS.monitor_thread_send_timeout,
+                )?;
+                Ok(RESPONSE
+                    .receiver
+                    .recv_timeout(SETTINGS.monitor_thread_recv_timeout)?)
             }()
             .map_err(|error| reject::custom(ChannelError(error)))
         });

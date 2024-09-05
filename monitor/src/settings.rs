@@ -18,6 +18,8 @@ pub struct Settings {
     pub api_cache_timeout: Duration,
     pub monitor_start_timeout: Duration,
     pub monitor_reserve_timeout: Duration,
+    pub monitor_thread_send_timeout: Duration,
+    pub monitor_thread_recv_timeout: Duration,
     // SERVO_CI_DONT_REGISTER_RUNNERS not used
     pub dont_create_runners: bool,
     // SERVO_CI_MAIN_REPO_PATH not used
@@ -41,6 +43,8 @@ impl Settings {
             api_cache_timeout: env_duration_secs("SERVO_CI_API_CACHE_TIMEOUT"),
             monitor_start_timeout: env_duration_secs("SERVO_CI_MONITOR_START_TIMEOUT"),
             monitor_reserve_timeout: env_duration_secs("SERVO_CI_MONITOR_RESERVE_TIMEOUT"),
+            monitor_thread_send_timeout: env_duration_secs("SERVO_CI_MONITOR_THREAD_SEND_TIMEOUT"),
+            monitor_thread_recv_timeout: env_duration_secs("SERVO_CI_MONITOR_THREAD_RECV_TIMEOUT"),
             dont_create_runners: env_bool("SERVO_CI_DONT_CREATE_RUNNERS"),
         }
     }
