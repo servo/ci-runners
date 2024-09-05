@@ -136,6 +136,7 @@ impl Profile {
             + self.idle_runner_count(runners)
             + self.reserved_runner_count(runners)
             + self.busy_runner_count(runners)
+            + self.done_or_unregistered_runner_count(runners)
     }
 
     pub fn started_or_crashed_runner_count(&self, runners: &Runners) -> usize {
@@ -159,6 +160,12 @@ impl Profile {
     pub fn busy_runner_count(&self, runners: &Runners) -> usize {
         self.runners(runners)
             .filter(|(_id, runner)| runner.status() == Status::Busy)
+            .count()
+    }
+
+    pub fn done_or_unregistered_runner_count(&self, runners: &Runners) -> usize {
+        self.runners(runners)
+            .filter(|(_id, runner)| runner.status() == Status::DoneOrUnregistered)
             .count()
     }
 
