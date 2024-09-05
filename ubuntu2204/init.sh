@@ -21,8 +21,8 @@ export HOME=/root
 # taplo-cli -> openssl-sys -> openssl.pc
 sudo apt install -y libssl-dev
 
-# linux.yml -> xvfb-run
-sudo apt install -y xvfb
+# linux.yml -> xvfb-run, python
+sudo apt install -y xvfb python-is-python3
 
 if ! [ -e /init/built_servo_once_successfully ]; then
     cd /a/servo/servo
