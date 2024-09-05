@@ -189,7 +189,7 @@ fn monitor_thread() -> eyre::Result<()> {
             base_vm_name: "servo-ubuntu2204".to_owned(),
             base_image_snapshot: "ready".to_owned(),
             github_runner_label: "self-hosted-image:ubuntu2204".to_owned(),
-            target_count: 1,
+            target_count: 2,
         },
     );
     profiles.insert(
