@@ -61,6 +61,7 @@
     htop
     jq
     ntfs3g
+    ripgrep
     rustup
     tmux
     unzip
