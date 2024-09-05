@@ -259,7 +259,9 @@ fn monitor_thread() -> eyre::Result<()> {
             .filter(|(_id, runner)| runner.status() == Status::Invalid);
         let done_or_unregistered = runners
             .iter()
-            .filter(|(_id, runner)| runner.status() == Status::DoneOrUnregistered);
+            .filter(|(_id, runner)| runner.status() == Status::DoneOrUnregistered)
+            // Don’t destroy unregistered runners if we aren’t registering them in the first place.
+            .filter(|_| !SETTINGS.dont_register_runners);
         let started_or_crashed_and_too_old = runners.iter().filter(|(_id, runner)| {
             runner.status() == Status::StartedOrCrashed
                 && runner
