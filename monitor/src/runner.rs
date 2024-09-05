@@ -152,7 +152,7 @@ impl Runners {
         let exit_status = Command::new("../reserve-runner.sh")
             .arg(&registration.id.to_string())
             .arg(unique_id)
-            .arg(format!("{user}/{repo}/actions/runners/{run_id}"))
+            .arg(format!("{user}/{repo}/actions/runs/{run_id}"))
             .spawn()
             .unwrap()
             .wait()
