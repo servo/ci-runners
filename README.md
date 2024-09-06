@@ -178,6 +178,25 @@ To clone and start a new runner:
 $ ./create-runner.sh servo-ubuntu2204 ready ubuntu2204
 ```
 
+macOS 13 runner (wip)
+---------------------
+
+- Clone the OSX-KVM repo: `git clone https://github.com/kholia/OSX-KVM.git /var/lib/libvirt/images/OSX-KVM`
+- Create zvol and libvirt guest with random UUID and MAC address
+    - `zfs create -V 90G tank/base/servo-macos13.clean`
+    - `virsh define macos13.xml`
+    - `virt-clone --preserve-data --check path_in_use=off -o servo-macos13.init -n servo-macos13.clean --nvram /var/lib/libvirt/images/OSX-KVM/OVMF_VARS.servo-macos13.clean.fd -f /var/lib/libvirt/images/OSX-KVM/OpenCore/OpenCore.qcow2 -f /dev/zvol/tank/base/servo-macos13.clean -f /var/lib/libvirt/images/OSX-KVM/BaseSystem.img`
+    - `cp /var/lib/libvirt/images/OSX-KVM/{OVMF_VARS-1920x1080.fd,OVMF_VARS.servo-macos13.clean.fd}`
+    - `virsh undefine --keep-nvram servo-macos13.init`
+        - TODO: improve per-vm nvram management
+    - `virsh start servo-macos13.clean`
+- Install macOS
+    - **Select Your Time Zone** > **Closest City:** = UTC - United Kingdom
+    - Uncheck **Share Mac Analytics with Apple**
+    - Quit the **Keyboard Setup Assistant**
+    - Once installed, click **Apple** > **Shut Down...**
+        - Uncheck **Reopen windows when logging back in**
+
 Baking new images after deployment
 ----------------------------------
 
