@@ -27,6 +27,13 @@
     interface = "eth0";
   };
 
+  # Pin nixpkgs flakeref to match our NixOS config, to avoid constantly fetching unstable packages.
+  # <https://discourse.nixos.org/t/how-to-pin-nix-registry-nixpkgs-to-release-channel/14883/7>
+  nix.registry.nixpkgs.to = { type = "path"; path = pkgs.path; };
+
+  # Pin nixpkgs channel to nixpkgs flakeref.
+  nix.nixPath = ["nixpkgs=flake:nixpkgs"];
+
   # First version of NixOS ever installed with this config.
   system.stateVersion = "24.11";
 
