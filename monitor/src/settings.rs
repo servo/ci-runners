@@ -20,6 +20,7 @@ pub struct Settings {
     pub monitor_reserve_timeout: Duration,
     pub monitor_thread_send_timeout: Duration,
     pub monitor_thread_recv_timeout: Duration,
+    pub destroy_all_non_busy_runners: bool,
     pub dont_register_runners: bool,
     pub dont_create_runners: bool,
     // SERVO_CI_MAIN_REPO_PATH not used
@@ -45,6 +46,7 @@ impl Settings {
             monitor_reserve_timeout: env_duration_secs("SERVO_CI_MONITOR_RESERVE_TIMEOUT"),
             monitor_thread_send_timeout: env_duration_secs("SERVO_CI_MONITOR_THREAD_SEND_TIMEOUT"),
             monitor_thread_recv_timeout: env_duration_secs("SERVO_CI_MONITOR_THREAD_RECV_TIMEOUT"),
+            destroy_all_non_busy_runners: env_bool("SERVO_CI_DESTROY_ALL_NON_BUSY_RUNNERS"),
             dont_register_runners: env_bool("SERVO_CI_DONT_REGISTER_RUNNERS"),
             dont_create_runners: env_bool("SERVO_CI_DONT_CREATE_RUNNERS"),
         }

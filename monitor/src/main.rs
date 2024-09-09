@@ -28,7 +28,7 @@ use crate::{
     id::IdGen,
     libvirt::list_runner_guests,
     profile::{Profile, Profiles, RunnerCounts},
-    runner::{Runners, Status},
+    runner::{Runner, Runners, Status},
     settings::Settings,
     zfs::list_runner_volumes,
 };
@@ -249,44 +249,7 @@ fn monitor_thread() -> eyre::Result<()> {
             runner.log_info();
         }
 
-        // Invalid => unregister and destroy
-        // DoneOrUnregistered => destroy (no need to unregister)
-        // StartedOrCrashed and too old => unregister and destroy
-        // Reserved for too long => unregister and destroy
-        // Idle or Busy => bleed off excess Idle runners
-        let invalid = runners
-            .iter()
-            .filter(|(_id, runner)| runner.status() == Status::Invalid);
-        let done_or_unregistered = runners
-            .iter()
-            .filter(|(_id, runner)| runner.status() == Status::DoneOrUnregistered)
-            // Don’t destroy unregistered runners if we aren’t registering them in the first place.
-            .filter(|_| !SETTINGS.dont_register_runners);
-        let started_or_crashed_and_too_old = runners.iter().filter(|(_id, runner)| {
-            runner.status() == Status::StartedOrCrashed
-                && runner
-                    .age()
-                    .map_or(true, |age| age > SETTINGS.monitor_start_timeout)
-        });
-        let reserved_for_too_long = runners.iter().filter(|(_id, runner)| {
-            runner.status() == Status::Reserved
-                && runner
-                    .reserved_since()
-                    .ok()
-                    .flatten()
-                    .map_or(true, |duration| duration > SETTINGS.monitor_reserve_timeout)
-        });
-        let excess_idle_runners = profiles.iter().flat_map(|(_key, profile)| {
-            profile
-                .idle_runners(&runners)
-                .take(profile.excess_idle_runner_count(&runners))
-        });
-        for (&id, runner) in invalid
-            .chain(done_or_unregistered)
-            .chain(started_or_crashed_and_too_old)
-            .chain(reserved_for_too_long)
-            .chain(excess_idle_runners)
-        {
+        let mut unregister_and_destroy = |id, runner: &Runner| {
             if runner.registration().is_some() {
                 if let Err(error) = runners.unregister_runner(id) {
                     warn!("Failed to unregister runner: {error}");
@@ -298,17 +261,67 @@ fn monitor_thread() -> eyre::Result<()> {
                 }
             }
             registrations_cache.invalidate();
-        }
+        };
 
-        let profile_wanted_counts = profiles
-            .iter()
-            .map(|(_key, profile)| (profile, profile.wanted_runner_count(&runners)));
-        for (profile, wanted_count) in profile_wanted_counts {
-            for _ in 0..wanted_count {
-                if let Err(error) = profile.create_runner(id_gen.next()) {
-                    warn!("Failed to create runner: {error}");
+        if SETTINGS.destroy_all_non_busy_runners {
+            let non_busy_runners = runners
+                .iter()
+                .filter(|(_id, runner)| runner.status() != Status::Busy);
+            for (&id, runner) in non_busy_runners {
+                unregister_and_destroy(id, runner);
+            }
+        } else {
+            // Invalid => unregister and destroy
+            // DoneOrUnregistered => destroy (no need to unregister)
+            // StartedOrCrashed and too old => unregister and destroy
+            // Reserved for too long => unregister and destroy
+            // Idle or Busy => bleed off excess Idle runners
+            let invalid = runners
+                .iter()
+                .filter(|(_id, runner)| runner.status() == Status::Invalid);
+            let done_or_unregistered = runners
+                .iter()
+                .filter(|(_id, runner)| runner.status() == Status::DoneOrUnregistered)
+                // Don’t destroy unregistered runners if we aren’t registering them in the first place.
+                .filter(|_| !SETTINGS.dont_register_runners);
+            let started_or_crashed_and_too_old = runners.iter().filter(|(_id, runner)| {
+                runner.status() == Status::StartedOrCrashed
+                    && runner
+                        .age()
+                        .map_or(true, |age| age > SETTINGS.monitor_start_timeout)
+            });
+            let reserved_for_too_long = runners.iter().filter(|(_id, runner)| {
+                runner.status() == Status::Reserved
+                    && runner
+                        .reserved_since()
+                        .ok()
+                        .flatten()
+                        .map_or(true, |duration| duration > SETTINGS.monitor_reserve_timeout)
+            });
+            let excess_idle_runners = profiles.iter().flat_map(|(_key, profile)| {
+                profile
+                    .idle_runners(&runners)
+                    .take(profile.excess_idle_runner_count(&runners))
+            });
+            for (&id, runner) in invalid
+                .chain(done_or_unregistered)
+                .chain(started_or_crashed_and_too_old)
+                .chain(reserved_for_too_long)
+                .chain(excess_idle_runners)
+            {
+                unregister_and_destroy(id, runner);
+            }
+
+            let profile_wanted_counts = profiles
+                .iter()
+                .map(|(_key, profile)| (profile, profile.wanted_runner_count(&runners)));
+            for (profile, wanted_count) in profile_wanted_counts {
+                for _ in 0..wanted_count {
+                    if let Err(error) = profile.create_runner(id_gen.next()) {
+                        warn!("Failed to create runner: {error}");
+                    }
+                    registrations_cache.invalidate();
                 }
-                registrations_cache.invalidate();
             }
         }
 
