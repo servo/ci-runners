@@ -181,6 +181,8 @@ $ ./create-runner.sh servo-ubuntu2204 ready ubuntu2204
 macOS 13 runner (wip)
 ---------------------
 
+To build the base vm, first build a clean image:
+
 - Clone the OSX-KVM repo: `git clone https://github.com/kholia/OSX-KVM.git /var/lib/libvirt/images/OSX-KVM`
 - Create zvol and libvirt guest with random UUID and MAC address
     - `zfs create -V 90G tank/base/servo-macos13.clean`
@@ -191,11 +193,28 @@ macOS 13 runner (wip)
         - TODO: improve per-vm nvram management
     - `virsh start servo-macos13.clean`
 - Install macOS
+    - At the boot menu, choose **macOS Base System**
+    - **Utilities** > **Terminal**
+        - `diskutil list | grep GB` and find the `diskN` line that is around 96.6 GB
+        - `diskutil partitionDisk diskN 2 GPT  ExFAT a 60G  APFS macOS 0G`
+    - Quit Terminal
+    - **Reinstall macOS Ventura**
+    - Shut down the guest when you see **Select Your Country or Region**: `virsh shutdown servo-macos13.clean`
+- Take a snapshot: `zfs snapshot tank/base/servo-macos13.clean@fresh-install`
+- Boot base vm guest: `virsh start servo-macos13.clean`
+    - **Select Your Country or Region** = United States
+    - **Migration Assistant** = Not Now
+    - **Sign In with Your Apple ID** = Set Up Later
+    - **Full name** = `servo`
+    - **Account name** = `servo`
+    - **Password** = `servo2024!`
+    - **Enable Location Services** = Continue, Don’t Use
     - **Select Your Time Zone** > **Closest City:** = UTC - United Kingdom
     - Uncheck **Share Mac Analytics with Apple**
+    - **Screen Time** = Set Up Later
     - Quit the **Keyboard Setup Assistant**
-    - Once installed, click **Apple** > **Shut Down...**
-        - Uncheck **Reopen windows when logging back in**
+    - Once installed, shut down the guest: `virsh shutdown servo-macos13.clean`
+- Take another snapshot: `zfs snapshot tank/base/servo-macos13.clean@oobe`
 
 Baking new images after deployment
 ----------------------------------
