@@ -94,6 +94,10 @@ async fn main() -> eyre::Result<()> {
 
     let status_route = warp::path!()
         .and(warp::filters::method::get())
+        .and(warp::filters::header::exact(
+            "Authorization",
+            &SETTINGS.monitor_api_token_authorization_value,
+        ))
         .and_then(|| async {
             || -> eyre::Result<String> {
                 REQUEST
@@ -108,6 +112,10 @@ async fn main() -> eyre::Result<()> {
 
     let take_runner_route = warp::path!(String / String / String / String / String)
         .and(warp::filters::method::post())
+        .and(warp::filters::header::exact(
+            "Authorization",
+            &SETTINGS.monitor_api_token_authorization_value,
+        ))
         .and_then(|profile, unique_id, user, repo, run_id| async {
             || -> eyre::Result<String> {
                 REQUEST.sender.send_timeout(
@@ -128,12 +136,7 @@ async fn main() -> eyre::Result<()> {
         });
 
     let routes = status_route.or(take_runner_route);
-    let routes = routes
-        .and(warp::filters::header::exact(
-            "Authorization",
-            &SETTINGS.monitor_api_token_authorization_value,
-        ))
-        .recover(recover);
+    let routes = routes.recover(recover);
 
     warp::serve(routes)
         .run(("::1".parse::<IpAddr>()?, 8000))
