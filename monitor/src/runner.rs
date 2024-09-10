@@ -207,6 +207,12 @@ impl Runner {
                     registration.labels().join(","),
                 );
             }
+            if let Some(workflow_run) = registration.label_with_key("reserved-by") {
+                info!(
+                    "[{}] - workflow run page: https://github.com/{}",
+                    self.id, workflow_run
+                );
+            }
         }
     }
 
