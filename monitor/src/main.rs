@@ -8,13 +8,18 @@ mod settings;
 mod zfs;
 
 use std::{
-    collections::BTreeMap, net::IpAddr, process::exit, sync::LazyLock, thread, time::Duration,
+    collections::BTreeMap,
+    net::IpAddr,
+    process::exit,
+    sync::{LazyLock, RwLock},
+    thread,
+    time::Duration,
 };
 
 use crossbeam_channel::{Receiver, Sender};
 use dotenv::dotenv;
 use http::StatusCode;
-use jane_eyre::eyre;
+use jane_eyre::eyre::{self, eyre};
 use log::{error, info, trace, warn};
 use serde_json::json;
 use warp::{
@@ -38,11 +43,11 @@ static SETTINGS: LazyLock<Settings> = LazyLock::new(|| {
     Settings::load()
 });
 
+/// GET `/` => `{"profile_runner_counts": {}, "runners": []}`
+static STATUS: RwLock<Option<String>> = RwLock::new(None);
+
 #[derive(Debug)]
 enum Request {
-    /// GET `/` => `{"profile_runner_counts": {}, "runners": []}`
-    Status,
-
     /// POST `/<profile>/<unique id>/<user>/<repo>/<run id>` => `{"id", "runner"}` | `null`
     TakeRunner {
         profile: String,
@@ -52,6 +57,10 @@ enum Request {
         run_id: String,
     },
 }
+
+#[derive(Debug)]
+struct NotReadyError(eyre::Report);
+impl Reject for NotReadyError {}
 #[derive(Debug)]
 struct ChannelError(eyre::Report);
 impl Reject for ChannelError {}
@@ -94,20 +103,17 @@ async fn main() -> eyre::Result<()> {
 
     let status_route = warp::path!()
         .and(warp::filters::method::get())
-        .and(warp::filters::header::exact(
-            "Authorization",
-            &SETTINGS.monitor_api_token_authorization_value,
-        ))
         .and_then(|| async {
-            || -> eyre::Result<String> {
-                REQUEST
-                    .sender
-                    .send_timeout(Request::Status, SETTINGS.monitor_thread_send_timeout)?;
-                Ok(RESPONSE
-                    .receiver
-                    .recv_timeout(SETTINGS.monitor_thread_recv_timeout)?)
-            }()
-            .map_err(|error| reject::custom(ChannelError(error)))
+            STATUS
+                .try_read()
+                .ok()
+                .map(|x| x.clone())
+                .flatten()
+                .ok_or_else(|| {
+                    reject::custom(NotReadyError(eyre!(
+                        "Monitor thread is still starting or not responding"
+                    )))
+                })
         });
 
     let take_runner_route = warp::path!(String / String / String / String / String)
@@ -146,7 +152,9 @@ async fn main() -> eyre::Result<()> {
 }
 
 async fn recover(error: Rejection) -> Result<impl Reply, std::convert::Infallible> {
-    Ok(if let Some(error) = error.find::<ChannelError>() {
+    Ok(if let Some(error) = error.find::<NotReadyError>() {
+        reply::with_status(format!("{}", error.0), StatusCode::SERVICE_UNAVAILABLE)
+    } else if let Some(error) = error.find::<ChannelError>() {
         reply::with_status(
             format!("Channel error: {}", error.0),
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -328,6 +336,22 @@ fn monitor_thread() -> eyre::Result<()> {
             }
         }
 
+        // Update status, for the API.
+        if let Ok(mut status) = STATUS.write() {
+            *status = Some(serde_json::to_string(&json!({
+                "profile_runner_counts": &profile_runner_counts,
+                "runners": &runners
+                    .iter()
+                    .map(|(id, runner)| {
+                        json!({
+                            "id": id,
+                            "runner": runner,
+                        })
+                    })
+                    .collect::<Vec<_>>(),
+            }))?);
+        }
+
         // Handle one request from the API.
         if let Ok(request) = REQUEST
             .receiver
@@ -336,23 +360,6 @@ fn monitor_thread() -> eyre::Result<()> {
             info!("Received API request: {request:?}");
 
             let response = match request {
-                Request::Status => {
-                    let runners = runners
-                        .iter()
-                        .map(|(id, runner)| {
-                            json!({
-                                "id": id,
-                                "runner": runner,
-                            })
-                        })
-                        .collect::<Vec<_>>();
-
-                    serde_json::to_string(&json!({
-                        "profile_runner_counts": &profile_runner_counts,
-                        "runners": &runners,
-                    }))?
-                }
-
                 Request::TakeRunner {
                     profile,
                     unique_id,
