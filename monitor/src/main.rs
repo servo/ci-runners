@@ -23,6 +23,7 @@ use jane_eyre::eyre::{self, eyre};
 use log::{error, info, trace, warn};
 use serde_json::json;
 use warp::{
+    filters::reply::header,
     reject::{self, Reject, Rejection},
     reply::{self, Reply},
     Filter,
@@ -141,7 +142,9 @@ async fn main() -> eyre::Result<()> {
             .map_err(|error| reject::custom(ChannelError(error)))
         });
 
+    // Successful responses are in JSON. Error responses are in plain text.
     let routes = status_route.or(take_runner_route);
+    let routes = routes.with(header("Content-Type", "application/json; charset=utf-8"));
     let routes = routes.recover(recover);
 
     warp::serve(routes)
