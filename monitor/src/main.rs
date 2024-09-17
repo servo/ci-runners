@@ -19,7 +19,7 @@ use std::{
 use crossbeam_channel::{Receiver, Sender};
 use dotenv::dotenv;
 use http::StatusCode;
-use jane_eyre::eyre::{self, eyre};
+use jane_eyre::eyre::{self, bail, eyre};
 use log::{error, info, trace, warn};
 use serde_json::json;
 use warp::{
@@ -47,7 +47,7 @@ static SETTINGS: LazyLock<Settings> = LazyLock::new(|| {
 /// GET `/` => `{"profile_runner_counts": {}, "runners": []}`
 static STATUS: RwLock<Option<String>> = RwLock::new(None);
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq)]
 enum Request {
     /// POST `/<profile>/<unique id>/<user>/<repo>/<run id>` => `{"id", "runner"}` | `null`
     TakeRunner {
@@ -74,7 +74,7 @@ static REQUEST: LazyLock<Channel<Request>> = LazyLock::new(|| {
     let (sender, receiver) = crossbeam_channel::bounded(1);
     Channel { sender, receiver }
 });
-static RESPONSE: LazyLock<Channel<String>> = LazyLock::new(|| {
+static RESPONSE: LazyLock<Channel<(Request, String)>> = LazyLock::new(|| {
     let (sender, receiver) = crossbeam_channel::bounded(1);
     Channel { sender, receiver }
 });
@@ -125,19 +125,24 @@ async fn main() -> eyre::Result<()> {
         ))
         .and_then(|profile, unique_id, user, repo, run_id| async {
             || -> eyre::Result<String> {
+                let expected_request = Request::TakeRunner {
+                    profile,
+                    unique_id,
+                    user,
+                    repo,
+                    run_id,
+                };
                 REQUEST.sender.send_timeout(
-                    Request::TakeRunner {
-                        profile,
-                        unique_id,
-                        user,
-                        repo,
-                        run_id,
-                    },
+                    expected_request.clone(),
                     SETTINGS.monitor_thread_send_timeout,
                 )?;
-                Ok(RESPONSE
+                let (actual_request, response) = RESPONSE
                     .receiver
-                    .recv_timeout(SETTINGS.monitor_thread_recv_timeout)?)
+                    .recv_timeout(SETTINGS.monitor_thread_recv_timeout)?;
+                if actual_request != expected_request {
+                    bail!("Got response to request we didn’t send! Expected: {expected_request:?}; Actual: {actual_request:?}");
+                }
+                Ok(response)
             }()
             .map_err(|error| reject::custom(ChannelError(error)))
         });
@@ -362,7 +367,7 @@ fn monitor_thread() -> eyre::Result<()> {
         {
             info!("Received API request: {request:?}");
 
-            let response = match request {
+            let response = match request.clone() {
                 Request::TakeRunner {
                     profile,
                     unique_id,
@@ -395,7 +400,7 @@ fn monitor_thread() -> eyre::Result<()> {
 
             RESPONSE
                 .sender
-                .send(response)
+                .send((request.clone(), response))
                 .expect("Failed to send Response to API thread");
         } else {
             info!("Did not receive an API request");
