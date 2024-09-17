@@ -161,13 +161,25 @@ async fn main() -> eyre::Result<()> {
 
 async fn recover(error: Rejection) -> Result<impl Reply, std::convert::Infallible> {
     Ok(if let Some(error) = error.find::<NotReadyError>() {
+        error!(
+            "NotReadyError: responding with HTTP 503 Service Unavailable: {}",
+            error.0
+        );
         reply::with_status(format!("{}", error.0), StatusCode::SERVICE_UNAVAILABLE)
     } else if let Some(error) = error.find::<ChannelError>() {
+        error!(
+            "ChannelError: responding with HTTP 500 Internal Server Error: {}",
+            error.0
+        );
         reply::with_status(
             format!("Channel error: {}", error.0),
             StatusCode::INTERNAL_SERVER_ERROR,
         )
     } else {
+        error!(
+            "Internal error: responding with HTTP 500 Internal Server Error: {:?}",
+            error
+        );
         reply::with_status(
             format!("Internal error: {error:?}"),
             StatusCode::INTERNAL_SERVER_ERROR,
