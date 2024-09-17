@@ -11,4 +11,5 @@ gh api "$SERVO_CI_GITHUB_API_SCOPE/actions/runners/$github_runner_id/labels" \
     -f "labels[]=reserved-for:$unique_id" \
     -f "labels[]=reserved-since:$reserved_since" \
     -f "labels[]=reserved-by:$reserved_by" \
-    --method POST
+    --method POST \
+| cat  # avoid pager when attached to tty
