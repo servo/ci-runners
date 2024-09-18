@@ -19,7 +19,7 @@ use std::{
 use crossbeam_channel::{Receiver, Sender};
 use dotenv::dotenv;
 use http::StatusCode;
-use jane_eyre::eyre::{self, bail, eyre};
+use jane_eyre::eyre::{self, eyre};
 use log::{error, info, trace, warn};
 use serde_json::json;
 use warp::{
@@ -47,10 +47,11 @@ static SETTINGS: LazyLock<Settings> = LazyLock::new(|| {
 /// GET `/` => `{"profile_runner_counts": {}, "runners": []}`
 static STATUS: RwLock<Option<String>> = RwLock::new(None);
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug)]
 enum Request {
     /// POST `/<profile>/<unique id>/<user>/<repo>/<run id>` => `{"id", "runner"}` | `null`
     TakeRunner {
+        response_tx: Sender<String>,
         profile: String,
         unique_id: String,
         user: String,
@@ -71,10 +72,6 @@ struct Channel<T> {
     receiver: Receiver<T>,
 }
 static REQUEST: LazyLock<Channel<Request>> = LazyLock::new(|| {
-    let (sender, receiver) = crossbeam_channel::bounded(0);
-    Channel { sender, receiver }
-});
-static RESPONSE: LazyLock<Channel<(Request, String)>> = LazyLock::new(|| {
     let (sender, receiver) = crossbeam_channel::bounded(0);
     Channel { sender, receiver }
 });
@@ -125,24 +122,19 @@ async fn main() -> eyre::Result<()> {
         ))
         .and_then(|profile, unique_id, user, repo, run_id| async {
             || -> eyre::Result<String> {
-                let expected_request = Request::TakeRunner {
-                    profile,
-                    unique_id,
-                    user,
-                    repo,
-                    run_id,
-                };
+                let (response_tx, response_rx) = crossbeam_channel::bounded(0);
                 REQUEST.sender.send_timeout(
-                    expected_request.clone(),
+                    Request::TakeRunner {
+                        response_tx,
+                        profile,
+                        unique_id,
+                        user,
+                        repo,
+                        run_id,
+                    },
                     SETTINGS.monitor_thread_send_timeout,
                 )?;
-                let (actual_request, response) = RESPONSE
-                    .receiver
-                    .recv_timeout(SETTINGS.monitor_thread_recv_timeout)?;
-                if actual_request != expected_request {
-                    bail!("Got response to request we didn’t send! Expected: {expected_request:?}; Actual: {actual_request:?}");
-                }
-                Ok(response)
+                Ok(response_rx.recv_timeout(SETTINGS.monitor_thread_recv_timeout)?)
             }()
             .map_err(|error| reject::custom(ChannelError(error)))
         });
@@ -379,17 +371,19 @@ fn monitor_thread() -> eyre::Result<()> {
         {
             info!("Received API request: {request:?}");
 
-            let response = match request.clone() {
+            let (response_tx, response) = match request {
                 Request::TakeRunner {
+                    response_tx,
                     profile,
                     unique_id,
                     user,
                     repo,
                     run_id,
                 } => {
-                    if let Some((&id, runner)) = runners.iter().find(|(_, runner)| {
-                        runner.status() == Status::Idle && runner.base_vm_name() == profile
-                    }) {
+                    let response = if let Some((&id, runner)) =
+                        runners.iter().find(|(_, runner)| {
+                            runner.status() == Status::Idle && runner.base_vm_name() == profile
+                        }) {
                         registrations_cache.invalidate();
                         if runners
                             .reserve_runner(id, &unique_id, &user, &repo, &run_id)
@@ -406,13 +400,13 @@ fn monitor_thread() -> eyre::Result<()> {
                     } else {
                         // TODO: send error when no runners available
                         serde_json::to_string(&Option::<()>::None)?
-                    }
+                    };
+                    (response_tx, response)
                 }
             };
 
-            RESPONSE
-                .sender
-                .send((request.clone(), response))
+            response_tx
+                .send(response)
                 .expect("Failed to send Response to API thread");
         } else {
             info!("Did not receive an API request");
