@@ -71,11 +71,11 @@ struct Channel<T> {
     receiver: Receiver<T>,
 }
 static REQUEST: LazyLock<Channel<Request>> = LazyLock::new(|| {
-    let (sender, receiver) = crossbeam_channel::bounded(1);
+    let (sender, receiver) = crossbeam_channel::bounded(0);
     Channel { sender, receiver }
 });
 static RESPONSE: LazyLock<Channel<(Request, String)>> = LazyLock::new(|| {
-    let (sender, receiver) = crossbeam_channel::bounded(1);
+    let (sender, receiver) = crossbeam_channel::bounded(0);
     Channel { sender, receiver }
 });
 
