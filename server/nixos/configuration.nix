@@ -68,10 +68,12 @@
     htop
     jq
     ntfs3g
+    python3
     ripgrep
     rustup
     tmux
     unzip
+    uv
     vim
     virt-manager
     zsh
