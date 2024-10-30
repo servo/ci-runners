@@ -129,6 +129,24 @@
     };
   };
 
+  systemd.services.monitor = {
+    # Wait for networking
+    wants = ["network-online.target"];
+    after = ["network-online.target"];
+
+    # Start on boot.
+    wantedBy = ["multi-user.target"];
+
+    path = ["/run/current-system/sw"];
+    script = ''
+      RUST_LOG=info target/debug/monitor
+    '';
+
+    serviceConfig = {
+      WorkingDirectory = "/config/monitor";
+    };
+  };
+
   networking.firewall.allowedTCPPorts = [
     80 443  # nginx
   ];
