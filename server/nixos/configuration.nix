@@ -149,6 +149,25 @@
     };
   };
 
+  systemd.services.intermittent-tracker = {
+    # Wait for networking
+    wants = ["network-online.target"];
+    after = ["network-online.target"];
+
+    # Start on boot.
+    wantedBy = ["multi-user.target"];
+
+    path = ["/run/current-system/sw"];
+    script = ''
+      . .venv/bin/activate
+      FLASK_DEBUG=1 python3 -m intermittent_tracker.flask_server
+    '';
+
+    serviceConfig = {
+      WorkingDirectory = "/config/intermittent-tracker";
+    };
+  };
+
   networking.firewall.allowedTCPPorts = [
     80 443  # nginx
   ];
