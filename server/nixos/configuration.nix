@@ -131,40 +131,51 @@
     };
   };
 
-  systemd.services.monitor = {
-    # Wait for networking
-    wants = ["network-online.target"];
-    after = ["network-online.target"];
+  systemd.services = let
+    intermittent-tracker = workingDir: {
+      # Wait for networking
+      wants = ["network-online.target"];
+      after = ["network-online.target"];
 
-    # Start on boot.
-    wantedBy = ["multi-user.target"];
+      # Start on boot.
+      wantedBy = ["multi-user.target"];
 
-    path = ["/run/current-system/sw"];
-    script = ''
-      RUST_LOG=info target/debug/monitor
-    '';
+      path = ["/run/current-system/sw"];
+      script = ''
+        . .venv/bin/activate
+        FLASK_DEBUG=1 python3 -m intermittent_tracker.flask_server
+      '';
 
-    serviceConfig = {
-      WorkingDirectory = "/config/monitor";
+      serviceConfig = {
+        WorkingDirectory = workingDir;
+      };
     };
-  };
+  in {
+    # $ git clone https://github.com/servo/intermittent-tracker.git <staging|prod>
+    # $ cd <staging|prod>
+    # $ uv venv
+    # $ . .venv/bin/activate
+    # $ uv pip install -r requirements.txt
+    # $ cp config.json.example config.json
+    intermittent-tracker-staging = intermittent-tracker "/config/intermittent-tracker/staging";
+    intermittent-tracker-prod = intermittent-tracker "/config/intermittent-tracker/prod";
 
-  systemd.services.intermittent-tracker = {
-    # Wait for networking
-    wants = ["network-online.target"];
-    after = ["network-online.target"];
+    monitor = {
+      # Wait for networking
+      wants = ["network-online.target"];
+      after = ["network-online.target"];
 
-    # Start on boot.
-    wantedBy = ["multi-user.target"];
+      # Start on boot.
+      wantedBy = ["multi-user.target"];
 
-    path = ["/run/current-system/sw"];
-    script = ''
-      . .venv/bin/activate
-      FLASK_DEBUG=1 python3 -m intermittent_tracker.flask_server
-    '';
+      path = ["/run/current-system/sw"];
+      script = ''
+        RUST_LOG=info target/debug/monitor
+      '';
 
-    serviceConfig = {
-      WorkingDirectory = "/config/intermittent-tracker";
+      serviceConfig = {
+        WorkingDirectory = "/config/monitor";
+      };
     };
   };
 
