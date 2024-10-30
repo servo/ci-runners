@@ -103,6 +103,10 @@
     certs."ci0.servo.org" = {
       email = "dazabani@igalia.com";
       webroot = "/var/lib/acme/acme-challenge";
+      extraDomainNames = [
+        "intermittent-tracker.servo.org"
+        "staging.intermittent-tracker.servo.org"
+      ];
     };
   };
   users.users.nginx.extraGroups = [ "acme" ];
@@ -126,6 +130,16 @@
       "\"\"" = {
         locations."/" = proxy // {
           proxyPass = "http://[::1]:8000";
+        };
+      } // ssl;
+      "intermittent-tracker.servo.org" = {
+        locations."/" = proxy // {
+          proxyPass = "http://127.0.0.1:5000";
+        };
+      } // ssl;
+      "staging.intermittent-tracker.servo.org" = {
+        locations."/" = proxy // {
+          proxyPass = "http://127.0.0.1:5001";
         };
       } // ssl;
     };
