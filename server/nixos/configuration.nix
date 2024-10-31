@@ -34,6 +34,9 @@
   # Pin nixpkgs channel to nixpkgs flakeref.
   nix.nixPath = ["nixpkgs=flake:nixpkgs"];
 
+  # When the NixOS configuration uses flakes, even old commands like nix-shell need flakes enabled.
+  nix.settings.experimental-features = [ "nix-command" "flakes" ];
+
   # First version of NixOS ever installed with this config.
   system.stateVersion = "24.11";
 
