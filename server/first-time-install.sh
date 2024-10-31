@@ -67,4 +67,4 @@ while [ $i -lt $# ]; do
     i=$((i+1))
 done
 
-./install-or-reinstall.sh nixos "/mnt/$hostname" "$hostname"
+./install-or-reinstall.sh "/mnt/$hostname" "$hostname"
