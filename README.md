@@ -47,7 +47,7 @@ Reconnect over SSH again, then run the following:
 
 ```
 $ git clone https://github.com/servo/ci-runners.git /config
-$ /config/server/update.sh /config/server/nixos
+$ /config/server/update.sh
 ```
 
 To get a GITHUB_TOKEN for the monitor service:
