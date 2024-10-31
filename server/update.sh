@@ -7,6 +7,4 @@ nixos_dir=$script_dir/nixos
 
 cd "$script_dir"
 git pull
-rm -Rf /etc/nixos
-ln -sr "$nixos_dir" /etc/nixos
-nixos-rebuild switch
+./deploy.sh
