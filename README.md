@@ -24,6 +24,21 @@ This repo contains:
 Setting up a server on Hetzner
 ------------------------------
 
+Overview of the server scripts:
+
+- `server/build-nixos-installer-kexec.sh`
+  <br>From any existing NixOS system, build a NixOS installer kexec image.
+- `server/start-nixos-installer.sh`
+  <br>From the Hetzner rescue system, build and run the NixOS installer.
+- `server/first-time-install.sh <hostname> <disk> [disk ...]`
+  <br>From the NixOS installer image, wipe the given disks and install NixOS.
+- `server/install-or-reinstall.sh <hostname> <path/to/mnt>`
+  <br>From the NixOS installer image, install or reinstall NixOS to the given root filesystem mount, without wiping any disks. Won’t run correctly on the deployed server.
+- `server/deploy.sh`
+  <br>On the deployed server, deploy any NixOS config changes.
+- `server/update.sh`
+  <br>On the deployed server, pull the config from GitHub and deploy it.
+
 Start the [rescue system](https://docs.hetzner.com/robot/dedicated-server/troubleshooting/hetzner-rescue-system/), then run the following:
 
 ```
