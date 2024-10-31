@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# usage: install-or-reinstall.sh <path/to/mnt> <hostname>
+# usage: install-or-reinstall.sh <hostname> <path/to/mnt>
 # requires: nixos-install
 if [ $# -lt 2 ]; then >&2 sed '2!d;2s/^# //;2q' "$0"; exit 1; fi
 set -xeuo pipefail -o bsdecho
