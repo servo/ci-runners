@@ -74,6 +74,7 @@
     python3
     ripgrep
     rustup
+    sqlite
     tmux
     unzip
     uv
