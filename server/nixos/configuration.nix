@@ -169,6 +169,7 @@
 
       serviceConfig = {
         WorkingDirectory = workingDir;
+        Restart = "on-failure";
       };
     };
   in {
@@ -196,6 +197,7 @@
 
       serviceConfig = {
         WorkingDirectory = "/config/monitor";
+        Restart = "on-failure";
       };
     };
   };
