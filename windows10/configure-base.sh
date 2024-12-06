@@ -13,7 +13,7 @@ download "$cache_dir" https://download.visualstudio.microsoft.com/download/pr/2d
 download "$cache_dir" https://github.com/microsoft/vswhere/releases/download/3.1.7/vswhere.exe c54f3b7c9164ea9a0db8641e81ecdda80c2664ef5a47c4191406f848cc07c662
 download "$cache_dir" https://aka.ms/vs/17/release/vs_community.exe 5606944c31b01519f5932cdfa29f1cf1c2591a7ebe973987bd03504dbcc0bbf9
 download "$cache_dir" https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe 193d6c727e18734edbf7303180657e96e9d5a08432002b4e6c5bbe77c60cb3e8
-download "$cache_dir" https://github.com/actions/runner/releases/download/v2.319.1/actions-runner-win-x64-2.319.1.zip 1c78c51d20b817fb639e0b0ab564cf0469d083ad543ca3d0d7a2cdad5723f3a7
+download "$cache_dir" https://github.com/actions/runner/releases/download/v2.321.0/actions-runner-win-x64-2.321.0.zip 88d754da46f4053aec9007d172020c1b75ab2e2049c08aef759b643316580bbc
 download "$cache_dir" https://github.com/git-for-windows/git/releases/download/v2.45.1.windows.1/Git-2.45.1-64-bit.exe 1b2b58fb516495feb70353aa91da230be0a2b4aa01acc3bc047ee1fe4846bc4e
 
 >&2 echo '[*] Applying changes to SOFTWARE hive'
@@ -38,7 +38,7 @@ inject init "$cache_dir/Git-2.45.1-64-bit.exe"
 # See also: <https://github.com/servo/servo/settings/actions/runners/new?arch=x64&os=win>
 rm -Rf actions-runner  # FIXME: necessary to avoid errors starting runner?
 mkdir -p actions-runner
-unzip -o -d actions-runner "$cache_dir/actions-runner-win-x64-2.319.1.zip"
+unzip -o -d actions-runner "$cache_dir/actions-runner-win-x64-2.321.0.zip"
 
 >&2 echo '[*] Creating working directory for builds (C:\a)'
 mkdir -p a

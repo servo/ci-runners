@@ -9,7 +9,7 @@ cache_dir=$script_dir/cache
 >&2 echo '[*] Caching downloads'
 mkdir -p -- "$cache_dir"
 download "$cache_dir" https://static.rust-lang.org/rustup/rustup-init.sh 32a680a84cf76014915b3f8aa44e3e40731f3af92cd45eb0fcc6264fd257c428
-download "$cache_dir" https://github.com/actions/runner/releases/download/v2.319.1/actions-runner-linux-x64-2.319.1.tar.gz 3f6efb7488a183e291fc2c62876e14c9ee732864173734facc85a1bfb1744464
+download "$cache_dir" https://github.com/actions/runner/releases/download/v2.321.0/actions-runner-linux-x64-2.321.0.tar.gz ba46ba7ce3a4d7236b16fbe44419fb453bc08f866b24f04d549ec89f1722a29e
 
 >&2 echo '[*] Injecting init script'
 mkdir -p init
@@ -22,7 +22,7 @@ chmod +x init/rustup-init.sh
 # See also: <https://github.com/servo/servo/settings/actions/runners/new?arch=x64&os=linux>
 rm -Rf actions-runner  # FIXME: necessary to avoid errors starting runner?
 mkdir -p actions-runner
-( cd actions-runner; tar xf "$cache_dir/actions-runner-linux-x64-2.319.1.tar.gz" )
+( cd actions-runner; tar xf "$cache_dir/actions-runner-linux-x64-2.321.0.tar.gz" )
 
 >&2 echo '[*] Creating working directory for builds (C:\a)'
 mkdir -p a
