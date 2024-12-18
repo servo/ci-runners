@@ -5,10 +5,10 @@ use std::{
 
 use jane_eyre::eyre;
 
-use crate::SETTINGS;
+use crate::DOTENV;
 
 pub fn get_data_path(path: impl AsRef<Path>) -> eyre::Result<PathBuf> {
-    let data = if let Some(path) = &SETTINGS.monitor_data_path {
+    let data = if let Some(path) = &DOTENV.monitor_data_path {
         path.into()
     } else {
         PathBuf::from("./data")

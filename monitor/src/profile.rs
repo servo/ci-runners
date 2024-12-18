@@ -6,7 +6,7 @@ use serde::Serialize;
 
 use crate::{
     runner::{Runner, Runners, Status},
-    SETTINGS,
+    DOTENV,
 };
 
 #[derive(Debug, Default)]
@@ -124,7 +124,7 @@ impl Profile {
     }
 
     pub fn target_runner_count(&self) -> usize {
-        if SETTINGS.dont_create_runners {
+        if DOTENV.dont_create_runners {
             0
         } else {
             self.target_count

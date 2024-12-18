@@ -3,7 +3,7 @@ use std::process::{Command, Stdio};
 
 use jane_eyre::eyre::{self, Context};
 
-use crate::SETTINGS;
+use crate::DOTENV;
 
 pub fn list_runner_guests() -> eyre::Result<Vec<String>> {
     let output = Command::new("../list-libvirt-guests.sh")
@@ -28,5 +28,5 @@ pub fn list_runner_guests() -> eyre::Result<Vec<String>> {
 }
 
 pub fn libvirt_prefix() -> String {
-    format!("{}-", SETTINGS.libvirt_prefix)
+    format!("{}-", DOTENV.libvirt_prefix)
 }

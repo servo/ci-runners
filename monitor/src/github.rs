@@ -8,7 +8,7 @@ use jane_eyre::eyre::{self, Context};
 use log::trace;
 use serde::{Deserialize, Serialize};
 
-use crate::SETTINGS;
+use crate::DOTENV;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ApiRunner {
@@ -51,7 +51,7 @@ impl<Response: Clone + Debug> Cache<Response> {
     pub fn get(&mut self, miss: impl FnOnce() -> eyre::Result<Response>) -> eyre::Result<Response> {
         if let Some(cached) = &mut self.inner {
             let age = Instant::now().duration_since(cached.cached_at);
-            if age < SETTINGS.api_cache_timeout {
+            if age < DOTENV.api_cache_timeout {
                 trace!("Cache hit ({age:?} seconds old): {:?}", cached.response);
                 return Ok(cached.response.clone());
             } else {
@@ -90,7 +90,7 @@ fn list_registered_runners() -> eyre::Result<Vec<ApiRunner>> {
 }
 
 pub fn list_registered_runners_for_host() -> eyre::Result<Vec<ApiRunner>> {
-    let suffix = format!("@{}", SETTINGS.github_api_suffix);
+    let suffix = format!("@{}", DOTENV.github_api_suffix);
     let result = list_registered_runners()?
         .into_iter()
         .filter(|runner| runner.name.ends_with(&suffix));

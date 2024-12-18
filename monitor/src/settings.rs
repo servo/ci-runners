@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-pub struct Settings {
+pub struct Dotenv {
     // GITHUB_TOKEN not used
     // LIBVIRT_DEFAULT_URI not used
     pub monitor_api_token_authorization_value: String,
@@ -27,7 +27,7 @@ pub struct Settings {
     // SERVO_CI_DOT_CARGO_PATH not used
 }
 
-impl Settings {
+impl Dotenv {
     pub fn load() -> Self {
         let monitor_api_token = env_string("SERVO_CI_MONITOR_API_TOKEN");
         if monitor_api_token == "ChangeMe" {

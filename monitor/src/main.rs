@@ -35,13 +35,13 @@ use crate::{
     libvirt::list_runner_guests,
     profile::{Profile, Profiles, RunnerCounts},
     runner::{Runner, Runners, Status},
-    settings::Settings,
+    settings::Dotenv,
     zfs::list_runner_volumes,
 };
 
-static SETTINGS: LazyLock<Settings> = LazyLock::new(|| {
+static DOTENV: LazyLock<Dotenv> = LazyLock::new(|| {
     dotenv().expect("Failed to load variables from .env");
-    Settings::load()
+    Dotenv::load()
 });
 
 /// GET `/` => `{"profile_runner_counts": {}, "runners": []}`
@@ -118,7 +118,7 @@ async fn main() -> eyre::Result<()> {
         .and(warp::filters::method::post())
         .and(warp::filters::header::exact(
             "Authorization",
-            &SETTINGS.monitor_api_token_authorization_value,
+            &DOTENV.monitor_api_token_authorization_value,
         ))
         .and_then(|profile, unique_id, user, repo, run_id| async {
             || -> eyre::Result<String> {
@@ -132,9 +132,9 @@ async fn main() -> eyre::Result<()> {
                         repo,
                         run_id,
                     },
-                    SETTINGS.monitor_thread_send_timeout,
+                    DOTENV.monitor_thread_send_timeout,
                 )?;
-                Ok(response_rx.recv_timeout(SETTINGS.monitor_thread_recv_timeout)?)
+                Ok(response_rx.recv_timeout(DOTENV.monitor_thread_recv_timeout)?)
             }()
             .map_err(|error| reject::custom(ChannelError(error)))
         });
@@ -286,7 +286,7 @@ fn monitor_thread() -> eyre::Result<()> {
             registrations_cache.invalidate();
         };
 
-        if SETTINGS.destroy_all_non_busy_runners {
+        if DOTENV.destroy_all_non_busy_runners {
             let non_busy_runners = runners
                 .iter()
                 .filter(|(_id, runner)| runner.status() != Status::Busy);
@@ -306,12 +306,12 @@ fn monitor_thread() -> eyre::Result<()> {
                 .iter()
                 .filter(|(_id, runner)| runner.status() == Status::DoneOrUnregistered)
                 // Don’t destroy unregistered runners if we aren’t registering them in the first place.
-                .filter(|_| !SETTINGS.dont_register_runners);
+                .filter(|_| !DOTENV.dont_register_runners);
             let started_or_crashed_and_too_old = runners.iter().filter(|(_id, runner)| {
                 runner.status() == Status::StartedOrCrashed
                     && runner
                         .age()
-                        .map_or(true, |age| age > SETTINGS.monitor_start_timeout)
+                        .map_or(true, |age| age > DOTENV.monitor_start_timeout)
             });
             let reserved_for_too_long = runners.iter().filter(|(_id, runner)| {
                 runner.status() == Status::Reserved
@@ -319,7 +319,7 @@ fn monitor_thread() -> eyre::Result<()> {
                         .reserved_since()
                         .ok()
                         .flatten()
-                        .map_or(true, |duration| duration > SETTINGS.monitor_reserve_timeout)
+                        .map_or(true, |duration| duration > DOTENV.monitor_reserve_timeout)
             });
             let excess_idle_runners = profiles.iter().flat_map(|(_key, profile)| {
                 profile
@@ -365,10 +365,7 @@ fn monitor_thread() -> eyre::Result<()> {
         }
 
         // Handle one request from the API.
-        if let Ok(request) = REQUEST
-            .receiver
-            .recv_timeout(SETTINGS.monitor_poll_interval)
-        {
+        if let Ok(request) = REQUEST.receiver.recv_timeout(DOTENV.monitor_poll_interval) {
             info!("Received API request: {request:?}");
 
             let (response_tx, response) = match request {
