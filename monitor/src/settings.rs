@@ -1,7 +1,16 @@
 use std::{
+    collections::BTreeMap,
     env::{self, VarError},
+    fs::File,
+    io::Read,
+    path::Path,
     time::Duration,
 };
+
+use jane_eyre::eyre;
+use serde::Deserialize;
+
+use crate::profile::Profile;
 
 pub struct Dotenv {
     // GITHUB_TOKEN not used
@@ -27,6 +36,11 @@ pub struct Dotenv {
     // SERVO_CI_DOT_CARGO_PATH not used
 }
 
+#[derive(Deserialize)]
+pub struct Toml {
+    pub profiles: BTreeMap<String, Profile>,
+}
+
 impl Dotenv {
     pub fn load() -> Self {
         let monitor_api_token = env_string("SERVO_CI_MONITOR_API_TOKEN");
@@ -50,6 +64,32 @@ impl Dotenv {
             dont_register_runners: env_bool("SERVO_CI_DONT_REGISTER_RUNNERS"),
             dont_create_runners: env_bool("SERVO_CI_DONT_CREATE_RUNNERS"),
         }
+    }
+}
+
+impl Toml {
+    pub fn load_default() -> eyre::Result<Self> {
+        Self::load("monitor.toml")
+    }
+
+    pub fn load(path: impl AsRef<Path>) -> eyre::Result<Self> {
+        let mut result = String::default();
+        File::open(path)?.read_to_string(&mut result)?;
+        let result: Toml = toml::from_str(&result)?;
+
+        for (key, profile) in result.profiles.iter() {
+            assert_eq!(*key, profile.base_vm_name, "Runner::base_vm_name relies on Toml.profiles key (profile name) and base_vm_name being equal");
+        }
+
+        Ok(result)
+    }
+
+    pub fn profiles(&self) -> impl Iterator<Item = (&str, &Profile)> {
+        self.profiles.iter().map(|(k, v)| (k.as_str(), v))
+    }
+
+    pub fn profile(&self, key: impl AsRef<str>) -> Option<&Profile> {
+        self.profiles.get(key.as_ref())
     }
 }
 

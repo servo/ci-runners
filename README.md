@@ -90,7 +90,8 @@ $ virsh net-start cinet
 $ rustup default stable
 $ git clone https://github.com/servo/servo.git ~/servo
 $ cp /config/.env.example /config/.env
-$ vim /config/.env
+$ cp /config/monitor/monitor.toml.example /config/monitor/monitor.toml
+$ vim -p /config/.env /config/monitor/monitor.toml
 $ cd /config
 $ RUST_LOG=debug cargo run
 ```

@@ -1,4 +1,5 @@
 /cache/
 /monitor/data/
 /monitor/target/
+/monitor/monitor.toml
 /.env

@@ -1,0 +1,27 @@
+[profiles.servo-windows10]
+configuration_name = "windows10"
+base_vm_name = "servo-windows10"
+base_image_snapshot = "ready"
+github_runner_label = "self-hosted-image:windows10"
+target_count = 2
+
+[profiles.servo-windows10.new]
+configuration_name = "windows10"
+base_vm_name = "servo-windows10.new"
+base_image_snapshot = "ready"
+github_runner_label = "self-hosted-image:windows10.new"
+target_count = 0
+
+[profiles.servo-ubuntu2204]
+configuration_name = "ubuntu2204"
+base_vm_name = "servo-ubuntu2204"
+base_image_snapshot = "ready"
+github_runner_label = "self-hosted-image:ubuntu2204"
+target_count = 2
+
+[profiles.servo-ubuntu2204.new]
+configuration_name = "ubuntu2204"
+base_vm_name = "servo-ubuntu2204.new"
+base_image_snapshot = "ready"
+github_runner_label = "self-hosted-image:ubuntu2204.new"
+target_count = 0

@@ -1,20 +1,15 @@
-use std::{collections::BTreeMap, process::Command};
+use std::process::Command;
 
 use jane_eyre::eyre;
 use log::info;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     runner::{Runner, Runners, Status},
     DOTENV,
 };
 
-#[derive(Debug, Default)]
-pub struct Profiles {
-    inner: BTreeMap<String, Profile>,
-}
-
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct Profile {
     pub configuration_name: String,
     pub base_vm_name: String,
@@ -33,21 +28,6 @@ pub struct RunnerCounts {
     pub busy: usize,
     pub excess_idle: usize,
     pub wanted: usize,
-}
-
-impl Profiles {
-    pub fn insert(&mut self, key: impl AsRef<str>, profile: Profile) {
-        assert_eq!(key.as_ref(), profile.base_vm_name, "Runner::base_vm_name relies on Profiles key (profile name) and base_vm_name being equal");
-        self.inner.insert(key.as_ref().to_owned(), profile);
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = (&str, &Profile)> {
-        self.inner.iter().map(|(k, v)| (k.as_str(), v))
-    }
-
-    pub fn get(&self, key: impl AsRef<str>) -> Option<&Profile> {
-        self.inner.get(key.as_ref())
-    }
 }
 
 impl Profile {

@@ -33,9 +33,9 @@ use crate::{
     github::{list_registered_runners_for_host, Cache},
     id::IdGen,
     libvirt::list_runner_guests,
-    profile::{Profile, Profiles, RunnerCounts},
+    profile::RunnerCounts,
     runner::{Runner, Runners, Status},
-    settings::Dotenv,
+    settings::{Dotenv, Toml},
     zfs::list_runner_volumes,
 };
 
@@ -43,6 +43,9 @@ static DOTENV: LazyLock<Dotenv> = LazyLock::new(|| {
     dotenv().expect("Failed to load variables from .env");
     Dotenv::load()
 });
+
+static TOML: LazyLock<Toml> =
+    LazyLock::new(|| Toml::load_default().expect("Failed to load settings from monitor.toml"));
 
 /// GET `/` => `{"profile_runner_counts": {}, "runners": []}`
 static STATUS: RwLock<Option<String>> = RwLock::new(None);
@@ -184,48 +187,6 @@ async fn recover(error: Rejection) -> Result<impl Reply, std::convert::Infallibl
 /// It handles one [`Request`] at a time, polling for updated resources before
 /// each request, then sends one response to the API server for each request.
 fn monitor_thread() -> eyre::Result<()> {
-    let mut profiles = Profiles::default();
-    profiles.insert(
-        "servo-windows10",
-        Profile {
-            configuration_name: "windows10".to_owned(),
-            base_vm_name: "servo-windows10".to_owned(),
-            base_image_snapshot: "ready".to_owned(),
-            github_runner_label: "self-hosted-image:windows10".to_owned(),
-            target_count: 2,
-        },
-    );
-    profiles.insert(
-        "servo-windows10.new",
-        Profile {
-            configuration_name: "windows10".to_owned(),
-            base_vm_name: "servo-windows10.new".to_owned(),
-            base_image_snapshot: "ready".to_owned(),
-            github_runner_label: "self-hosted-image:windows10.new".to_owned(),
-            target_count: 0,
-        },
-    );
-    profiles.insert(
-        "servo-ubuntu2204",
-        Profile {
-            configuration_name: "ubuntu2204".to_owned(),
-            base_vm_name: "servo-ubuntu2204".to_owned(),
-            base_image_snapshot: "ready".to_owned(),
-            github_runner_label: "self-hosted-image:ubuntu2204".to_owned(),
-            target_count: 2,
-        },
-    );
-    profiles.insert(
-        "servo-ubuntu2204.new",
-        Profile {
-            configuration_name: "ubuntu2204".to_owned(),
-            base_vm_name: "servo-ubuntu2204.new".to_owned(),
-            base_image_snapshot: "ready".to_owned(),
-            github_runner_label: "self-hosted-image:ubuntu2204.new".to_owned(),
-            target_count: 0,
-        },
-    );
-
     let mut id_gen = IdGen::new_load().unwrap_or_else(|error| {
         warn!("{error}");
         IdGen::new_empty()
@@ -248,8 +209,8 @@ fn monitor_thread() -> eyre::Result<()> {
         );
 
         let runners = Runners::new(registrations, guests, volumes);
-        let profile_runner_counts: BTreeMap<_, _> = profiles
-            .iter()
+        let profile_runner_counts: BTreeMap<_, _> = TOML
+            .profiles()
             .map(|(key, profile)| (key, profile.runner_counts(&runners)))
             .collect();
         for (
@@ -278,7 +239,7 @@ fn monitor_thread() -> eyre::Result<()> {
                     warn!("Failed to unregister runner: {error}");
                 }
             }
-            if let Some(profile) = profiles.get(runner.base_vm_name()) {
+            if let Some(profile) = TOML.profile(runner.base_vm_name()) {
                 if let Err(error) = profile.destroy_runner(id) {
                     warn!("Failed to destroy runner: {error}");
                 }
@@ -321,7 +282,7 @@ fn monitor_thread() -> eyre::Result<()> {
                         .flatten()
                         .map_or(true, |duration| duration > DOTENV.monitor_reserve_timeout)
             });
-            let excess_idle_runners = profiles.iter().flat_map(|(_key, profile)| {
+            let excess_idle_runners = TOML.profiles().flat_map(|(_key, profile)| {
                 profile
                     .idle_runners(&runners)
                     .take(profile.excess_idle_runner_count(&runners))
@@ -335,8 +296,8 @@ fn monitor_thread() -> eyre::Result<()> {
                 unregister_and_destroy(id, runner);
             }
 
-            let profile_wanted_counts = profiles
-                .iter()
+            let profile_wanted_counts = TOML
+                .profiles()
                 .map(|(_key, profile)| (profile, profile.wanted_runner_count(&runners)));
             for (profile, wanted_count) in profile_wanted_counts {
                 for _ in 0..wanted_count {
