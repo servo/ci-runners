@@ -21,8 +21,17 @@ export HOME=/root
 # taplo-cli -> openssl-sys -> openssl.pc
 sudo apt install -y libssl-dev
 
-# linux.yml -> xvfb-run, python
-sudo apt install -y xvfb python-is-python3
+# linux.yml -> xvfb-run
+sudo apt install -y xvfb
+
+# Install Python, for checkouts without servo#34504
+sudo apt install -y python-is-python3
+
+# Install uv and ensure it is on PATH
+if ! [ -e /root/.local/bin/uv ]; then
+    /init/install-uv.sh
+fi
+export PATH=$HOME/.local/bin:$PATH
 
 if ! [ -e /init/built_servo_once_successfully ]; then
     cd /a/servo/servo

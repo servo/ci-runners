@@ -10,13 +10,14 @@ cache_dir=$script_dir/cache
 mkdir -p -- "$cache_dir"
 download "$cache_dir" https://static.rust-lang.org/rustup/rustup-init.sh 32a680a84cf76014915b3f8aa44e3e40731f3af92cd45eb0fcc6264fd257c428
 download "$cache_dir" https://github.com/actions/runner/releases/download/v2.321.0/actions-runner-linux-x64-2.321.0.tar.gz ba46ba7ce3a4d7236b16fbe44419fb453bc08f866b24f04d549ec89f1722a29e
+download "$cache_dir" https://astral.sh/uv/install.sh 47ead06f79eba7461fd113fc92dc0f191af7455418462fbbed21affa2a6c22e2
 
 >&2 echo '[*] Injecting init script'
 mkdir -p init
 inject etc/rc.local "$script_dir/ubuntu2204/init.sh"
 inject init "$cache_dir/rustup-init.sh"
-inject init "$cache_dir/rustup-init.sh"
-chmod +x init/rustup-init.sh
+inject init/install-uv.sh "$cache_dir/install.sh"
+chmod +x init/rustup-init.sh init/install-uv.sh
 
 >&2 echo '[*] Injecting GitHub Actions runner'
 # See also: <https://github.com/servo/servo/settings/actions/runners/new?arch=x64&os=linux>
