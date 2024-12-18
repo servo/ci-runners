@@ -23,10 +23,16 @@ if (!(Test-Path 'C:\Program Files\Git\cmd\git.exe')) {
     C:\init\Git-2.45.1-64-bit.exe /silent | Out-Default
 }
 
-# Install Python
+# Install Python, for checkouts without servo#34504
 # Note: installer is idempotent, so the check is just there to save time
 if (!(Test-Path $env:LOCALAPPDATA\Programs\Python\Python310\python.exe)) {
     C:\init\python-3.10.11-amd64.exe /passive | Out-Default
+}
+
+# Install uv. Note that actually running uv relies on $env:USERPROFILE\.local\bin being on PATH,
+# and that directory gets added to PATH by Chocolatey and refreshenv (see refreshenv.ps1).
+if (!(Test-Path C:\Users\Administrator\.local\bin\uv.exe)) {
+    . C:\init\install-uv.ps1
 }
 
 # Install rustup and Rust 1.80.1

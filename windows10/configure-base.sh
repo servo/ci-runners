@@ -9,6 +9,7 @@ cache_dir=$script_dir/cache
 >&2 echo '[*] Caching downloads'
 mkdir -p -- "$cache_dir"
 download "$cache_dir" https://www.python.org/ftp/python/3.10.11/python-3.10.11-amd64.exe d8dede5005564b408ba50317108b765ed9c3c510342a598f9fd42681cbe0648b
+download "$cache_dir" https://astral.sh/uv/install.ps1 87fe546b1fd64d0f2d776a185fa52ec786e0f0624f359480781f724123604362
 download "$cache_dir" https://download.visualstudio.microsoft.com/download/pr/2d6bb6b2-226a-4baa-bdec-798822606ff1/8494001c276a4b96804cde7829c04d7f/ndp48-x86-x64-allos-enu.exe 68c9986a8dcc0214d909aa1f31bee9fb5461bb839edca996a75b08ddffc1483f
 download "$cache_dir" https://github.com/microsoft/vswhere/releases/download/3.1.7/vswhere.exe c54f3b7c9164ea9a0db8641e81ecdda80c2664ef5a47c4191406f848cc07c662
 download "$cache_dir" https://aka.ms/vs/17/release/vs_community.exe 5606944c31b01519f5932cdfa29f1cf1c2591a7ebe973987bd03504dbcc0bbf9
@@ -28,6 +29,7 @@ inject init "$script_dir/windows10/init.ps1"
 inject init "$script_dir/windows10/warm.ps1"
 inject init "$script_dir/windows10/refreshenv.ps1"
 inject init "$cache_dir/python-3.10.11-amd64.exe"
+inject init/install-uv.ps1 "$cache_dir/install.ps1"
 inject init "$cache_dir/ndp48-x86-x64-allos-enu.exe"
 inject init "$cache_dir/vswhere.exe"
 inject init "$cache_dir/vs_community.exe"
