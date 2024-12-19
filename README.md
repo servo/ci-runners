@@ -143,25 +143,18 @@ Ubuntu runner
 To build the base vm, first build a clean image:
 
 - Download images into /var/lib/libvirt/images
-    - Ubuntu Server 22.04.4: [ubuntu-22.04.4-live-server-amd64.iso](http://mirror.internode.on.net/pub/ubuntu/releases/22.04.4/ubuntu-22.04.4-live-server-amd64.iso) (sha256 = 45f873de9f8cb637345d6e66a583762730bbea30277ef7b32c9c3bd6700a32b2)
+    - Ubuntu Server 22.04 cloud image: [jammy-server-cloudimg-amd64.img](https://cloud-images.ubuntu.com/jammy/20241217/jammy-server-cloudimg-amd64.img) (sha256 = 0d8345a343c2547e55ac815342e6cb4a593aa5556872651eb47e6856a2bb0cdd)
 - Create zvol and libvirt guest with random UUID and MAC address
     - `zfs create -V 90G tank/base/servo-ubuntu2204.clean`
     - `virsh define ubuntu2204.xml`
     - `virt-clone --preserve-data --check path_in_use=off -o servo-ubuntu2204.init -n servo-ubuntu2204.clean -f /dev/zvol/tank/base/servo-ubuntu2204.clean`
     - `virsh undefine servo-ubuntu2204.init`
+- Install Ubuntu:
+    - `qemu-img convert -f qcow2 -O raw jammy-server-cloudimg-amd64.{img,raw}`
+    - `dd status=progress bs=1M if=jammy-server-cloudimg-amd64.raw of=/dev/zvol/tank/base/servo-ubuntu2204.clean`
+    - `genisoimage -V CIDATA -R -o /var/lib/libvirt/images/servo-ubuntu2204.config.iso ubuntu2204/{user-data,meta-data}`
     - `virsh start servo-ubuntu2204.clean`
-- Install Ubuntu
-    - Uncheck “Set up this disk as an LVM group”
-    - Use hostname `servo-ubuntu2204`
-    - Use credentials `servo` and `servo2024!`
-    - If we want SSH access for debugging…
-        - Check “Install OpenSSH server”
-        - Provide a SSH public key
-        - Uncheck “Allow password authentication over SSH”
-    - …otherwise, uncheck “Install OpenSSH server”
-    - Once installed, choose “Reboot now”
-    - Press Enter when prompted about the installation medium (no need to eject)
-    - Once rebooted, shut down the guest
+    - Wait for the guest to shut down
 - Take a snapshot: `zfs snapshot tank/base/servo-ubuntu2204.clean@fresh-install`
 
 Then build the base image:
@@ -171,8 +164,7 @@ Then build the base image:
 - Update new base image: `./mount-runner.sh servo-ubuntu2204.new $PWD/ubuntu2204/configure-base.sh`
 - Take another snapshot: `zfs snapshot tank/base/servo-ubuntu2204.new@configure-base`
 - Boot temporary vm guest: `virsh start servo-ubuntu2204.new`
-    - Once installed, log in and check that rc.local succeeded: `journalctl -b`
-    - If the init script succeeded, shut down the guest
+- Wait for the guest to shut down, which indicates Servo was built successfully
 - Take another snapshot: `zfs snapshot tank/base/servo-ubuntu2204.new@ready`
 - Destroy the old base image (if it exists): `zfs destroy -r tank/base/servo-ubuntu2204`
 - Rename the new base image: `zfs rename tank/base/servo-ubuntu2204{.new,}`

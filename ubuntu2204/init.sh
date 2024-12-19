@@ -39,6 +39,8 @@ if ! [ -e /init/built_servo_once_successfully ]; then
     # Build the same way as a typical Linux build job, to allow for incremental builds.
     ./mach build --use-crown --locked --release
     touch /init/built_servo_once_successfully
+    poweroff
+    exit
 fi
 
 if [ -e /init/runner.sh ]; then
