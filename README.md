@@ -111,21 +111,11 @@ To build the base vm, first build a clean image:
     - `virsh define windows10.xml`
     - `virt-clone --preserve-data --check path_in_use=off -o servo-windows10.init -n servo-windows10.clean -f /dev/zvol/tank/base/servo-windows10.clean`
     - `virsh undefine servo-windows10.init`
+- Install Windows:
+    - `genisoimage -J -o /var/lib/libvirt/images/servo-windows10.config.iso windows10/autounattend.xml`
     - `virsh start servo-windows10.clean`
-- Install Windows 10 Pro
-    - Click “I don't have a product key”
-    - Load disk driver from `E:\vioscsi\w10\amd64`
-    - Shut down the guest when you see “Let’s start with region. Is this right?”: `virsh shutdown servo-windows10.clean`
-- Take a snapshot: `zfs snapshot tank/base/servo-windows10.clean@fresh-install`
-- Boot base vm guest: `virsh start servo-windows10.clean`
-    - Click “I don’t have internet”
-    - Click “Continue with limited setup”
-    - Set username to `servo`
-    - Leave password empty
-    - Turn off the six privacy settings
-    - Click “Not now” for Cortana
-    - Once installed, shut down the guest: `shutdown /s /t 0`
-- Take another snapshot: `zfs snapshot tank/base/servo-windows10.clean@oobe`
+    - Wait for the guest to shut down
+- Take a snapshot: `zfs snapshot tank/base/servo-windows10.clean@oobe`
 
 Then build the base image:
 
@@ -134,9 +124,7 @@ Then build the base image:
 - Update new base image: `./mount-runner.sh servo-windows10.new $PWD/windows10/configure-base.sh`
 - Take a snapshot: `zfs snapshot tank/base/servo-windows10.new@configure-base`
 - Boot temporary vm guest: `virsh start servo-windows10.new`
-    - Open an elevated PowerShell: **Win**+**X**, **A**
-    - Run the init script once: `C:\init\init.ps1`
-    - Once installed, shut down the guest: `shutdown /s /t 0`
+- Wait for the guest to shut down, which indicates Servo was built successfully
 - Take another snapshot: `zfs snapshot tank/base/servo-windows10.new@ready`
 - Destroy the old base image (if it exists): `zfs destroy -r tank/base/servo-windows10`
 - Rename the new base image: `zfs rename tank/base/servo-windows10{.new,}`

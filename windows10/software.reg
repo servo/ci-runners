@@ -1,11 +1,14 @@
 Windows Registry Editor Version 5.00
 
-; Enable autologon
+; Enable autologon. We need to unset AutoLogonCount because autounattend.xml
+; also enables autologon with an AutoLogonCount of 1, which decrements to zero,
+; breaking any further attempts to enable autologon.
 ; https://learn.microsoft.com/en-us/troubleshoot/windows-server/user-profiles-and-logon/turn-on-automatic-logon
 [HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon]
 "AutoAdminLogon"="1"
 "DefaultUserName"="Administrator"
 "DefaultPassword"="servo2024!"
+"AutoLogonCount"=-
 
 ; Allow running PowerShell scripts
 [HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\PowerShell\1\ShellIds\Microsoft.PowerShell]

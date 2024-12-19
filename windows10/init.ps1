@@ -81,7 +81,10 @@ if ($(C:\init\vswhere.exe -format value -property isComplete) -ne '1') {
 
 if (!(Test-Path C:\init\built_servo_once_successfully)) {
     . C:\init\warm.ps1
-    New-Item C:\init\built_servo_once_successfully
+    if (Test-Path C:\a\servo\servo\target\release\servo.exe) {
+        New-Item C:\init\built_servo_once_successfully
+        shutdown /s /t 0
+    }
     exit
 }
 

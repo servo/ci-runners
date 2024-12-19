@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
-	<!-- NOTE: to build unattend.iso: sudo genisoimage -J -o /var/lib/libvirt/images/unattend.iso autounattend.xml -->
-	<!--https://schneegans.de/windows/unattend-generator/?LanguageMode=Unattended&UILanguage=en-US&Locale=en-US&Keyboard=00000409&GeoLocation=244&ProcessorArchitecture=amd64&ComputerNameMode=Random&CompactOsMode=Default&TimeZoneMode=Explicit&TimeZone=UTC&PartitionMode=Custom&DiskpartScript=LIST+DISK&InstallToMode=Available&WindowsEditionMode=Generic&WindowsEdition=home&UserAccountMode=Unattended&AccountName0=&AccountName1=&AccountName2=&AccountName3=&AccountName4=&AutoLogonMode=Builtin&BuiltinAdministratorPassword=servo2024%21&PasswordExpirationMode=Unlimited&LockoutMode=Default&HideFiles=Hidden&TaskbarSearch=Box&TaskbarIconsMode=Default&StartTilesMode=Default&StartPinsMode=Default&DisableDefender=true&DisableSac=true&DisableSmartScreen=true&DisableFastStartup=true&DisableSystemRestore=true&DisableAppSuggestions=true&WifiMode=Skip&ExpressSettings=DisableAll&KeysMode=Skip&ColorMode=Default&WallpaperMode=Default&UserOnceScript0=schtasks+%2FCreate+%2FF+%2FTN+%22servo+ci+init%22+%2FSC+ONLOGON+%2FRL+HIGHEST+%2FTR+%22powershell+-NoExit+C%3A%5Cinit%5Cinit.ps1%22&UserOnceScriptType0=Ps1&WdacMode=Skip-->
+	<!--https://schneegans.de/windows/unattend-generator/?LanguageMode=Unattended&UILanguage=en-US&Locale=en-US&Keyboard=00000409&GeoLocation=244&ProcessorArchitecture=amd64&ComputerNameMode=Random&CompactOsMode=Default&TimeZoneMode=Explicit&TimeZone=UTC&PartitionMode=Custom&DiskpartScript=LIST+DISK&InstallToMode=Available&WindowsEditionMode=Generic&WindowsEdition=pro&UserAccountMode=Unattended&AccountName0=&AccountName1=&AccountName2=&AccountName3=&AccountName4=&AutoLogonMode=Builtin&BuiltinAdministratorPassword=servo2024%21&PasswordExpirationMode=Unlimited&LockoutMode=Default&HideFiles=Hidden&TaskbarSearch=Box&TaskbarIconsMode=Default&StartTilesMode=Default&StartPinsMode=Default&DisableDefender=true&DisableSac=true&DisableSmartScreen=true&DisableFastStartup=true&DisableSystemRestore=true&DisableAppSuggestions=true&WifiMode=Skip&ExpressSettings=DisableAll&KeysMode=Skip&ColorMode=Default&WallpaperMode=Default&UserOnceScript0=schtasks+%2FCreate+%2FF+%2FTN+%22servo+ci+init%22+%2FSC+ONLOGON+%2FRL+HIGHEST+%2FTR+%22powershell+-NoExit+C%3A%5Cinit%5Cinit.ps1%22%0D%0Ashutdown+%2Fs+%2Ft+0&UserOnceScriptType0=Ps1&WdacMode=Skip-->
 	<settings pass="offlineServicing"></settings>
 	<settings pass="windowsPE">
 		<!-- MANUALLY ADDED: vioscsi storage driver -->
@@ -213,6 +212,7 @@ foreach( $file in $Document.unattend.Extensions.File ) {
 		</ExtractScript>
 		<File path="C:\Windows\Setup\Scripts\unattend-01.ps1" transformation="Text">
 schtasks /Create /F /TN "servo ci init" /SC ONLOGON /RL HIGHEST /TR "powershell -NoExit C:\init\init.ps1"
+shutdown /s /t 0
 		</File>
 		<File path="C:\Windows\Setup\Scripts\Specialize.ps1" transformation="Text">
 $scripts = @(
