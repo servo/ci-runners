@@ -1,0 +1,56 @@
+Content-Type: multipart/mixed; boundary="==part=="
+MIME-Version: 1.0
+Number-Attachments: 3
+
+--==part==
+Content-Type: text/cloud-config; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: binary
+
+# https://docs.cloud-init.io/en/24.1/reference/datasources/nocloud.html#file-formats
+# https://docs.cloud-init.io/en/24.1/explanation/format.html#cloud-config-data
+
+password: "servo2024!"
+chpasswd:
+  expire: False
+
+--==part==
+Content-Type: text/cloud-boothook; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: binary
+
+#!/bin/sh
+# This script runs on every boot, near the start of cloud-init.
+# https://docs.cloud-init.io/en/24.1/reference/datasources/nocloud.html#file-formats
+# https://docs.cloud-init.io/en/latest/explanation/format.html#cloud-boothook
+
+# On first boot, configure journald.conf(5) to print logs to tty7 and restart journald.
+# This means we print logs to tty7 on every boot, including the first boot. We use a
+# boothook here, instead of write_files + cc_scripts_user, because boothooks run much
+# earlier, so more logs will be readable.
+# https://manpages.ubuntu.com/manpages/jammy/en/man1/cloud-init-per.1.html
+cloud-init-per instance configure-journald  tee -a /etc/systemd/journald.conf <<'EOF'
+ForwardToConsole=yes
+MaxLevelConsole=debug
+TTYPath=/dev/tty7
+EOF
+cloud-init-per instance restart-journald  systemctl restart systemd-journald
+
+# On every boot, switch to tty7, which displays logs only and has no getty.
+chvt 7
+
+--==part==
+Content-Type: text/x-shellscript; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: binary
+
+#!/bin/sh
+# This script runs once, near the end of cloud-init.
+# https://docs.cloud-init.io/en/24.1/reference/datasources/nocloud.html#file-formats
+# https://docs.cloud-init.io/en/24.1/explanation/format.html#user-data-script
+
+# We need to boot the Ubuntu cloud image once, so we can expand the root filesystem.
+# But once this is done, we shut down, so we can continue building the image.
+cloud-init-per instance poweroff  poweroff
+
+--==part==--
