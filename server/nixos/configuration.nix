@@ -64,6 +64,7 @@
   boot.kernelParams = ["default_hugepagesz=1G" "hugepagesz=1G" "hugepages=96"];
 
   environment.systemPackages = with pkgs; [
+    cdrkit  # for genisoimage
     clang
     gh
     git
