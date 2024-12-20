@@ -116,7 +116,7 @@ To build the base vm, first build a clean image:
     - VirtIO drivers: [virtio-win-0.1.240.iso](https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.240-1/virtio-win-0.1.240.iso) (sha256 = ebd48258668f7f78e026ed276c28a9d19d83e020ffa080ad69910dc86bbcbcc6)
 - Create zvol and libvirt guest with random UUID and MAC address
     - `zfs create -V 90G tank/base/servo-windows10.clean`
-    - `virsh define windows10.xml`
+    - `virsh define windows10/guest.xml`
     - `virt-clone --preserve-data --check path_in_use=off -o servo-windows10.init -n servo-windows10.clean -f /dev/zvol/tank/base/servo-windows10.clean`
     - `virsh undefine servo-windows10.init`
 - Install Windows:
@@ -156,7 +156,7 @@ To build the base vm, first build a clean image:
     - Ubuntu Server 22.04 cloud image: [jammy-server-cloudimg-amd64.img](https://cloud-images.ubuntu.com/jammy/20241217/jammy-server-cloudimg-amd64.img) (sha256 = 0d8345a343c2547e55ac815342e6cb4a593aa5556872651eb47e6856a2bb0cdd)
 - Create zvol and libvirt guest with random UUID and MAC address
     - `zfs create -V 90G tank/base/servo-ubuntu2204.clean`
-    - `virsh define ubuntu2204.xml`
+    - `virsh define ubuntu2204/guest.xml`
     - `virt-clone --preserve-data --check path_in_use=off -o servo-ubuntu2204.init -n servo-ubuntu2204.clean -f /dev/zvol/tank/base/servo-ubuntu2204.clean`
     - `virsh undefine servo-ubuntu2204.init`
 - Install Ubuntu:
@@ -195,7 +195,7 @@ To build the base vm, first build a clean image:
 - Clone the OSX-KVM repo: `git clone https://github.com/kholia/OSX-KVM.git /var/lib/libvirt/images/OSX-KVM`
 - Create zvol and libvirt guest with random UUID and MAC address
     - `zfs create -V 90G tank/base/servo-macos13.clean`
-    - `virsh define macos13.xml`
+    - `virsh define macos13/guest.xml`
     - `virt-clone --preserve-data --check path_in_use=off -o servo-macos13.init -n servo-macos13.clean --nvram /var/lib/libvirt/images/OSX-KVM/OVMF_VARS.servo-macos13.clean.fd -f /var/lib/libvirt/images/OSX-KVM/OpenCore/OpenCore.qcow2 -f /dev/zvol/tank/base/servo-macos13.clean -f /var/lib/libvirt/images/OSX-KVM/BaseSystem.img`
     - `cp /var/lib/libvirt/images/OSX-KVM/{OVMF_VARS-1920x1080.fd,OVMF_VARS.servo-macos13.clean.fd}`
     - `virsh undefine --keep-nvram servo-macos13.init`
