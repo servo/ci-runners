@@ -72,7 +72,7 @@ enum Request {
 
     /// GET `/runner/<our runner id>/screenshot` => image/png
     Screenshot {
-        response_tx: Sender<Temp>,
+        response_tx: Sender<eyre::Result<Temp>>,
         runner_id: usize,
     },
 }
@@ -178,7 +178,7 @@ async fn main() -> eyre::Result<()> {
                     },
                     DOTENV.monitor_thread_send_timeout,
                 )?;
-                let path = response_rx.recv_timeout(DOTENV.monitor_thread_recv_timeout)?;
+                let path = response_rx.recv_timeout(DOTENV.monitor_thread_recv_timeout)??;
                 let mut file = File::open(&path)?; // borrow to avoid dropping Temp
                 let mut result = vec![];
                 file.read_to_end(&mut result)?;
@@ -410,9 +410,8 @@ fn monitor_thread() -> eyre::Result<()> {
                     response_tx,
                     runner_id,
                 } => {
-                    let response = runners.screenshot_runner(runner_id)?;
                     response_tx
-                        .send(response)
+                        .send(runners.screenshot_runner(runner_id))
                         .expect("Failed to send Response to API thread");
                 }
             }
