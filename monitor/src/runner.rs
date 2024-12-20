@@ -2,16 +2,18 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Debug,
     fs,
+    path::PathBuf,
     process::Command,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use itertools::Itertools;
-use jane_eyre::eyre::{self, bail};
+use jane_eyre::eyre::{self, bail, eyre};
+use mktemp::Temp;
 use serde::Serialize;
 use tracing::{info, trace, warn};
 
-use crate::{data::get_runner_data_path, github::ApiRunner, libvirt::libvirt_prefix};
+use crate::{data::get_runner_data_path, github::ApiRunner, libvirt::libvirt_prefix, shell::SHELL};
 
 #[derive(Debug, Serialize)]
 pub struct Runners {
@@ -157,6 +159,30 @@ impl Runners {
             .unwrap();
         if exit_status.success() {
             Ok(())
+        } else {
+            eyre::bail!("Command exited with status {}", exit_status);
+        }
+    }
+
+    pub fn screenshot_runner(&self, id: usize) -> eyre::Result<Temp> {
+        let Some(runner) = self.runners.get(&id) else {
+            bail!("No runner with id exists: {id}");
+        };
+        let Some(guest_name) = runner.guest_name.as_deref() else {
+            bail!("Tried to screenshot a runner with no libvirt guest: {id}");
+        };
+        let result = Temp::new_file()?;
+        let exit_status = SHELL
+            .lock()
+            .map_err(|e| eyre!("Mutex poisoned: {e:?}"))?
+            .run(
+                include_str!("screenshot-guest.sh"),
+                [PathBuf::from(guest_name), result.clone()],
+            )?
+            .spawn()?
+            .wait()?;
+        if exit_status.success() {
+            Ok(result)
         } else {
             eyre::bail!("Command exited with status {}", exit_status);
         }

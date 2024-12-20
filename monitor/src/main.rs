@@ -5,10 +5,13 @@ mod libvirt;
 mod profile;
 mod runner;
 mod settings;
+mod shell;
 mod zfs;
 
 use std::{
     collections::BTreeMap,
+    fs::File,
+    io::Read,
     net::IpAddr,
     process::exit,
     sync::{LazyLock, RwLock},
@@ -20,6 +23,7 @@ use crossbeam_channel::{Receiver, Sender};
 use dotenv::dotenv;
 use http::StatusCode;
 use jane_eyre::eyre::{self, eyre};
+use mktemp::Temp;
 use serde_json::json;
 use tracing::{error, info, trace, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -51,6 +55,9 @@ static TOML: LazyLock<Toml> =
 /// GET `/` => `{"profile_runner_counts": {}, "runners": []}`
 static STATUS: RwLock<Option<String>> = RwLock::new(None);
 
+static JSON: &str = "application/json; charset=utf-8";
+static PNG: &str = "image/png";
+
 #[derive(Debug)]
 enum Request {
     /// POST `/<profile>/<unique id>/<user>/<repo>/<run id>` => `{"id", "runner"}` | `null`
@@ -61,6 +68,12 @@ enum Request {
         user: String,
         repo: String,
         run_id: String,
+    },
+
+    /// GET `/runner/<our runner id>/screenshot` => image/png
+    Screenshot {
+        response_tx: Sender<Temp>,
+        runner_id: usize,
     },
 }
 
@@ -124,7 +137,8 @@ async fn main() -> eyre::Result<()> {
                         "Monitor thread is still starting or not responding"
                     )))
                 })
-        });
+        })
+        .with(header("Content-Type", JSON));
 
     let take_runner_route = warp::path!(String / String / String / String / String)
         .and(warp::filters::method::post())
@@ -149,11 +163,33 @@ async fn main() -> eyre::Result<()> {
                 Ok(response_rx.recv_timeout(DOTENV.monitor_thread_recv_timeout)?)
             }()
             .map_err(|error| reject::custom(ChannelError(error)))
-        });
+        })
+        .with(header("Content-Type", JSON));
 
-    // Successful responses are in JSON. Error responses are in plain text.
-    let routes = status_route.or(take_runner_route);
-    let routes = routes.with(header("Content-Type", "application/json; charset=utf-8"));
+    let screenshot_route = warp::path!("runner" / usize / "screenshot")
+        .and(warp::filters::method::get())
+        .and_then(|runner_id| async move {
+            || -> eyre::Result<Vec<u8>> {
+                let (response_tx, response_rx) = crossbeam_channel::bounded(0);
+                REQUEST.sender.send_timeout(
+                    Request::Screenshot {
+                        response_tx,
+                        runner_id,
+                    },
+                    DOTENV.monitor_thread_send_timeout,
+                )?;
+                let path = response_rx.recv_timeout(DOTENV.monitor_thread_recv_timeout)?;
+                let mut file = File::open(&path)?; // borrow to avoid dropping Temp
+                let mut result = vec![];
+                file.read_to_end(&mut result)?;
+                Ok(result)
+            }()
+            .map_err(|error| reject::custom(ChannelError(error)))
+        })
+        .with(header("Content-Type", PNG));
+
+    // Successful responses are in their own types. Error responses are in plain text.
+    let routes = status_route.or(take_runner_route).or(screenshot_route);
     let routes = routes.recover(recover);
 
     warp::serve(routes)
@@ -336,7 +372,7 @@ fn monitor_thread() -> eyre::Result<()> {
         if let Ok(request) = REQUEST.receiver.recv_timeout(DOTENV.monitor_poll_interval) {
             info!(?request, "Received API request");
 
-            let (response_tx, response) = match request {
+            match request {
                 Request::TakeRunner {
                     response_tx,
                     profile,
@@ -366,13 +402,20 @@ fn monitor_thread() -> eyre::Result<()> {
                         // TODO: send error when no runners available
                         serde_json::to_string(&Option::<()>::None)?
                     };
-                    (response_tx, response)
+                    response_tx
+                        .send(response)
+                        .expect("Failed to send Response to API thread");
                 }
-            };
-
-            response_tx
-                .send(response)
-                .expect("Failed to send Response to API thread");
+                Request::Screenshot {
+                    response_tx,
+                    runner_id,
+                } => {
+                    let response = runners.screenshot_runner(runner_id)?;
+                    response_tx
+                        .send(response)
+                        .expect("Failed to send Response to API thread");
+                }
+            }
         } else {
             info!("Did not receive an API request");
         }
