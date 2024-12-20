@@ -361,6 +361,7 @@ fn monitor_thread() -> eyre::Result<()> {
                     .map(|(id, runner)| {
                         json!({
                             "id": id,
+                            "screenshot_url": format!("{}runner/{id}/screenshot", TOML.external_base_url),
                             "runner": runner,
                         })
                     })

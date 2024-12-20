@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use jane_eyre::eyre;
+use jane_eyre::eyre::{self, bail};
 use serde::Deserialize;
 
 use crate::profile::Profile;
@@ -38,6 +38,7 @@ pub struct Dotenv {
 
 #[derive(Deserialize)]
 pub struct Toml {
+    pub external_base_url: String,
     pub profiles: BTreeMap<String, Profile>,
 }
 
@@ -76,6 +77,10 @@ impl Toml {
         let mut result = String::default();
         File::open(path)?.read_to_string(&mut result)?;
         let result: Toml = toml::from_str(&result)?;
+
+        if !result.external_base_url.ends_with("/") {
+            bail!("external_base_url setting must end with slash!");
+        }
 
         for (key, profile) in result.profiles.iter() {
             assert_eq!(*key, profile.base_vm_name, "Runner::base_vm_name relies on Toml.profiles key (profile name) and base_vm_name being equal");
