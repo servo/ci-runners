@@ -19,6 +19,14 @@ Windows Registry Editor Version 5.00
 [HKEY_LOCAL_MACHINE\Software\Microsoft\ServerManager]
 "DoNotOpenServerManagerAtLogon"=dword:00000001
 
+; Don’t turn display off after inactivity
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Power]
+
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Power\PowerSettings]
+
+[HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Power\PowerSettings\3C0BC021-C8A8-4E07-A973-6B14CBCB2B7E]
+"ACSettingIndex"=dword:00000000
+
 ; Disable Windows Update
 ; See also: <https://github.com/meetrevision/playbook/blob/24.06/src/Configuration/features/revision/registry/configure-windows-update-and-install.yml>
 [HKEY_LOCAL_MACHINE\Software\Policies\Microsoft\Windows\WindowsUpdate]
