@@ -148,6 +148,8 @@ $ ./create-runner.sh servo-windows10 ready windows10
 Ubuntu runner
 -------------
 
+Runners created from this image preinstall all dependencies (including those specified in the main repo, like mach bootstrap deps), preload the main repo, and prebuild Servo in the release profile.
+
 To build the base vm, first build a clean image:
 
 - Download images into /var/lib/libvirt/images
@@ -158,8 +160,8 @@ To build the base vm, first build a clean image:
     - `virt-clone --preserve-data --check path_in_use=off -o servo-ubuntu2204.init -n servo-ubuntu2204.clean -f /dev/zvol/tank/base/servo-ubuntu2204.clean`
     - `virsh undefine servo-ubuntu2204.init`
 - Install Ubuntu:
-    - `qemu-img convert -f qcow2 -O raw jammy-server-cloudimg-amd64.{img,raw}`
-    - `dd status=progress bs=1M if=jammy-server-cloudimg-amd64.raw of=/dev/zvol/tank/base/servo-ubuntu2204.clean`
+    - `qemu-img convert -f qcow2 -O raw /var/lib/libvirt/images/jammy-server-cloudimg-amd64.{img,raw}`
+    - `dd status=progress bs=1M if=/var/lib/libvirt/images/jammy-server-cloudimg-amd64.raw of=/dev/zvol/tank/base/servo-ubuntu2204.clean`
     - `genisoimage -V CIDATA -R -o /var/lib/libvirt/images/servo-ubuntu2204.config.iso ubuntu2204/{user-data,meta-data}`
     - `virsh start servo-ubuntu2204.clean`
     - Wait for the guest to shut down
