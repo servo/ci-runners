@@ -4,7 +4,7 @@ use std::{
 };
 
 use jane_eyre::eyre::{self, Context};
-use log::warn;
+use tracing::warn;
 
 use crate::data::get_data_path;
 
@@ -38,7 +38,7 @@ impl IdGen {
         let last = self.last.map_or(0, |id| id + 1);
         self.last = Some(last);
         if let Err(error) = self.write_last(last) {
-            warn!("{error}");
+            warn!(?error, "Failed to write last-runner-id: {error}");
         }
 
         last

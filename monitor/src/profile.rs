@@ -1,8 +1,8 @@
 use std::process::Command;
 
 use jane_eyre::eyre;
-use log::info;
 use serde::{Deserialize, Serialize};
+use tracing::info;
 
 use crate::{
     runner::{Runner, Runners, Status},
@@ -32,10 +32,7 @@ pub struct RunnerCounts {
 
 impl Profile {
     pub fn create_runner(&self, id: usize) -> eyre::Result<()> {
-        info!(
-            "Creating runner {id} with base vm name {}",
-            self.base_vm_name
-        );
+        info!(runner_id = id, self.base_vm_name, "Creating runner");
         let exit_status = Command::new("../create-runner.sh")
             .args([
                 &id.to_string(),
@@ -56,10 +53,7 @@ impl Profile {
     }
 
     pub fn destroy_runner(&self, id: usize) -> eyre::Result<()> {
-        info!(
-            "Destroying runner {id} with base vm name {}",
-            self.base_vm_name
-        );
+        info!(runner_id = id, self.base_vm_name, "Destroying runner");
         let exit_status = Command::new("../destroy-runner.sh")
             .args([&self.base_vm_name, &id.to_string()])
             .spawn()

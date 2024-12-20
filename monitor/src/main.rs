@@ -20,8 +20,9 @@ use crossbeam_channel::{Receiver, Sender};
 use dotenv::dotenv;
 use http::StatusCode;
 use jane_eyre::eyre::{self, eyre};
-use log::{error, info, trace, warn};
 use serde_json::json;
+use tracing::{error, info, trace, warn};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 use warp::{
     filters::reply::header,
     reject::{self, Reject, Rejection},
@@ -82,7 +83,15 @@ static REQUEST: LazyLock<Channel<Request>> = LazyLock::new(|| {
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
     jane_eyre::install()?;
-    env_logger::init();
+    if std::env::var_os("RUST_LOG").is_none() {
+        // EnvFilter Builder::with_default_directive doesn’t support multiple directives,
+        // so we need to apply defaults ourselves.
+        std::env::set_var("RUST_LOG", "monitor=info,warp::server=info");
+    }
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer().with_writer(std::io::stderr))
+        .with(EnvFilter::builder().from_env_lossy())
+        .init();
 
     tokio::task::spawn(async move {
         let thread = thread::spawn(monitor_thread);
@@ -93,8 +102,8 @@ async fn main() -> eyre::Result<()> {
                         info!("Monitor thread exited");
                         exit(0);
                     }
-                    Ok(Err(report)) => error!("Monitor thread error: {report}"),
-                    Err(panic) => error!("Monitor thread panic: {panic:?}"),
+                    Ok(Err(report)) => error!(%report, "Monitor thread error"),
+                    Err(panic) => error!(?panic, "Monitor thread panic"),
                 };
                 exit(1);
             }
@@ -157,14 +166,14 @@ async fn main() -> eyre::Result<()> {
 async fn recover(error: Rejection) -> Result<impl Reply, std::convert::Infallible> {
     Ok(if let Some(error) = error.find::<NotReadyError>() {
         error!(
-            "NotReadyError: responding with HTTP 503 Service Unavailable: {}",
-            error.0
+            ?error,
+            "NotReadyError: responding with HTTP 503 Service Unavailable: {}", error.0
         );
         reply::with_status(format!("{}", error.0), StatusCode::SERVICE_UNAVAILABLE)
     } else if let Some(error) = error.find::<ChannelError>() {
         error!(
-            "ChannelError: responding with HTTP 500 Internal Server Error: {}",
-            error.0
+            ?error,
+            "ChannelError: responding with HTTP 500 Internal Server Error: {}", error.0
         );
         reply::with_status(
             format!("Channel error: {}", error.0),
@@ -172,11 +181,11 @@ async fn recover(error: Rejection) -> Result<impl Reply, std::convert::Infallibl
         )
     } else {
         error!(
-            "Internal error: responding with HTTP 500 Internal Server Error: {:?}",
-            error
+            ?error,
+            "Unknown error: responding with HTTP 500 Internal Server Error",
         );
         reply::with_status(
-            format!("Internal error: {error:?}"),
+            format!("Unknown error: {error:?}"),
             StatusCode::INTERNAL_SERVER_ERROR,
         )
     })
@@ -188,7 +197,7 @@ async fn recover(error: Rejection) -> Result<impl Reply, std::convert::Infallibl
 /// each request, then sends one response to the API server for each request.
 fn monitor_thread() -> eyre::Result<()> {
     let mut id_gen = IdGen::new_load().unwrap_or_else(|error| {
-        warn!("{error}");
+        warn!(?error, "Failed to read last-runner-id: {error}");
         IdGen::new_empty()
     });
 
@@ -198,9 +207,7 @@ fn monitor_thread() -> eyre::Result<()> {
         let registrations = registrations_cache.get(|| list_registered_runners_for_host())?;
         let guests = list_runner_guests()?;
         let volumes = list_runner_volumes()?;
-        trace!("registrations = {:?}", registrations);
-        trace!("guests = {:?}", guests);
-        trace!("volumes = {:?}", volumes);
+        trace!(?registrations, ?guests, ?volumes);
         info!(
             "{} registrations, {} guests, {} volumes",
             registrations.len(),
@@ -236,12 +243,12 @@ fn monitor_thread() -> eyre::Result<()> {
         let mut unregister_and_destroy = |id, runner: &Runner| {
             if runner.registration().is_some() {
                 if let Err(error) = runners.unregister_runner(id) {
-                    warn!("Failed to unregister runner: {error}");
+                    warn!(?error, "Failed to unregister runner: {error}");
                 }
             }
             if let Some(profile) = TOML.profile(runner.base_vm_name()) {
                 if let Err(error) = profile.destroy_runner(id) {
-                    warn!("Failed to destroy runner: {error}");
+                    warn!(?error, "Failed to destroy runner: {error}");
                 }
             }
             registrations_cache.invalidate();
@@ -302,7 +309,7 @@ fn monitor_thread() -> eyre::Result<()> {
             for (profile, wanted_count) in profile_wanted_counts {
                 for _ in 0..wanted_count {
                     if let Err(error) = profile.create_runner(id_gen.next()) {
-                        warn!("Failed to create runner: {error}");
+                        warn!(?error, "Failed to create runner: {error}");
                     }
                     registrations_cache.invalidate();
                 }
@@ -327,7 +334,7 @@ fn monitor_thread() -> eyre::Result<()> {
 
         // Handle one request from the API.
         if let Ok(request) = REQUEST.receiver.recv_timeout(DOTENV.monitor_poll_interval) {
-            info!("Received API request: {request:?}");
+            info!(?request, "Received API request");
 
             let (response_tx, response) = match request {
                 Request::TakeRunner {

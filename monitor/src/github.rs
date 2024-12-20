@@ -5,8 +5,8 @@ use std::{
 };
 
 use jane_eyre::eyre::{self, Context};
-use log::trace;
 use serde::{Deserialize, Serialize};
+use tracing::trace;
 
 use crate::DOTENV;
 
@@ -52,10 +52,10 @@ impl<Response: Clone + Debug> Cache<Response> {
         if let Some(cached) = &mut self.inner {
             let age = Instant::now().duration_since(cached.cached_at);
             if age < DOTENV.api_cache_timeout {
-                trace!("Cache hit ({age:?} seconds old): {:?}", cached.response);
+                trace!(?age, ?cached.response, "Cache hit");
                 return Ok(cached.response.clone());
             } else {
-                trace!("Cache expired ({age:?} seconds old)");
+                trace!(?age, "Cache expired");
                 self.invalidate();
             }
         }

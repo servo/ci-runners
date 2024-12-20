@@ -8,8 +8,8 @@ use std::{
 
 use itertools::Itertools;
 use jane_eyre::eyre::{self, bail};
-use log::{info, trace, warn};
 use serde::Serialize;
+use tracing::{info, trace, warn};
 
 use crate::{data::get_runner_data_path, github::ApiRunner, libvirt::libvirt_prefix};
 
@@ -67,7 +67,7 @@ impl Runners {
             .chain(guest_ids.iter().copied())
             .chain(volume_ids.iter().copied())
             .collect();
-        trace!("ids = {ids:?}, registration_ids = {registration_ids:?}, guest_ids = {guest_ids:?}, volume_ids = {volume_ids:?}");
+        trace!(?ids, ?registration_ids, ?guest_ids, ?volume_ids);
 
         // Create a tracking object for each runner id.
         let mut runners = BTreeMap::default();
@@ -75,7 +75,11 @@ impl Runners {
             let runner = match Runner::new(id) {
                 Ok(runner) => runner,
                 Err(error) => {
-                    warn!("Failed to create Runner object for runner id {id}: {error}");
+                    warn!(
+                        runner_id = id,
+                        ?error,
+                        "Failed to create Runner object: {error}",
+                    );
                     continue;
                 }
             };
@@ -114,10 +118,7 @@ impl Runners {
         else {
             bail!("Tried to unregister an unregistered runner");
         };
-        info!(
-            "Unregistering runner {id} with GitHub API runner id {}",
-            registration.id
-        );
+        info!(runner_id = id, registration.id, "Unregistering runner");
         let exit_status = Command::new("../unregister-runner.sh")
             .arg(&registration.id.to_string())
             .spawn()
@@ -145,10 +146,7 @@ impl Runners {
         let Some(registration) = runner.registration() else {
             bail!("Tried to reserve an unregistered runner");
         };
-        info!(
-            "Reserving runner {id} with GitHub API runner id {}",
-            registration.id
-        );
+        info!(runner_id = id, registration.id, "Reserving runner");
         let exit_status = Command::new("../reserve-runner.sh")
             .arg(&registration.id.to_string())
             .arg(unique_id)
@@ -172,7 +170,7 @@ impl Runner {
     fn new(id: usize) -> eyre::Result<Self> {
         let created_time = get_runner_data_path(id, "created-time")?;
         let created_time = fs::metadata(created_time)?.modified()?;
-        trace!("[{id}] created_time = {created_time:?}");
+        trace!(?created_time, "[{id}]");
 
         Ok(Self {
             id,
