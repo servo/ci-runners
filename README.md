@@ -109,35 +109,16 @@ Windows 10 runner
 
 Runners created from this image preinstall all dependencies (including those specified in the main repo, like GStreamer and Chocolatey deps), preload the main repo, and prebuild Servo in the release profile.
 
-To build the base vm, first build a clean image:
+To build the base vm image:
 
 - Download images into /var/lib/libvirt/images
     - Windows 10 (multi-edition ISO), English (United States): [Win10_22H2_English_x64v1.iso](https://www.microsoft.com/en-us/software-download/windows10ISO) (sha256 = a6f470ca6d331eb353b815c043e327a347f594f37ff525f17764738fe812852e)
-    - VirtIO drivers: [virtio-win-0.1.240.iso](https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.240-1/virtio-win-0.1.240.iso) (sha256 = ebd48258668f7f78e026ed276c28a9d19d83e020ffa080ad69910dc86bbcbcc6)
-- Create zvol and libvirt guest with random UUID and MAC address
-    - `zfs create -V 90G tank/base/servo-windows10.clean`
-    - `virsh define windows10/guest.xml`
-    - `virt-clone --preserve-data --check path_in_use=off -o servo-windows10.init -n servo-windows10.clean -f /dev/zvol/tank/base/servo-windows10.clean`
-    - `virsh undefine servo-windows10.init`
-- Install Windows:
-    - `genisoimage -J -o /var/lib/libvirt/images/servo-windows10.config.iso windows10/autounattend.xml`
-    - `virsh start servo-windows10.clean`
-    - Wait for the guest to shut down
-- Take a snapshot: `zfs snapshot tank/base/servo-windows10.clean@oobe`
-
-Then build the base image:
-
-- Clone the clean image: `zfs clone tank/base/servo-windows10{.clean@oobe,.new}`
-- Create a temporary libvirt guest: `virt-clone --preserve-data --check path_in_use=off -o servo-windows10.clean -n servo-windows10.new -f /dev/zvol/tank/base/servo-windows10.new`
-- Update new base image: `./mount-runner.sh servo-windows10.new $PWD/windows10/configure-base.sh`
-- Take a snapshot: `zfs snapshot tank/base/servo-windows10.new@configure-base`
-- Boot temporary vm guest: `virsh start servo-windows10.new`
-- Wait for the guest to shut down, which indicates Servo was built successfully
-- Take another snapshot: `zfs snapshot tank/base/servo-windows10.new@ready`
+- Run the build script: `windows10/build-image.sh`
+    - FIXME: if Windows fails to autologon (stuck at lock screen): `virsh reboot servo-windows10.new`
 - Destroy the old base image (if it exists): `zfs destroy -r tank/base/servo-windows10`
 - Rename the new base image: `zfs rename tank/base/servo-windows10{.new,}`
+- Create the base libvirt guest (if it doesn’t exist): `virt-clone --preserve-data --check path_in_use=off -o servo-windows10.new -n servo-windows10 -f /dev/zvol/tank/base/servo-windows10`
 - Undefine the temporary libvirt guest: `virsh undefine servo-windows10.new`
-- Create the base libvirt guest (if it doesn’t exist): `virt-clone --preserve-data --check path_in_use=off -o servo-windows10.clean -n servo-windows10 -f /dev/zvol/tank/base/servo-windows10`
 
 To clone and start a new runner:
 
@@ -150,36 +131,13 @@ Ubuntu runner
 
 Runners created from this image preinstall all dependencies (including those specified in the main repo, like mach bootstrap deps), preload the main repo, and prebuild Servo in the release profile.
 
-To build the base vm, first build a clean image:
+To build the base vm image:
 
-- Download images into /var/lib/libvirt/images
-    - Ubuntu Server 22.04 cloud image: [jammy-server-cloudimg-amd64.img](https://cloud-images.ubuntu.com/jammy/20241217/jammy-server-cloudimg-amd64.img) (sha256 = 0d8345a343c2547e55ac815342e6cb4a593aa5556872651eb47e6856a2bb0cdd)
-- Create zvol and libvirt guest with random UUID and MAC address
-    - `zfs create -V 90G tank/base/servo-ubuntu2204.clean`
-    - `virsh define ubuntu2204/guest.xml`
-    - `virt-clone --preserve-data --check path_in_use=off -o servo-ubuntu2204.init -n servo-ubuntu2204.clean -f /dev/zvol/tank/base/servo-ubuntu2204.clean`
-    - `virsh undefine servo-ubuntu2204.init`
-- Install Ubuntu:
-    - `qemu-img convert -f qcow2 -O raw /var/lib/libvirt/images/jammy-server-cloudimg-amd64.{img,raw}`
-    - `dd status=progress bs=1M if=/var/lib/libvirt/images/jammy-server-cloudimg-amd64.raw of=/dev/zvol/tank/base/servo-ubuntu2204.clean`
-    - `genisoimage -V CIDATA -R -o /var/lib/libvirt/images/servo-ubuntu2204.config.iso ubuntu2204/{user-data,meta-data}`
-    - `virsh start servo-ubuntu2204.clean`
-    - Wait for the guest to shut down
-- Take a snapshot: `zfs snapshot tank/base/servo-ubuntu2204.clean@fresh-install`
-
-Then build the base image:
-
-- Clone the clean image: `zfs clone tank/base/servo-ubuntu2204{.clean@fresh-install,.new}`
-- Create a temporary libvirt guest: `virt-clone --preserve-data --check path_in_use=off -o servo-ubuntu2204.clean -n servo-ubuntu2204.new -f /dev/zvol/tank/base/servo-ubuntu2204.new`
-- Update new base image: `./mount-runner.sh servo-ubuntu2204.new $PWD/ubuntu2204/configure-base.sh`
-- Take another snapshot: `zfs snapshot tank/base/servo-ubuntu2204.new@configure-base`
-- Boot temporary vm guest: `virsh start servo-ubuntu2204.new`
-- Wait for the guest to shut down, which indicates Servo was built successfully
-- Take another snapshot: `zfs snapshot tank/base/servo-ubuntu2204.new@ready`
+- Run the build script: `ubuntu2204/build-image.sh`
 - Destroy the old base image (if it exists): `zfs destroy -r tank/base/servo-ubuntu2204`
 - Rename the new base image: `zfs rename tank/base/servo-ubuntu2204{.new,}`
+- Create the base libvirt guest (if it doesn’t exist): `virt-clone --preserve-data --check path_in_use=off -o servo-ubuntu2204.new -n servo-ubuntu2204 -f /dev/zvol/tank/base/servo-ubuntu2204`
 - Undefine the temporary libvirt guest: `virsh undefine servo-ubuntu2204.new`
-- Create the base libvirt guest (if it doesn’t exist): `virt-clone --preserve-data --check path_in_use=off -o servo-ubuntu2204.clean -n servo-ubuntu2204 -f /dev/zvol/tank/base/servo-ubuntu2204`
 
 To clone and start a new runner:
 
