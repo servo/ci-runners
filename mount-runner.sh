@@ -18,5 +18,11 @@ else
     >&2 echo "fatal: failed to find $vm-part1 in /dev/zvol/$SERVO_CI_ZFS_PREFIX or /dev/zvol/$SERVO_CI_ZFS_CLONE_PREFIX"
     exit 1
 fi
-( cd $mount; "$@" || : )
+cd $mount
+set +e
+"$@"
+retval=$?
+set -e
+cd -
 umount $mount
+exit $retval

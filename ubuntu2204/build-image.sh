@@ -71,10 +71,11 @@ if ! time virsh event --timeout 2000 -- "$image_name" lifecycle; then
     exit 1
 fi
 
+>&2 echo '[*] Checking that Servo was built correctly'
+./mount-runner.sh "$image_name" sh -c 'ls init/built_servo_once_successfully'
+
 snapshot=$(date -u +\%FT\%RZ)
 >&2 echo "[*] Taking zvol snapshot: $SERVO_CI_ZFS_CLONE_PREFIX/$image_name@build-image-$snapshot"
 zfs snapshot "$SERVO_CI_ZFS_CLONE_PREFIX/$image_name@build-image-$snapshot"
-
-# TODO: check that servo was actually built correctly
 
 >&2 echo '[*] Done!'
