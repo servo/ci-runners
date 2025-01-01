@@ -115,6 +115,7 @@ To build the base vm image:
     - Windows 10 (multi-edition ISO), English (United States): [Win10_22H2_English_x64v1.iso](https://www.microsoft.com/en-us/software-download/windows10ISO) (sha256 = a6f470ca6d331eb353b815c043e327a347f594f37ff525f17764738fe812852e)
 - Run the build script: `windows10/build-image.sh`
     - FIXME: if Windows fails to autologon (stuck at lock screen): `virsh reboot servo-windows10.new`
+- Update the profile config in `monitor/monitor.toml` to point to the new zvol snapshot, e.g. `base_image_snapshot = "build-image-2025-01-01T11:30Z"`
 
 To clone and start a new runner:
 
@@ -130,6 +131,7 @@ Runners created from this image preinstall all dependencies (including those spe
 To build the base vm image:
 
 - Run the build script: `ubuntu2204/build-image.sh`
+- Update the profile config in `monitor/monitor.toml` to point to the new zvol snapshot, e.g. `base_image_snapshot = "build-image-2025-01-01T11:30Z"`
 
 To clone and start a new runner:
 
