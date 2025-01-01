@@ -56,13 +56,19 @@ static DOTENV: LazyLock<Dotenv> = LazyLock::new(|| {
 static TOML: LazyLock<Toml> =
     LazyLock::new(|| Toml::load_default().expect("Failed to load settings from monitor.toml"));
 
-/// GET `/` => `{"profile_runner_counts": {}, "runners": []}`
 static DASHBOARD: RwLock<Option<Dashboard>> = RwLock::new(None);
 
 static HTML: &str = "text/html; charset=utf-8";
 static JSON: &str = "application/json; charset=utf-8";
 static PNG: &str = "image/png";
 
+/// Requests that are handled synchronously by the monitor thread.
+///
+/// The requests that can be handled without the monitor thread are as follows:
+/// - GET `/` => templates/index.html
+/// - GET `/dashboard.html` => templates/dashboard.html
+/// - GET `/dashboard.json` => `{"profile_runner_counts": {}, "runners": []}`
+/// - GET `/runner/<our runner id>/screenshot.png` => image/png
 #[derive(Debug)]
 enum Request {
     /// POST `/<profile>/<unique id>/<user>/<repo>/<run id>` => `{"id", "runner"}` | `null`
@@ -75,7 +81,7 @@ enum Request {
         run_id: String,
     },
 
-    /// GET `/runner/<our runner id>/screenshot` => image/png
+    /// GET `/runner/<our runner id>/screenshot/now` => image/png
     Screenshot {
         response_tx: Sender<eyre::Result<Temp>>,
         runner_id: usize,
