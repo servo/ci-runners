@@ -13,7 +13,7 @@ register_runner=$script_dir/$configuration_name/register-runner.sh
 vm=$base_vm.$id
 >&2 printf '[*] Creating runner: %s\n' $vm
 
-runner_data=$SERVO_CI_MONITOR_DATA_PATH/$id
+runner_data=$SERVO_CI_MONITOR_DATA_PATH/runners/$id
 mkdir $runner_data
 touch $runner_data/created-time
 

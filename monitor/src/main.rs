@@ -38,7 +38,7 @@ use warp::{
 
 use crate::{
     dashboard::Dashboard,
-    data::get_runner_data_path,
+    data::{get_runner_data_path, run_migrations},
     github::{list_registered_runners_for_host, Cache},
     id::IdGen,
     libvirt::list_runner_guests,
@@ -125,6 +125,8 @@ async fn main() -> eyre::Result<()> {
         .with(tracing_subscriber::fmt::layer().with_writer(std::io::stderr))
         .with(EnvFilter::builder().from_env_lossy())
         .init();
+
+    run_migrations()?;
 
     tokio::task::spawn(async move {
         let thread = thread::spawn(monitor_thread);
