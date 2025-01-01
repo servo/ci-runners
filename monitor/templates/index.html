@@ -49,19 +49,34 @@
 </fieldset>
 
 <script>
+    const screenshotImg = document.querySelector("#screenshot img");
     const pollInterval = 1000;
     setTimeout(update, pollInterval);
 
     async function update() {
         const response = await fetch("/dashboard.html");
         document.querySelector("main").innerHTML = await response.text();
+        if (screenshotImg.complete) {
+            try {
+                screenshotImg.src = force_reload(screenshotImg.src);
+            } catch (e) {
+                // Do nothing; src is probably empty
+            }
+        }
         setTimeout(update, pollInterval);
+    }
+
+    function force_reload(url) {
+        // Force reload with timestamp in fragment (not sent to server)
+        const result = new URL(url);
+        result.hash = `${+new Date}`;
+        return `${result}`;
     }
 
     addEventListener("click", event => {
         if (event.target.matches("a.screenshot") && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey) {
             // Force reload with timestamp in fragment (not sent to server)
-            document.querySelector("#screenshot img").src = `${event.target.href}#${+new Date}`;
+            screenshotImg.src = force_reload(event.target.href);
             document.querySelector("#screenshot legend").textContent = event.target.dataset.runnerId;
             document.querySelector("#screenshot").style.display = "initial";
             event.preventDefault();

@@ -1,8 +1,8 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Debug,
-    fs,
-    path::PathBuf,
+    fs::{self, rename},
+    path::{Path, PathBuf},
     process::Command,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -11,7 +11,7 @@ use itertools::Itertools;
 use jane_eyre::eyre::{self, bail, eyre};
 use mktemp::Temp;
 use serde::Serialize;
-use tracing::{info, trace, warn};
+use tracing::{error, info, trace, warn};
 
 use crate::{data::get_runner_data_path, github::ApiRunner, libvirt::libvirt_prefix, shell::SHELL};
 
@@ -192,6 +192,42 @@ impl Runners {
         } else {
             eyre::bail!("Command exited with status {}", exit_status);
         }
+    }
+
+    pub fn update_runner_screenshots(&self) {
+        for &id in self.runners.keys() {
+            if let Err(error) = self.update_runner_screenshot(id) {
+                error!(id, ?error, "Failed to update screenshot for runner");
+            }
+        }
+    }
+
+    fn update_runner_screenshot(&self, id: usize) -> eyre::Result<()> {
+        let Some(runner) = self.runners.get(&id) else {
+            bail!("No runner with id exists: {id}");
+        };
+        let Some(guest_name) = runner.guest_name.as_deref() else {
+            bail!("Tried to screenshot a runner with no libvirt guest: {id}");
+        };
+        let new_path = get_runner_data_path(id, "screenshot.png.new")?;
+        let exit_status = SHELL
+            .lock()
+            .map_err(|e| eyre!("Mutex poisoned: {e:?}"))?
+            .run(
+                include_str!("screenshot-guest.sh"),
+                [Path::new(guest_name), &new_path],
+            )?
+            .spawn()?
+            .wait()?;
+        if !exit_status.success() {
+            eyre::bail!("Command exited with status {}", exit_status);
+        }
+
+        // Update the runner’s screenshot.png atomically
+        let path = get_runner_data_path(id, "screenshot.png")?;
+        rename(new_path, path)?;
+
+        Ok(())
     }
 }
 

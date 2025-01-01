@@ -17,14 +17,14 @@ use std::{
     process::exit,
     sync::{LazyLock, RwLock},
     thread,
-    time::Duration,
+    time::{Duration, UNIX_EPOCH},
 };
 
 use askama::Template;
 use crossbeam_channel::{Receiver, Sender};
 use dotenv::dotenv;
 use http::StatusCode;
-use jane_eyre::eyre::{self, eyre};
+use jane_eyre::eyre::{self, eyre, Context};
 use mktemp::Temp;
 use serde_json::json;
 use tracing::{error, info, trace, warn};
@@ -32,12 +32,13 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 use warp::{
     filters::reply::header,
     reject::{self, Reject, Rejection},
-    reply::{self, Reply},
+    reply::{self, with_header, Reply},
     Filter,
 };
 
 use crate::{
     dashboard::Dashboard,
+    data::get_runner_data_path,
     github::{list_registered_runners_for_host, Cache},
     id::IdGen,
     libvirt::list_runner_guests,
@@ -87,6 +88,9 @@ impl Reject for NotReadyError {}
 #[derive(Debug)]
 struct ChannelError(eyre::Report);
 impl Reject for ChannelError {}
+#[derive(Debug)]
+struct InternalError(eyre::Report);
+impl Reject for InternalError {}
 
 struct Channel<T> {
     sender: Sender<T>,
@@ -138,10 +142,14 @@ async fn main() -> eyre::Result<()> {
         .and(warp::filters::method::get())
         .and_then(|| async {
             DASHBOARD
-                .try_read()
-                .ok()
-                .and_then(|x| x.clone())
-                .map(|x| IndexTemplate { content: x.html })
+                .read()
+                .map_err(|e| {
+                    reject::custom(NotReadyError(eyre!("Failed to acquire RwLock: {e:?}")))
+                })?
+                .as_ref()
+                .map(|d| IndexTemplate {
+                    content: d.html.clone(),
+                })
                 .ok_or_else(|| {
                     reject::custom(NotReadyError(eyre!(
                         "Monitor thread is still starting or not responding"
@@ -154,10 +162,12 @@ async fn main() -> eyre::Result<()> {
         .and(warp::filters::method::get())
         .and_then(|| async {
             DASHBOARD
-                .try_read()
-                .ok()
-                .and_then(|x| x.clone())
-                .map(|x| x.html)
+                .read()
+                .map_err(|e| {
+                    reject::custom(NotReadyError(eyre!("Failed to acquire RwLock: {e:?}")))
+                })?
+                .as_ref()
+                .map(|d| d.html.clone())
                 .ok_or_else(|| {
                     reject::custom(NotReadyError(eyre!(
                         "Monitor thread is still starting or not responding"
@@ -170,10 +180,12 @@ async fn main() -> eyre::Result<()> {
         .and(warp::filters::method::get())
         .and_then(|| async {
             DASHBOARD
-                .try_read()
-                .ok()
-                .and_then(|x| x.clone())
-                .map(|x| x.json)
+                .read()
+                .map_err(|e| {
+                    reject::custom(NotReadyError(eyre!("Failed to acquire RwLock: {e:?}")))
+                })?
+                .as_ref()
+                .map(|x| x.json.clone())
                 .ok_or_else(|| {
                     reject::custom(NotReadyError(eyre!(
                         "Monitor thread is still starting or not responding"
@@ -208,7 +220,43 @@ async fn main() -> eyre::Result<()> {
         })
         .with(header("Content-Type", JSON));
 
-    let screenshot_route = warp::path!("runner" / usize / "screenshot")
+    let screenshot_route = warp::path!("runner" / usize / "screenshot.png")
+        .and(warp::filters::method::get())
+        .and(warp::filters::header::optional("If-None-Match"))
+        .and_then(|runner_id, if_none_match: Option<String>| async move {
+            let path = get_runner_data_path(runner_id, "screenshot.png")
+                .wrap_err("Failed to compute path")
+                .map_err(InternalError)?;
+            let mut file = File::open(path)
+                .wrap_err("Failed to open file")
+                .map_err(InternalError)?;
+            let metadata = file
+                .metadata()
+                .wrap_err("Failed to get metadata")
+                .map_err(InternalError)?;
+            let mtime = metadata
+                .modified()
+                .wrap_err("Failed to get mtime")
+                .map_err(InternalError)?
+                .duration_since(UNIX_EPOCH)
+                .wrap_err("Failed to compute mtime")
+                .map_err(InternalError)?
+                .as_millis();
+            let etag = format!(r#""{mtime}""#);
+
+            Ok::<_, Rejection>(if if_none_match.is_some_and(|inm| inm == etag) {
+                Box::new(StatusCode::NOT_MODIFIED) as Box<dyn Reply>
+            } else {
+                let mut result = vec![];
+                file.read_to_end(&mut result)
+                    .wrap_err("Failed to read file")
+                    .map_err(InternalError)?;
+                Box::new(with_header(result, "ETag", etag)) as Box<dyn Reply>
+            })
+        })
+        .with(header("Content-Type", PNG));
+
+    let screenshot_now_route = warp::path!("runner" / usize / "screenshot" / "now")
         .and(warp::filters::method::get())
         .and_then(|runner_id| async move {
             || -> eyre::Result<Vec<u8>> {
@@ -235,7 +283,8 @@ async fn main() -> eyre::Result<()> {
         .or(dashboard_html_route)
         .or(dashboard_json_route)
         .or(take_runner_route)
-        .or(screenshot_route);
+        .or(screenshot_route)
+        .or(screenshot_now_route);
     let routes = routes.recover(recover);
 
     warp::serve(routes)
@@ -259,6 +308,15 @@ async fn recover(error: Rejection) -> Result<impl Reply, std::convert::Infallibl
         );
         reply::with_status(
             format!("Channel error: {}", error.0),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        )
+    } else if let Some(error) = error.find::<InternalError>() {
+        error!(
+            ?error,
+            "InternalError: responding with HTTP 500 Internal Server Error: {}", error.0
+        );
+        reply::with_status(
+            format!("Internal error: {}", error.0),
             StatusCode::INTERNAL_SERVER_ERROR,
         )
     } else {
@@ -398,9 +456,10 @@ fn monitor_thread() -> eyre::Result<()> {
             }
         }
 
-        // Update status, for the API.
-        if let Ok(mut status) = DASHBOARD.write() {
-            *status = Some(Dashboard::render(&profile_runner_counts, &runners)?);
+        // Update dashboard data, for the API.
+        if let Ok(mut dashboard) = DASHBOARD.write() {
+            *dashboard = Some(Dashboard::render(&profile_runner_counts, &runners)?);
+            runners.update_runner_screenshots();
         }
 
         // Handle one request from the API.
