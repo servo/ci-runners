@@ -112,6 +112,12 @@ impl Runners {
         self.runners.iter()
     }
 
+    pub fn by_profile<'s>(&'s self, key: &'s str) -> impl Iterator<Item = (&usize, &Runner)> {
+        self.runners
+            .iter()
+            .filter(move |(_, runner)| runner.base_vm_name() == key)
+    }
+
     pub fn unregister_runner(&self, id: usize) -> eyre::Result<()> {
         let Some(registration) = self
             .runners

@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+askama = { version = "0.12.1", features = ["with-warp"] }
+askama_warp = "0.13.0"
 crossbeam-channel = "0.5.13"
 dotenv = "0.15.0"
 http = "0.2"

@@ -1,0 +1,62 @@
+<!doctype html><meta charset="utf-8">
+<style>
+    @import url("https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&display=swap");
+    *:not(xmp):not(pre):not(plaintext):not(tt):not(code):not(kbd):not(samp) {
+        font-family: Atkinson Hyperlegible;
+    }
+    .labels {
+        line-height: 3;
+        --radius: 0.25em;
+    }
+    .label {
+        display: inline-block;
+        line-height: normal;
+    }
+    .label.key-only {
+        border-radius: var(--radius);
+        border: 1px solid black;
+        padding: var(--radius);
+        color: white;
+        background: black;
+    }
+    .label.key-value .key {
+        border-radius: var(--radius) 0 0 var(--radius);
+        border: 1px solid black;
+        padding: var(--radius);
+        color: white;
+        background: black;
+    }
+    .label.key-value .value {
+        border-radius: 0 var(--radius) var(--radius) 0;
+        border: 1px solid black;
+        padding: var(--radius);
+    }
+    #screenshot {
+        max-width: 100%;
+    }
+</style>
+
+<main>
+{{ content|safe }}
+</main>
+
+<img id="screenshot">
+
+<script>
+    const pollInterval = 1000;
+    setTimeout(update, pollInterval);
+
+    async function update() {
+        const response = await fetch("/dashboard.html");
+        document.querySelector("main").innerHTML = await response.text();
+        setTimeout(update, pollInterval);
+    }
+
+    addEventListener("click", event => {
+        if (event.target.matches("a.screenshot") && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey) {
+            // Force reload with timestamp in fragment (not sent to server)
+            document.querySelector("#screenshot").src = `${event.target.href}#${+new Date}`;
+            event.preventDefault();
+        }
+    }, true);
+</script>

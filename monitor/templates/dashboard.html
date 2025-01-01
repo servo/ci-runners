@@ -1,0 +1,17 @@
+{% for (key, counts) in profile_runner_counts.iter() %}
+<h2>{{ counts.healthy }}/{{ counts.target }} runners for {{ key }}</h2>
+<ul>
+{% for (id, runner) in runners.by_profile(key) %}
+    <li>id {{ id }}, <a class="screenshot" href="/runner/{{ id }}/screenshot">screenshot</a>, status {{ self.status(runner) }}, age {{ self.age(runner)? }}, reserved for {{ self.reserved_since(runner)? }}
+    <div class="labels">
+        {% for label in self.labels(runner) %}
+        {% if let Some((key, value)) = label.split_once(':') %}
+        <span class="label key-value"><span class="key">{{ key }}</span><span class="value">{{ value }}</span></span>
+        {% else %}
+        <span class="label key-only"><span class="key">{{ label }}</span></span>
+        {% endif %}
+        {% endfor %}
+    </div>
+{% endfor %}
+</ul>
+{% endfor %}

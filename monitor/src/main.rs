@@ -20,6 +20,7 @@ use std::{
     time::Duration,
 };
 
+use askama::Template;
 use crossbeam_channel::{Receiver, Sender};
 use dotenv::dotenv;
 use http::StatusCode;
@@ -57,6 +58,7 @@ static TOML: LazyLock<Toml> =
 /// GET `/` => `{"profile_runner_counts": {}, "runners": []}`
 static DASHBOARD: RwLock<Option<Dashboard>> = RwLock::new(None);
 
+static HTML: &str = "text/html; charset=utf-8";
 static JSON: &str = "application/json; charset=utf-8";
 static PNG: &str = "image/png";
 
@@ -95,6 +97,12 @@ static REQUEST: LazyLock<Channel<Request>> = LazyLock::new(|| {
     Channel { sender, receiver }
 });
 
+#[derive(Clone, Debug, Template)]
+#[template(path = "index.html")]
+pub struct IndexTemplate {
+    pub content: String,
+}
+
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
     jane_eyre::install()?;
@@ -126,7 +134,39 @@ async fn main() -> eyre::Result<()> {
         }
     });
 
-    let dashboard_route = warp::path!()
+    let index_route = warp::path!()
+        .and(warp::filters::method::get())
+        .and_then(|| async {
+            DASHBOARD
+                .try_read()
+                .ok()
+                .and_then(|x| x.clone())
+                .map(|x| IndexTemplate { content: x.html })
+                .ok_or_else(|| {
+                    reject::custom(NotReadyError(eyre!(
+                        "Monitor thread is still starting or not responding"
+                    )))
+                })
+        })
+        .with(header("Content-Type", HTML));
+
+    let dashboard_html_route = warp::path!("dashboard.html")
+        .and(warp::filters::method::get())
+        .and_then(|| async {
+            DASHBOARD
+                .try_read()
+                .ok()
+                .and_then(|x| x.clone())
+                .map(|x| x.html)
+                .ok_or_else(|| {
+                    reject::custom(NotReadyError(eyre!(
+                        "Monitor thread is still starting or not responding"
+                    )))
+                })
+        })
+        .with(header("Content-Type", HTML));
+
+    let dashboard_json_route = warp::path!("dashboard.json")
         .and(warp::filters::method::get())
         .and_then(|| async {
             DASHBOARD
@@ -191,7 +231,11 @@ async fn main() -> eyre::Result<()> {
         .with(header("Content-Type", PNG));
 
     // Successful responses are in their own types. Error responses are in plain text.
-    let routes = dashboard_route.or(take_runner_route).or(screenshot_route);
+    let routes = index_route
+        .or(dashboard_html_route)
+        .or(dashboard_json_route)
+        .or(take_runner_route)
+        .or(screenshot_route);
     let routes = routes.recover(recover);
 
     warp::serve(routes)
