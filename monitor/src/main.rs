@@ -1,3 +1,4 @@
+mod dashboard;
 mod data;
 mod github;
 mod id;
@@ -35,6 +36,7 @@ use warp::{
 };
 
 use crate::{
+    dashboard::Dashboard,
     github::{list_registered_runners_for_host, Cache},
     id::IdGen,
     libvirt::list_runner_guests,
@@ -53,7 +55,7 @@ static TOML: LazyLock<Toml> =
     LazyLock::new(|| Toml::load_default().expect("Failed to load settings from monitor.toml"));
 
 /// GET `/` => `{"profile_runner_counts": {}, "runners": []}`
-static STATUS: RwLock<Option<String>> = RwLock::new(None);
+static DASHBOARD: RwLock<Option<Dashboard>> = RwLock::new(None);
 
 static JSON: &str = "application/json; charset=utf-8";
 static PNG: &str = "image/png";
@@ -124,14 +126,14 @@ async fn main() -> eyre::Result<()> {
         }
     });
 
-    let status_route = warp::path!()
+    let dashboard_route = warp::path!()
         .and(warp::filters::method::get())
         .and_then(|| async {
-            STATUS
+            DASHBOARD
                 .try_read()
                 .ok()
-                .map(|x| x.clone())
-                .flatten()
+                .and_then(|x| x.clone())
+                .map(|x| x.json)
                 .ok_or_else(|| {
                     reject::custom(NotReadyError(eyre!(
                         "Monitor thread is still starting or not responding"
@@ -189,7 +191,7 @@ async fn main() -> eyre::Result<()> {
         .with(header("Content-Type", PNG));
 
     // Successful responses are in their own types. Error responses are in plain text.
-    let routes = status_route.or(take_runner_route).or(screenshot_route);
+    let routes = dashboard_route.or(take_runner_route).or(screenshot_route);
     let routes = routes.recover(recover);
 
     warp::serve(routes)
@@ -353,20 +355,8 @@ fn monitor_thread() -> eyre::Result<()> {
         }
 
         // Update status, for the API.
-        if let Ok(mut status) = STATUS.write() {
-            *status = Some(serde_json::to_string(&json!({
-                "profile_runner_counts": &profile_runner_counts,
-                "runners": &runners
-                    .iter()
-                    .map(|(id, runner)| {
-                        json!({
-                            "id": id,
-                            "screenshot_url": format!("{}runner/{id}/screenshot", TOML.external_base_url),
-                            "runner": runner,
-                        })
-                    })
-                    .collect::<Vec<_>>(),
-            }))?);
+        if let Ok(mut status) = DASHBOARD.write() {
+            *status = Some(Dashboard::render(&profile_runner_counts, &runners)?);
         }
 
         // Handle one request from the API.
