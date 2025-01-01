@@ -32,6 +32,9 @@
         padding: var(--radius);
     }
     #screenshot {
+        display: none;
+    }
+    #screenshot img {
         max-width: 100%;
     }
 </style>
@@ -40,7 +43,10 @@
 {{ content|safe }}
 </main>
 
-<img id="screenshot">
+<fieldset id="screenshot">
+    <legend></legend>
+    <img>
+</fieldset>
 
 <script>
     const pollInterval = 1000;
@@ -55,7 +61,9 @@
     addEventListener("click", event => {
         if (event.target.matches("a.screenshot") && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey) {
             // Force reload with timestamp in fragment (not sent to server)
-            document.querySelector("#screenshot").src = `${event.target.href}#${+new Date}`;
+            document.querySelector("#screenshot img").src = `${event.target.href}#${+new Date}`;
+            document.querySelector("#screenshot legend").textContent = event.target.dataset.runnerId;
+            document.querySelector("#screenshot").style.display = "initial";
             event.preventDefault();
         }
     }, true);
