@@ -115,10 +115,6 @@ To build the base vm image:
     - Windows 10 (multi-edition ISO), English (United States): [Win10_22H2_English_x64v1.iso](https://www.microsoft.com/en-us/software-download/windows10ISO) (sha256 = a6f470ca6d331eb353b815c043e327a347f594f37ff525f17764738fe812852e)
 - Run the build script: `windows10/build-image.sh`
     - FIXME: if Windows fails to autologon (stuck at lock screen): `virsh reboot servo-windows10.new`
-- Destroy the old base image (if it exists): `zfs destroy -r tank/base/servo-windows10`
-- Rename the new base image: `zfs rename tank/base/servo-windows10{.new,}`
-- Create the base libvirt guest (if it doesn’t exist): `virt-clone --preserve-data --check path_in_use=off -o servo-windows10.new -n servo-windows10 -f /dev/zvol/tank/base/servo-windows10`
-- Undefine the temporary libvirt guest: `virsh undefine servo-windows10.new`
 
 To clone and start a new runner:
 
@@ -134,10 +130,6 @@ Runners created from this image preinstall all dependencies (including those spe
 To build the base vm image:
 
 - Run the build script: `ubuntu2204/build-image.sh`
-- Destroy the old base image (if it exists): `zfs destroy -r tank/base/servo-ubuntu2204`
-- Rename the new base image: `zfs rename tank/base/servo-ubuntu2204{.new,}`
-- Create the base libvirt guest (if it doesn’t exist): `virt-clone --preserve-data --check path_in_use=off -o servo-ubuntu2204.new -n servo-ubuntu2204 -f /dev/zvol/tank/base/servo-ubuntu2204`
-- Undefine the temporary libvirt guest: `virsh undefine servo-ubuntu2204.new`
 
 To clone and start a new runner:
 
