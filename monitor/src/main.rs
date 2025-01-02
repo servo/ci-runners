@@ -39,7 +39,7 @@ use warp::{
 
 use crate::{
     dashboard::Dashboard,
-    data::{get_runner_data_path, run_migrations},
+    data::{get_profile_data_path, get_runner_data_path, run_migrations},
     github::{list_registered_runners_for_host, Cache},
     id::IdGen,
     libvirt::list_runner_guests,
@@ -69,6 +69,7 @@ static PNG: &str = "image/png";
 /// - GET `/` => templates/index.html
 /// - GET `/dashboard.html` => templates/dashboard.html
 /// - GET `/dashboard.json` => `{"profile_runner_counts": {}, "runners": []}`
+/// - GET `/profile/<profile key>/screenshot.png` => image/png
 /// - GET `/runner/<our runner id>/screenshot.png` => image/png
 #[derive(Debug)]
 enum Request {
@@ -229,7 +230,20 @@ async fn main() -> eyre::Result<()> {
         })
         .with(header("Content-Type", JSON));
 
-    let screenshot_route = warp::path!("runner" / usize / "screenshot.png")
+    let profile_screenshot_route = warp::path!("profile" / String / "screenshot.png")
+        .and(warp::filters::method::get())
+        .and(warp::filters::header::optional("If-None-Match"))
+        .and_then(
+            |profile_key: String, if_none_match: Option<String>| async move {
+                let path = get_profile_data_path(&profile_key, Path::new("screenshot.png"))
+                    .wrap_err("Failed to compute path")
+                    .map_err(InternalError)?;
+                serve_static_file(path, if_none_match)
+            },
+        )
+        .with(header("Content-Type", PNG));
+
+    let runner_screenshot_route = warp::path!("runner" / usize / "screenshot.png")
         .and(warp::filters::method::get())
         .and(warp::filters::header::optional("If-None-Match"))
         .and_then(|runner_id, if_none_match: Option<String>| async move {
@@ -240,7 +254,7 @@ async fn main() -> eyre::Result<()> {
         })
         .with(header("Content-Type", PNG));
 
-    let screenshot_now_route = warp::path!("runner" / usize / "screenshot" / "now")
+    let runner_screenshot_now_route = warp::path!("runner" / usize / "screenshot" / "now")
         .and(warp::filters::method::get())
         .and_then(|runner_id| async move {
             || -> eyre::Result<Vec<u8>> {
@@ -267,8 +281,9 @@ async fn main() -> eyre::Result<()> {
         .or(dashboard_html_route)
         .or(dashboard_json_route)
         .or(take_runner_route)
-        .or(screenshot_route)
-        .or(screenshot_now_route);
+        .or(profile_screenshot_route)
+        .or(runner_screenshot_route)
+        .or(runner_screenshot_now_route);
     let routes = routes.recover(recover);
 
     warp::serve(routes)
