@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# usage: ubuntu2204/build-image.sh
+# usage: ubuntu2204/build-image.sh <snapshot_name>
 image_dir=${0:a:h}
 script_dir=${0:a:h}/..
 . "$script_dir/common.sh"
@@ -9,6 +9,7 @@ cache_dir=$script_dir/cache
 . "$script_dir/inject.sh"
 undo_commands=$(mktemp)
 image_name=servo-ubuntu2204
+snapshot_name=$1; shift
 
 >&2 echo '[*] Caching downloads'
 download "$cache_dir" https://cloud-images.ubuntu.com/jammy/20241217/jammy-server-cloudimg-amd64.img 0d8345a343c2547e55ac815342e6cb4a593aa5556872651eb47e6856a2bb0cdd
@@ -21,6 +22,7 @@ zfs list -Ho name "$SERVO_CI_ZFS_CLONE_PREFIX/$image_name" || zfs create -V 90G 
 
 >&2 echo '[*] Creating libvirt guest (or recreating it with new config)'
 if virsh domstate -- "$image_name"; then
+    virsh destroy -- "$image_name" || :  # FIXME make this idempotent in a less noisy way?
     virsh undefine -- "$image_name"
 fi
 virsh define -- "$image_dir/guest.xml"
@@ -74,8 +76,7 @@ fi
 >&2 echo '[*] Checking that Servo was built correctly'
 ./mount-runner.sh "$image_name" sh -c 'ls init/built_servo_once_successfully'
 
-snapshot=$(date -u +\%FT\%RZ)
->&2 echo "[*] Taking zvol snapshot: $SERVO_CI_ZFS_CLONE_PREFIX/$image_name@build-image-$snapshot"
-zfs snapshot "$SERVO_CI_ZFS_CLONE_PREFIX/$image_name@build-image-$snapshot"
+>&2 echo "[*] Taking zvol snapshot: $SERVO_CI_ZFS_CLONE_PREFIX/$image_name@$snapshot_name"
+zfs snapshot "$SERVO_CI_ZFS_CLONE_PREFIX/$image_name@$snapshot_name"
 
 >&2 echo '[*] Done!'

@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# usage: windows10/build-image.sh
+# usage: windows10/build-image.sh <snapshot_name>
 image_dir=${0:a:h}
 script_dir=${0:a:h}/..
 . "$script_dir/common.sh"
@@ -9,6 +9,7 @@ cache_dir=$script_dir/cache
 . "$script_dir/inject.sh"
 undo_commands=$(mktemp)
 image_name=servo-windows10
+snapshot_name=$1; shift
 
 >&2 echo '[*] Caching downloads'
 download "$cache_dir" https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.240-1/virtio-win-0.1.240.iso ebd48258668f7f78e026ed276c28a9d19d83e020ffa080ad69910dc86bbcbcc6
@@ -18,6 +19,7 @@ zfs list -Ho name "$SERVO_CI_ZFS_CLONE_PREFIX/$image_name" || zfs create -V 90G 
 
 >&2 echo '[*] Creating libvirt guest (or recreating it with new config)'
 if virsh domstate -- "$image_name"; then
+    virsh destroy -- "$image_name" || :  # FIXME make this idempotent in a less noisy way?
     virsh undefine -- "$image_name"
 fi
 virsh define -- "$image_dir/guest.xml"
@@ -71,8 +73,7 @@ fi
 >&2 echo '[*] Checking that Servo was built correctly'
 ./mount-runner.sh "$image_name" sh -c 'ls -l init/built_servo_once_successfully'
 
-snapshot=$(date -u +\%FT\%RZ)
->&2 echo "[*] Taking zvol snapshot: $SERVO_CI_ZFS_CLONE_PREFIX/$image_name@build-image-$snapshot"
-zfs snapshot "$SERVO_CI_ZFS_CLONE_PREFIX/$image_name@build-image-$snapshot"
+>&2 echo "[*] Taking zvol snapshot: $SERVO_CI_ZFS_CLONE_PREFIX/$image_name@$snapshot_name"
+zfs snapshot "$SERVO_CI_ZFS_CLONE_PREFIX/$image_name@$snapshot_name"
 
 >&2 echo '[*] Done!'
