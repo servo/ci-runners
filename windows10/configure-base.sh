@@ -58,3 +58,6 @@ git -C a/servo/servo config core.fileMode false
 
 >&2 echo '[*] Injecting cargo cache'
 inject Users/Administrator "$SERVO_CI_DOT_CARGO_PATH"
+
+>&2 echo '[*] Injecting cargo config'
+inject Users/Administrator/.cargo/config.toml "$script_dir/shared/cargo-config.toml"

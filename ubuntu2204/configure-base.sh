@@ -36,3 +36,6 @@ git -C a/servo/servo remote add origin https://github.com/servo/servo.git
 
 >&2 echo '[*] Injecting cargo cache'
 inject root "$SERVO_CI_DOT_CARGO_PATH"
+
+>&2 echo '[*] Injecting cargo config'
+inject root/.cargo/config.toml "$script_dir/shared/cargo-config.toml"
