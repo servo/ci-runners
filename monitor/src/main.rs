@@ -236,32 +236,7 @@ async fn main() -> eyre::Result<()> {
             let path = get_runner_data_path(runner_id, Path::new("screenshot.png"))
                 .wrap_err("Failed to compute path")
                 .map_err(InternalError)?;
-            let mut file = File::open(path)
-                .wrap_err("Failed to open file")
-                .map_err(InternalError)?;
-            let metadata = file
-                .metadata()
-                .wrap_err("Failed to get metadata")
-                .map_err(InternalError)?;
-            let mtime = metadata
-                .modified()
-                .wrap_err("Failed to get mtime")
-                .map_err(InternalError)?
-                .duration_since(UNIX_EPOCH)
-                .wrap_err("Failed to compute mtime")
-                .map_err(InternalError)?
-                .as_millis();
-            let etag = format!(r#""{mtime}""#);
-
-            Ok::<_, Rejection>(if if_none_match.is_some_and(|inm| inm == etag) {
-                Box::new(StatusCode::NOT_MODIFIED) as Box<dyn Reply>
-            } else {
-                let mut result = vec![];
-                file.read_to_end(&mut result)
-                    .wrap_err("Failed to read file")
-                    .map_err(InternalError)?;
-                Box::new(with_header(result, "ETag", etag)) as Box<dyn Reply>
-            })
+            serve_static_file(path, if_none_match)
         })
         .with(header("Content-Type", PNG));
 
@@ -337,6 +312,38 @@ async fn recover(error: Rejection) -> Result<impl Reply, std::convert::Infallibl
             format!("Unknown error: {error:?}"),
             StatusCode::INTERNAL_SERVER_ERROR,
         )
+    })
+}
+
+fn serve_static_file(
+    path: impl AsRef<Path>,
+    if_none_match: Option<String>,
+) -> Result<Box<dyn Reply>, Rejection> {
+    let mut file = File::open(path)
+        .wrap_err("Failed to open file")
+        .map_err(InternalError)?;
+    let metadata = file
+        .metadata()
+        .wrap_err("Failed to get metadata")
+        .map_err(InternalError)?;
+    let mtime = metadata
+        .modified()
+        .wrap_err("Failed to get mtime")
+        .map_err(InternalError)?
+        .duration_since(UNIX_EPOCH)
+        .wrap_err("Failed to compute mtime")
+        .map_err(InternalError)?
+        .as_millis();
+    let etag = format!(r#""{mtime}""#);
+
+    Ok::<_, Rejection>(if if_none_match.is_some_and(|inm| inm == etag) {
+        Box::new(StatusCode::NOT_MODIFIED) as Box<dyn Reply>
+    } else {
+        let mut result = vec![];
+        file.read_to_end(&mut result)
+            .wrap_err("Failed to read file")
+            .map_err(InternalError)?;
+        Box::new(with_header(result, "ETag", etag)) as Box<dyn Reply>
     })
 }
 
