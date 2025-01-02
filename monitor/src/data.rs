@@ -26,6 +26,12 @@ pub fn get_runner_data_path(id: usize, path: impl AsRef<Path>) -> eyre::Result<P
     Ok(runner_data.join(path))
 }
 
+pub fn get_profile_data_path(key: &str, path: impl AsRef<Path>) -> eyre::Result<PathBuf> {
+    let profile_data = get_data_path("profiles")?.join(key);
+
+    Ok(profile_data.join(path))
+}
+
 #[tracing::instrument]
 pub fn run_migrations() -> eyre::Result<()> {
     let migrations_dir = get_data_path("migrations")?;

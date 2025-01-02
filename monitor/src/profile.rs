@@ -2,9 +2,11 @@ use std::process::Command;
 
 use jane_eyre::eyre;
 use serde::{Deserialize, Serialize};
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::{
+    data::get_profile_data_path,
+    libvirt::update_screenshot,
     runner::{Runner, Runners, Status},
     DOTENV,
 };
@@ -162,5 +164,22 @@ impl Profile {
         } else {
             0
         }
+    }
+
+    pub fn update_screenshot(&self) {
+        if let Err(error) = self.try_update_screenshot() {
+            debug!(
+                self.base_vm_name,
+                ?error,
+                "Failed to update screenshot for profile guest"
+            );
+        }
+    }
+
+    fn try_update_screenshot(&self) -> eyre::Result<()> {
+        let output_dir = get_profile_data_path(&self.base_vm_name, ".")?;
+        update_screenshot(&self.base_vm_name, &output_dir)?;
+
+        Ok(())
     }
 }

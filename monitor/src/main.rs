@@ -468,6 +468,9 @@ fn monitor_thread() -> eyre::Result<()> {
         if let Ok(mut dashboard) = DASHBOARD.write() {
             *dashboard = Some(Dashboard::render(&profile_runner_counts, &runners)?);
             runners.update_screenshots();
+            for (_key, profile) in TOML.profiles() {
+                profile.update_screenshot();
+            }
         }
 
         // Handle one request from the API.

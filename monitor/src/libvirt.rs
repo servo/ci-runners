@@ -1,6 +1,6 @@
 use core::str;
 use std::{
-    fs::rename,
+    fs::{create_dir_all, rename},
     path::Path,
     process::{Command, Stdio},
 };
@@ -36,6 +36,7 @@ pub fn libvirt_prefix() -> String {
 }
 
 pub fn update_screenshot(guest_name: &str, output_dir: &Path) -> Result<(), eyre::Error> {
+    create_dir_all(output_dir)?;
     let new_path = output_dir.join("screenshot.png.new");
     let exit_status = SHELL
         .lock()
