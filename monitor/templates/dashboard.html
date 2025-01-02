@@ -6,7 +6,14 @@
     <div class="labels">
         {% for label in self.labels(runner) %}
         {% if let Some((key, value)) = label.split_once(':') %}
-        <span class="label key-value"><span class="key">{{ key }}</span><span class="value">{{ value }}</span></span>
+        <span class="label key-value">
+            <span class="key">{{ key }}</span>
+            {%- if key.clone() == "reserved-by" -%}
+            <a class="value" target="_blank" href="https://github.com/{{ value }}">{{ value }}</a>
+            {%- else -%}
+            <span class="value">{{ value }}</span>
+            {%- endif -%}
+        </span>
         {% else %}
         <span class="label key-only"><span class="key">{{ label }}</span></span>
         {% endif %}
