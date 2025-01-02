@@ -14,6 +14,7 @@ use std::{
     fs::File,
     io::Read,
     net::IpAddr,
+    path::Path,
     process::exit,
     sync::{LazyLock, RwLock},
     thread,
@@ -232,7 +233,7 @@ async fn main() -> eyre::Result<()> {
         .and(warp::filters::method::get())
         .and(warp::filters::header::optional("If-None-Match"))
         .and_then(|runner_id, if_none_match: Option<String>| async move {
-            let path = get_runner_data_path(runner_id, "screenshot.png")
+            let path = get_runner_data_path(runner_id, Path::new("screenshot.png"))
                 .wrap_err("Failed to compute path")
                 .map_err(InternalError)?;
             let mut file = File::open(path)

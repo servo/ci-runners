@@ -177,7 +177,7 @@ impl Profile {
     }
 
     fn try_update_screenshot(&self) -> eyre::Result<()> {
-        let output_dir = get_profile_data_path(&self.base_vm_name, ".")?;
+        let output_dir = get_profile_data_path(&self.base_vm_name, None)?;
         update_screenshot(&self.base_vm_name, &output_dir)?;
 
         Ok(())

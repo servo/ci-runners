@@ -8,7 +8,7 @@ use tracing::info;
 
 use crate::DOTENV;
 
-pub fn get_data_path(path: impl AsRef<Path>) -> eyre::Result<PathBuf> {
+pub fn get_data_path<'p>(path: impl Into<Option<&'p Path>>) -> eyre::Result<PathBuf> {
     let data = if let Some(path) = &DOTENV.monitor_data_path {
         path.into()
     } else {
@@ -17,24 +17,39 @@ pub fn get_data_path(path: impl AsRef<Path>) -> eyre::Result<PathBuf> {
 
     fs::create_dir_all(&data)?;
 
-    Ok(data.join(path))
+    Ok(match path.into() {
+        Some(path) => data.join(path),
+        None => data,
+    })
 }
 
-pub fn get_runner_data_path(id: usize, path: impl AsRef<Path>) -> eyre::Result<PathBuf> {
-    let runner_data = get_data_path("runners")?.join(id.to_string());
+pub fn get_runner_data_path<'p>(
+    id: usize,
+    path: impl Into<Option<&'p Path>>,
+) -> eyre::Result<PathBuf> {
+    let runner_data = get_data_path(Path::new("runners"))?.join(id.to_string());
 
-    Ok(runner_data.join(path))
+    Ok(match path.into() {
+        Some(path) => runner_data.join(path),
+        None => runner_data,
+    })
 }
 
-pub fn get_profile_data_path(key: &str, path: impl AsRef<Path>) -> eyre::Result<PathBuf> {
-    let profile_data = get_data_path("profiles")?.join(key);
+pub fn get_profile_data_path<'p>(
+    key: &str,
+    path: impl Into<Option<&'p Path>>,
+) -> eyre::Result<PathBuf> {
+    let profile_data = get_data_path(Path::new("profiles"))?.join(key);
 
-    Ok(profile_data.join(path))
+    Ok(match path.into() {
+        Some(path) => profile_data.join(path),
+        None => profile_data,
+    })
 }
 
 #[tracing::instrument]
 pub fn run_migrations() -> eyre::Result<()> {
-    let migrations_dir = get_data_path("migrations")?;
+    let migrations_dir = get_data_path(Path::new("migrations"))?;
     create_dir_all(&migrations_dir)?;
 
     for version in 1.. {
@@ -45,9 +60,9 @@ pub fn run_migrations() -> eyre::Result<()> {
         match version {
             1 => {
                 info!("Moving per-runner data to runners subdirectory");
-                let runners_dir = get_data_path("runners")?;
+                let runners_dir = get_data_path(Path::new("runners"))?;
                 create_dir_all(&runners_dir)?;
-                for entry in read_dir(get_data_path(".")?)? {
+                for entry in read_dir(get_data_path(None)?)? {
                     let entry = entry?;
                     // Move entries that parse as a runner id (usize)
                     if entry

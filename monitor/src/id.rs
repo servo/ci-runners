@@ -1,6 +1,7 @@
 use std::{
     fs::File,
     io::{Read, Write},
+    path::Path,
 };
 
 use jane_eyre::eyre::{self, Context};
@@ -15,7 +16,7 @@ pub struct IdGen {
 
 impl IdGen {
     pub fn new_load() -> eyre::Result<Self> {
-        if let Ok(mut file) = File::open(get_data_path("last-runner-id")?) {
+        if let Ok(mut file) = File::open(get_data_path(Path::new("last-runner-id"))?) {
             let mut last = String::default();
             file.read_to_string(&mut last)
                 .wrap_err("Failed to read last runner id")?;
@@ -45,8 +46,8 @@ impl IdGen {
     }
 
     fn write_last(&self, last: usize) -> eyre::Result<()> {
-        let path = get_data_path("last-runner-id")?;
-        let new_path = get_data_path("last-runner-id.new")?;
+        let path = get_data_path(Path::new("last-runner-id"))?;
+        let new_path = get_data_path(Path::new("last-runner-id.new"))?;
         let mut file = File::create(&new_path)?;
         file.write_all(last.to_string().as_bytes())?;
         std::fs::rename(&new_path, &path)?;

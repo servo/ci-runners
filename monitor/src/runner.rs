@@ -2,7 +2,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Debug,
     fs,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Command,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -214,7 +214,7 @@ impl Runners {
         let Some(guest_name) = runner.guest_name.as_deref() else {
             bail!("Tried to screenshot a runner with no libvirt guest: {id}");
         };
-        let output_dir = get_runner_data_path(id, ".")?;
+        let output_dir = get_runner_data_path(id, None)?;
         update_screenshot(guest_name, &output_dir)?;
 
         Ok(())
@@ -226,7 +226,7 @@ impl Runner {
     ///
     /// For use by [`Runners::new`] only. Does not create a runner.
     fn new(id: usize) -> eyre::Result<Self> {
-        let created_time = get_runner_data_path(id, "created-time")?;
+        let created_time = get_runner_data_path(id, Path::new("created-time"))?;
         let created_time = fs::metadata(created_time)?.modified()?;
         trace!(?created_time, "[{id}]");
 
