@@ -1,6 +1,9 @@
-use std::process::Command;
+use std::{
+    process::Command,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
-use jane_eyre::eyre;
+use jane_eyre::eyre::{self, Context};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
 
@@ -8,6 +11,7 @@ use crate::{
     data::get_profile_data_path,
     libvirt::update_screenshot,
     runner::{Runner, Runners, Status},
+    zfs::snapshot_creation_time_unix,
     DOTENV,
 };
 
@@ -30,6 +34,7 @@ pub struct RunnerCounts {
     pub busy: usize,
     pub excess_idle: usize,
     pub wanted: usize,
+    pub image_age: Option<Duration>,
 }
 
 impl Profile {
@@ -96,6 +101,7 @@ impl Profile {
             busy: self.busy_runner_count(runners),
             excess_idle: self.excess_idle_runner_count(runners),
             wanted: self.wanted_runner_count(runners),
+            image_age: self.image_age().ok().flatten(),
         }
     }
 
@@ -164,6 +170,26 @@ impl Profile {
         } else {
             0
         }
+    }
+
+    pub fn image_age(&self) -> eyre::Result<Option<Duration>> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .wrap_err("Failed to get current time")?;
+        let creation_time =
+            match snapshot_creation_time_unix(&self.base_vm_name, &self.base_image_snapshot) {
+                Ok(result) => result,
+                Err(error) => {
+                    debug!(
+                        self.base_vm_name,
+                        ?error,
+                        "Failed to get snapshot creation time"
+                    );
+                    return Ok(None);
+                }
+            };
+
+        Ok(Some(now - creation_time))
     }
 
     pub fn update_screenshot(&self) {

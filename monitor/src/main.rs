@@ -403,10 +403,11 @@ fn monitor_thread() -> eyre::Result<()> {
                 busy,
                 excess_idle,
                 wanted,
+                image_age,
             },
         ) in profile_runner_counts.iter()
         {
-            info!("profile {key}: {healthy}/{target} healthy runners ({idle} idle, {reserved} reserved, {busy} busy, {started_or_crashed} started or crashed, {excess_idle} excess idle, {wanted} wanted)");
+            info!("profile {key}: image age {image_age:?}, {healthy}/{target} healthy runners ({idle} idle, {reserved} reserved, {busy} busy, {started_or_crashed} started or crashed, {excess_idle} excess idle, {wanted} wanted)");
         }
         for (_id, runner) in runners.iter() {
             runner.log_info();
