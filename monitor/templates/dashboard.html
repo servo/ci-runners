@@ -1,6 +1,11 @@
 {% for (key, counts) in profile_runner_counts.iter() %}
 <h2>{{ counts.healthy }}/{{ counts.target }} runners for {{ key }}</h2>
 <ul>
+{% if let Some(profile) = self.profile(key) %}
+{% if profile.image_needs_rebuild().unwrap_or(true) %}
+    <li>image rebuild, <a class="screenshot" href="/profile/{{ key }}/screenshot.png" data-profile-key="{{ key }}">screenshot</a>
+{% endif %}
+{% endif %}
 {% for (id, runner) in runners.by_profile(key) %}
     <li>id {{ id }}, <a class="screenshot" href="/runner/{{ id }}/screenshot.png" data-runner-id="{{ id }}">screenshot</a>, status {{ self.status(runner) }}, age {{ self.age(runner)? }}, reserved for {{ self.reserved_since(runner)? }}
     <div class="labels">

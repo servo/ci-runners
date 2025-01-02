@@ -5,7 +5,7 @@ use jane_eyre::eyre;
 use serde_json::json;
 
 use crate::{
-    profile::RunnerCounts,
+    profile::{Profile, RunnerCounts},
     runner::{Runner, Runners},
     TOML,
 };
@@ -19,12 +19,14 @@ pub struct Dashboard {
 #[derive(Clone, Debug, Template)]
 #[template(path = "dashboard.html")]
 struct DashboardTemplate<'monitor> {
+    profiles: &'monitor BTreeMap<String, Profile>,
     profile_runner_counts: &'monitor BTreeMap<String, RunnerCounts>,
     runners: &'monitor Runners,
 }
 
 impl Dashboard {
     pub fn render(
+        profiles: &BTreeMap<String, Profile>,
         profile_runner_counts: &BTreeMap<String, RunnerCounts>,
         runners: &Runners,
     ) -> eyre::Result<Self> {
@@ -42,6 +44,7 @@ impl Dashboard {
                 .collect::<Vec<_>>(),
         }))?;
         let html = DashboardTemplate {
+            profiles,
             profile_runner_counts,
             runners,
         }
@@ -52,6 +55,10 @@ impl Dashboard {
 }
 
 impl DashboardTemplate<'_> {
+    fn profile(&self, key: impl AsRef<str>) -> Option<&Profile> {
+        self.profiles.get(key.as_ref())
+    }
+
     fn status(&self, runner: &Runner) -> String {
         format!("{:?}", runner.status())
     }

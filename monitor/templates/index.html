@@ -77,7 +77,13 @@
         if (event.target.matches("a.screenshot") && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey) {
             // Force reload with timestamp in fragment (not sent to server)
             screenshotImg.src = force_reload(event.target.href);
-            document.querySelector("#screenshot legend").textContent = event.target.dataset.runnerId;
+            if (event.target.dataset.profileKey != null) {
+                document.querySelector("#screenshot legend").textContent = `image rebuild for ${event.target.dataset.profileKey}`;
+            } else if (event.target.dataset.runnerId != null) {
+                document.querySelector("#screenshot legend").textContent = `runner id ${event.target.dataset.runnerId}`;
+            } else {
+                document.querySelector("#screenshot legend").textContent = `screenshot`;
+            }
             document.querySelector("#screenshot").style.display = "initial";
             event.preventDefault();
         }

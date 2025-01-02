@@ -515,7 +515,11 @@ fn monitor_thread() -> eyre::Result<()> {
 
         // Update dashboard data, for the API.
         if let Ok(mut dashboard) = DASHBOARD.write() {
-            *dashboard = Some(Dashboard::render(&profile_runner_counts, &runners)?);
+            *dashboard = Some(Dashboard::render(
+                &profiles,
+                &profile_runner_counts,
+                &runners,
+            )?);
             runners.update_screenshots();
             for (_key, profile) in profiles.iter() {
                 profile.update_screenshot();
