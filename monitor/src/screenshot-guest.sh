@@ -4,4 +4,5 @@ set -euo pipefail -o bsdecho
 guest_name=$1; shift
 output_path=$1; shift
 
-virsh screenshot -- "$guest_name" "$output_path" > /dev/null
+# Squelch errors due to guests being shut off
+virsh screenshot -- "$guest_name" "$output_path" > /dev/null 2>&1
