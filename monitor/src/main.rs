@@ -17,7 +17,7 @@ use std::{
     path::Path,
     process::exit,
     sync::{LazyLock, RwLock},
-    thread,
+    thread::{self},
     time::{Duration, UNIX_EPOCH},
 };
 
@@ -372,6 +372,7 @@ fn monitor_thread() -> eyre::Result<()> {
         IdGen::new_empty()
     });
 
+    let /* mut */ profiles = TOML.initial_profiles();
     let mut registrations_cache = Cache::default();
 
     loop {
@@ -387,9 +388,9 @@ fn monitor_thread() -> eyre::Result<()> {
         );
 
         let runners = Runners::new(registrations, guests, volumes);
-        let profile_runner_counts: BTreeMap<_, _> = TOML
-            .profiles()
-            .map(|(key, profile)| (key, profile.runner_counts(&runners)))
+        let profile_runner_counts: BTreeMap<_, _> = profiles
+            .iter()
+            .map(|(key, profile)| (key.clone(), profile.runner_counts(&runners)))
             .collect();
         for (
             key,
@@ -417,7 +418,7 @@ fn monitor_thread() -> eyre::Result<()> {
                     warn!(?error, "Failed to unregister runner: {error}");
                 }
             }
-            if let Some(profile) = TOML.profile(runner.base_vm_name()) {
+            if let Some(profile) = profiles.get(runner.base_vm_name()) {
                 if let Err(error) = profile.destroy_runner(id) {
                     warn!(?error, "Failed to destroy runner: {error}");
                 }
@@ -460,7 +461,7 @@ fn monitor_thread() -> eyre::Result<()> {
                         .flatten()
                         .map_or(true, |duration| duration > DOTENV.monitor_reserve_timeout)
             });
-            let excess_idle_runners = TOML.profiles().flat_map(|(_key, profile)| {
+            let excess_idle_runners = profiles.iter().flat_map(|(_key, profile)| {
                 profile
                     .idle_runners(&runners)
                     .take(profile.excess_idle_runner_count(&runners))
@@ -474,8 +475,8 @@ fn monitor_thread() -> eyre::Result<()> {
                 unregister_and_destroy(id, runner);
             }
 
-            let profile_wanted_counts = TOML
-                .profiles()
+            let profile_wanted_counts = profiles
+                .iter()
                 .map(|(_key, profile)| (profile, profile.wanted_runner_count(&runners)));
             for (profile, wanted_count) in profile_wanted_counts {
                 for _ in 0..wanted_count {
@@ -491,7 +492,7 @@ fn monitor_thread() -> eyre::Result<()> {
         if let Ok(mut dashboard) = DASHBOARD.write() {
             *dashboard = Some(Dashboard::render(&profile_runner_counts, &runners)?);
             runners.update_screenshots();
-            for (_key, profile) in TOML.profiles() {
+            for (_key, profile) in profiles.iter() {
                 profile.update_screenshot();
             }
         }

@@ -19,13 +19,13 @@ pub struct Dashboard {
 #[derive(Clone, Debug, Template)]
 #[template(path = "dashboard.html")]
 struct DashboardTemplate<'monitor> {
-    profile_runner_counts: &'monitor BTreeMap<&'monitor str, RunnerCounts>,
+    profile_runner_counts: &'monitor BTreeMap<String, RunnerCounts>,
     runners: &'monitor Runners,
 }
 
 impl Dashboard {
     pub fn render(
-        profile_runner_counts: &BTreeMap<&str, RunnerCounts>,
+        profile_runner_counts: &BTreeMap<String, RunnerCounts>,
         runners: &Runners,
     ) -> eyre::Result<Self> {
         let json = serde_json::to_string(&json!({

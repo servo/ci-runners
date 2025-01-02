@@ -11,7 +11,7 @@ use crate::{
     DOTENV,
 };
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Profile {
     pub configuration_name: String,
     pub base_vm_name: String,

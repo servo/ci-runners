@@ -39,7 +39,7 @@ pub struct Dotenv {
 #[derive(Deserialize)]
 pub struct Toml {
     pub external_base_url: String,
-    pub profiles: BTreeMap<String, Profile>,
+    profiles: BTreeMap<String, Profile>,
 }
 
 impl Dotenv {
@@ -89,12 +89,8 @@ impl Toml {
         Ok(result)
     }
 
-    pub fn profiles(&self) -> impl Iterator<Item = (&str, &Profile)> {
-        self.profiles.iter().map(|(k, v)| (k.as_str(), v))
-    }
-
-    pub fn profile(&self, key: impl AsRef<str>) -> Option<&Profile> {
-        self.profiles.get(key.as_ref())
+    pub fn initial_profiles(&self) -> BTreeMap<String, Profile> {
+        self.profiles.clone()
     }
 }
 
