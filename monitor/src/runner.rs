@@ -1,8 +1,8 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Debug,
-    fs::{self, rename},
-    path::{Path, PathBuf},
+    fs,
+    path::PathBuf,
     process::Command,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -13,7 +13,12 @@ use mktemp::Temp;
 use serde::Serialize;
 use tracing::{error, info, trace, warn};
 
-use crate::{data::get_runner_data_path, github::ApiRunner, libvirt::libvirt_prefix, shell::SHELL};
+use crate::{
+    data::get_runner_data_path,
+    github::ApiRunner,
+    libvirt::{libvirt_prefix, update_screenshot},
+    shell::SHELL,
+};
 
 #[derive(Debug, Serialize)]
 pub struct Runners {
@@ -194,38 +199,23 @@ impl Runners {
         }
     }
 
-    pub fn update_runner_screenshots(&self) {
+    pub fn update_screenshots(&self) {
         for &id in self.runners.keys() {
-            if let Err(error) = self.update_runner_screenshot(id) {
+            if let Err(error) = self.update_screenshot(id) {
                 error!(id, ?error, "Failed to update screenshot for runner");
             }
         }
     }
 
-    fn update_runner_screenshot(&self, id: usize) -> eyre::Result<()> {
+    fn update_screenshot(&self, id: usize) -> eyre::Result<()> {
         let Some(runner) = self.runners.get(&id) else {
             bail!("No runner with id exists: {id}");
         };
         let Some(guest_name) = runner.guest_name.as_deref() else {
             bail!("Tried to screenshot a runner with no libvirt guest: {id}");
         };
-        let new_path = get_runner_data_path(id, "screenshot.png.new")?;
-        let exit_status = SHELL
-            .lock()
-            .map_err(|e| eyre!("Mutex poisoned: {e:?}"))?
-            .run(
-                include_str!("screenshot-guest.sh"),
-                [Path::new(guest_name), &new_path],
-            )?
-            .spawn()?
-            .wait()?;
-        if !exit_status.success() {
-            eyre::bail!("Command exited with status {}", exit_status);
-        }
-
-        // Update the runner’s screenshot.png atomically
-        let path = get_runner_data_path(id, "screenshot.png")?;
-        rename(new_path, path)?;
+        let output_dir = get_runner_data_path(id, ".")?;
+        update_screenshot(guest_name, &output_dir)?;
 
         Ok(())
     }

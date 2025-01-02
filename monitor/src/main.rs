@@ -467,7 +467,7 @@ fn monitor_thread() -> eyre::Result<()> {
         // Update dashboard data, for the API.
         if let Ok(mut dashboard) = DASHBOARD.write() {
             *dashboard = Some(Dashboard::render(&profile_runner_counts, &runners)?);
-            runners.update_runner_screenshots();
+            runners.update_screenshots();
         }
 
         // Handle one request from the API.

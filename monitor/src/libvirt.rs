@@ -1,9 +1,13 @@
 use core::str;
-use std::process::{Command, Stdio};
+use std::{
+    fs::rename,
+    path::Path,
+    process::{Command, Stdio},
+};
 
-use jane_eyre::eyre::{self, Context};
+use jane_eyre::eyre::{self, eyre, Context};
 
-use crate::DOTENV;
+use crate::{shell::SHELL, DOTENV};
 
 pub fn list_runner_guests() -> eyre::Result<Vec<String>> {
     let output = Command::new("../list-libvirt-guests.sh")
@@ -29,4 +33,24 @@ pub fn list_runner_guests() -> eyre::Result<Vec<String>> {
 
 pub fn libvirt_prefix() -> String {
     format!("{}-", DOTENV.libvirt_prefix)
+}
+
+pub fn update_screenshot(guest_name: &str, output_dir: &Path) -> Result<(), eyre::Error> {
+    let new_path = output_dir.join("screenshot.png.new");
+    let exit_status = SHELL
+        .lock()
+        .map_err(|e| eyre!("Mutex poisoned: {e:?}"))?
+        .run(
+            include_str!("screenshot-guest.sh"),
+            [Path::new(guest_name), &new_path],
+        )?
+        .spawn()?
+        .wait()?;
+    if !exit_status.success() {
+        eyre::bail!("Command exited with status {}", exit_status);
+    }
+    let path = output_dir.join("screenshot.png");
+    rename(new_path, path)?;
+
+    Ok(())
 }
