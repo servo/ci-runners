@@ -39,6 +39,7 @@ pub struct Dotenv {
 #[derive(Deserialize)]
 pub struct Toml {
     pub external_base_url: String,
+    base_image_max_age: u64,
     profiles: BTreeMap<String, Profile>,
 }
 
@@ -88,6 +89,10 @@ impl Toml {
         }
 
         Ok(result)
+    }
+
+    pub fn base_image_max_age(&self) -> Duration {
+        Duration::from_secs(self.base_image_max_age)
     }
 
     pub fn initial_profiles(&self) -> BTreeMap<String, Profile> {

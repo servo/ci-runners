@@ -1,6 +1,9 @@
 # Prepend this to any internal URL in our own responses. Must end with trailing slash.
 external_base_url = "http://[::1]:8000/"
 
+# Maximum age of base images before they need to be rebuilt, in seconds.
+base_image_max_age = 86400
+
 [profiles.servo-windows10]
 configuration_name = "windows10"
 base_vm_name = "servo-windows10"

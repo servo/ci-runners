@@ -5,14 +5,14 @@ use std::{
 
 use jane_eyre::eyre::{self, Context};
 use serde::{Deserialize, Serialize};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::{
     data::get_profile_data_path,
     libvirt::update_screenshot,
     runner::{Runner, Runners, Status},
     zfs::snapshot_creation_time_unix,
-    DOTENV,
+    DOTENV, TOML,
 };
 
 #[derive(Clone, Debug, Deserialize)]
@@ -106,7 +106,7 @@ impl Profile {
     }
 
     pub fn target_runner_count(&self) -> usize {
-        if DOTENV.dont_create_runners {
+        if DOTENV.dont_create_runners || self.image_needs_rebuild().unwrap_or(true) {
             0
         } else {
             self.target_count
@@ -170,6 +170,28 @@ impl Profile {
         } else {
             0
         }
+    }
+
+    /// Returns whether the image definitely needs to be rebuilt or not, or None
+    /// if we don’t know.
+    pub fn image_needs_rebuild(&self) -> Option<bool> {
+        if self.target_count == 0 {
+            // Profiles with zero target_count may have been set to zero because
+            // there is insufficient hugepages space to run them
+            return Some(false);
+        }
+
+        // If we fail to get the image age, err on the side of caution
+        let image_age = match self.image_age() {
+            Ok(result) => result,
+            Err(error) => {
+                warn!(?error, "Failed to get image age");
+                return None;
+            }
+        };
+
+        // If the profile has no image age, we may need to build its image for the first time
+        Some(image_age.map_or(true, |age| age > TOML.base_image_max_age()))
     }
 
     pub fn image_age(&self) -> eyre::Result<Option<Duration>> {

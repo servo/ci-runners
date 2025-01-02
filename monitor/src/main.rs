@@ -413,6 +413,30 @@ fn monitor_thread() -> eyre::Result<()> {
             runner.log_info();
         }
 
+        // Determine whether any profiles need their images rebuilt.
+        for (key, profile) in profiles.iter() {
+            let needs_rebuild = profile.image_needs_rebuild();
+            if needs_rebuild.unwrap_or(true) {
+                let runner_count = profile.runners(&runners).count();
+                if needs_rebuild.is_none() {
+                    info!(
+                        key,
+                        runner_count, "profile image may or may not need rebuild"
+                    );
+                } else if runner_count > 0 {
+                    info!(
+                        key,
+                        runner_count, "profile image needs rebuild; waiting for runners"
+                    );
+                } else {
+                    info!(
+                        key,
+                        runner_count, "profile image needs rebuild; TODO start image rebuild"
+                    );
+                }
+            }
+        }
+
         let mut unregister_and_destroy = |id, runner: &Runner| {
             if runner.registration().is_some() {
                 if let Err(error) = runners.unregister_runner(id) {
