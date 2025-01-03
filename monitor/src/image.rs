@@ -120,9 +120,15 @@ fn rebuild_thread(
     snapshot_name: &str,
 ) -> eyre::Result<()> {
     info!(build_script_path = ?build_script_path.as_ref(), ?snapshot_name, "Starting image rebuild");
-    let mut child = Exec::cmd(build_script_path.as_ref())
+    let exec = Exec::cmd(build_script_path.as_ref())
         .cwd("..")
-        .arg(snapshot_name)
+        .arg(snapshot_name);
+
+    run_and_log_output_as_info(exec)
+}
+
+fn run_and_log_output_as_info(exec: Exec) -> eyre::Result<()> {
+    let mut child = exec
         .stdout(Redirection::Pipe)
         .stderr(Redirection::Merge)
         .popen()?;
