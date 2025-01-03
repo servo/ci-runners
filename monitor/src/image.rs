@@ -13,10 +13,11 @@ use jane_eyre::eyre::{self, bail, OptionExt};
 use subprocess::{CommunicateError, Exec, Redirection};
 use tracing::{error, info, warn};
 
-use crate::{profile::Profile, runner::Runners};
+use crate::{profile::Profile, runner::Runners, DOTENV};
 
 #[derive(Debug, Default)]
 pub struct Rebuilds {
+    cached_servo_repo_update: Option<JoinHandle<eyre::Result<()>>>,
     rebuilds: BTreeMap<String, Rebuild>,
 }
 
@@ -33,6 +34,23 @@ impl Rebuilds {
         runners: &Runners,
     ) -> eyre::Result<()> {
         let mut profiles_needing_rebuild = BTreeMap::default();
+        let mut cached_servo_repo_was_just_updated = false;
+
+        // Reap the Servo update thread, if needed.
+        if let Some(thread) = self.cached_servo_repo_update.take() {
+            if thread.is_finished() {
+                match thread.join() {
+                    Ok(Ok(())) => {
+                        info!("Servo update thread exited");
+                        cached_servo_repo_was_just_updated = true;
+                    }
+                    Ok(Err(report)) => error!(%report, "Servo update thread error"),
+                    Err(panic) => error!(?panic, "Servo update thread panic"),
+                };
+            } else {
+                self.cached_servo_repo_update = Some(thread);
+            }
+        }
 
         // Determine which profiles need their images rebuilt.
         for (key, profile) in profiles.iter() {
@@ -40,28 +58,35 @@ impl Rebuilds {
             if needs_rebuild.unwrap_or(true) {
                 let runner_count = profile.runners(&runners).count();
                 if needs_rebuild.is_none() {
-                    info!(
-                        runner_count,
-                        "profile {key}: image may or may not need rebuild"
-                    );
+                    info!("profile {key}: image may or may not need rebuild");
+                } else if self.cached_servo_repo_update.is_some() {
+                    info!( "profile {key}: image needs rebuild; cached Servo repo update still running" );
+                } else if self.rebuilds.contains_key(key) {
+                    info!("profile {key}: image needs rebuild; image rebuild still running");
                 } else if runner_count > 0 {
                     info!(
                         runner_count,
                         "profile {key}: image needs rebuild; waiting for runners"
                     );
-                } else if self.rebuilds.contains_key(key) {
-                    info!(
-                        runner_count,
-                        "profile {key}: image needs rebuild; image rebuild still running"
-                    );
                 } else {
-                    info!(
-                        runner_count,
-                        "profile {key}: image needs rebuild; starting image rebuild now"
-                    );
+                    info!("profile {key}: image needs rebuild");
                     profiles_needing_rebuild.insert(key, profile);
                 }
             }
+        }
+
+        // If we’re kicking off image rebuilds, update our cached Servo repo if there are no
+        // rebuilds already running that might read from it.
+        if self.rebuilds.is_empty()
+            && !profiles_needing_rebuild.is_empty()
+            && !cached_servo_repo_was_just_updated
+        {
+            assert!(self.cached_servo_repo_update.is_none());
+
+            // Kick off a Servo update thread. Don’t start any image rebuild threads.
+            info!("Updating our cached Servo repo, before we start image rebuilds");
+            self.cached_servo_repo_update = Some(thread::spawn(servo_update_thread));
+            return Ok(());
         }
 
         // Kick off image rebuild threads for profiles needing it.
@@ -111,6 +136,20 @@ impl Rebuilds {
 
         Ok(())
     }
+}
+
+#[tracing::instrument]
+fn servo_update_thread() -> eyre::Result<()> {
+    info!("Starting repo update");
+    fn git() -> Exec {
+        Exec::cmd("git").cwd(&DOTENV.main_repo_path)
+    }
+
+    run_and_log_output_as_info(git().args(&["reset", "--hard"]))?;
+    run_and_log_output_as_info(git().args(&["fetch", "origin"]))?;
+    run_and_log_output_as_info(git().args(&["switch", "--detach", "FETCH_HEAD"]))?;
+
+    Ok(())
 }
 
 #[tracing::instrument(skip(build_script_path, snapshot_name))]

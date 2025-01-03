@@ -32,7 +32,7 @@ pub struct Dotenv {
     pub destroy_all_non_busy_runners: bool,
     pub dont_register_runners: bool,
     pub dont_create_runners: bool,
-    // SERVO_CI_MAIN_REPO_PATH not used
+    pub main_repo_path: String,
     // SERVO_CI_DOT_CARGO_PATH not used
 }
 
@@ -66,6 +66,7 @@ impl Dotenv {
             destroy_all_non_busy_runners: env_bool("SERVO_CI_DESTROY_ALL_NON_BUSY_RUNNERS"),
             dont_register_runners: env_bool("SERVO_CI_DONT_REGISTER_RUNNERS"),
             dont_create_runners: env_bool("SERVO_CI_DONT_CREATE_RUNNERS"),
+            main_repo_path: env_string("SERVO_CI_MAIN_REPO_PATH"),
         }
     }
 }
