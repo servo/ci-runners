@@ -146,7 +146,7 @@ fn servo_update_thread() -> eyre::Result<()> {
     }
 
     run_and_log_output_as_info(git().args(&["reset", "--hard"]))?;
-    run_and_log_output_as_info(git().args(&["fetch", "origin"]))?;
+    run_and_log_output_as_info(git().args(&["fetch", "origin", "main"]))?;
     run_and_log_output_as_info(git().args(&["switch", "--detach", "FETCH_HEAD"]))?;
 
     Ok(())
