@@ -32,44 +32,60 @@ impl Rebuilds {
         profiles: &mut BTreeMap<String, Profile>,
         runners: &Runners,
     ) -> eyre::Result<()> {
-        // Kick off rebuilds for any profiles whose images are too old.
+        let mut profiles_needing_rebuild = BTreeMap::default();
+
+        // Determine which profiles need their images rebuilt.
         for (key, profile) in profiles.iter() {
             let needs_rebuild = profile.image_needs_rebuild();
             if needs_rebuild.unwrap_or(true) {
                 let runner_count = profile.runners(&runners).count();
                 if needs_rebuild.is_none() {
                     info!(
-                        key,
-                        runner_count, "profile image may or may not need rebuild"
+                        runner_count,
+                        "profile {key}: image may or may not need rebuild"
                     );
                 } else if runner_count > 0 {
                     info!(
-                        key,
-                        runner_count, "profile image needs rebuild; waiting for runners"
+                        runner_count,
+                        "profile {key}: image needs rebuild; waiting for runners"
                     );
                 } else if self.rebuilds.contains_key(key) {
                     info!(
-                        key,
-                        runner_count, "profile image needs rebuild; image rebuild still running"
+                        runner_count,
+                        "profile {key}: image needs rebuild; image rebuild still running"
                     );
                 } else {
                     info!(
-                        key,
-                        runner_count, "profile image needs rebuild; starting image rebuild now"
+                        runner_count,
+                        "profile {key}: image needs rebuild; starting image rebuild now"
                     );
-                    let build_script_path =
-                        Path::new(&profile.configuration_name).join("build-image.sh");
-                    let snapshot_name = Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true);
-                    let cloned_snapshot_name = snapshot_name.clone();
-                    let rebuild = Rebuild {
-                        thread: thread::spawn(move || {
-                            rebuild_thread(build_script_path, &cloned_snapshot_name)
-                        }),
-                        snapshot_name: snapshot_name.clone(),
-                    };
-                    self.rebuilds.insert(key.to_owned(), rebuild);
+                    profiles_needing_rebuild.insert(key, profile);
                 }
             }
+        }
+
+        // Kick off image rebuild threads for profiles needing it.
+        for (key, profile) in profiles_needing_rebuild {
+            let build_script_path = Path::new(&profile.configuration_name).join("build-image.sh");
+            let snapshot_name = Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true);
+
+            let key_for_thread = key.clone();
+            let snapshot_name_for_thread = snapshot_name.clone();
+            let thread = thread::spawn(move || {
+                rebuild_thread(
+                    &key_for_thread,
+                    build_script_path,
+                    &snapshot_name_for_thread,
+                )
+            });
+
+            self.rebuilds.insert(
+                key.to_owned(),
+                Rebuild {
+                    thread,
+                    snapshot_name: snapshot_name.clone(),
+                },
+            );
         }
 
         // Reap image rebuild threads, updating the profile on success.
@@ -97,8 +113,13 @@ impl Rebuilds {
     }
 }
 
-#[tracing::instrument(skip(build_script_path), fields(build_script_path = ?build_script_path.as_ref()))]
-fn rebuild_thread(build_script_path: impl AsRef<Path>, snapshot_name: &str) -> eyre::Result<()> {
+#[tracing::instrument(skip(build_script_path, snapshot_name))]
+fn rebuild_thread(
+    profile_key: &str,
+    build_script_path: impl AsRef<Path>,
+    snapshot_name: &str,
+) -> eyre::Result<()> {
+    info!(build_script_path = ?build_script_path.as_ref(), ?snapshot_name, "Starting image rebuild");
     let mut child = Exec::cmd(build_script_path.as_ref())
         .cwd("..")
         .arg(snapshot_name)
