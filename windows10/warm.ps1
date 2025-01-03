@@ -23,4 +23,4 @@ echo "`$env:PATH in runner image = $env:PATH" >> C:\init\incremental_build_debug
 
 # Build the same way as a typical Windows build job, to allow for incremental builds.
 $env:RUSTUP_WINDOWS_PATH_ADD_BIN = 1
-.\mach build --use-crown --locked --release
+.\mach build --use-crown --locked --release --features layout_2013

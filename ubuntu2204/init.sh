@@ -37,7 +37,7 @@ if ! [ -e /init/built_servo_once_successfully ]; then
     cd /a/servo/servo
     ./mach bootstrap --force
     # Build the same way as a typical Linux build job, to allow for incremental builds.
-    ./mach build --use-crown --locked --release
+    ./mach build --use-crown --locked --release --features layout_2013
     touch /init/built_servo_once_successfully
     poweroff
     exit
