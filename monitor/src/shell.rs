@@ -11,7 +11,7 @@ use std::{
 
 use jane_eyre::eyre::{self, Context};
 use mktemp::Temp;
-use tracing::info;
+use tracing::debug;
 
 /// Global instance of [Shell] for single-threaded situations.
 pub static SHELL: LazyLock<Mutex<Shell>> =
@@ -51,7 +51,7 @@ impl Shell {
             .into_iter()
             .map(|arg| arg.as_ref().to_owned())
             .collect::<Vec<_>>();
-        info!(?path, ?args, "Running script");
+        debug!(?path, ?args, "Running script");
         let mut file = File::create(&self.0).wrap_err("Failed to create shell script")?;
         file.write_all(code.as_bytes())
             .wrap_err("Failed to write shell script")?;
