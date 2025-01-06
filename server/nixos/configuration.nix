@@ -140,6 +140,9 @@
         locations."/" = proxy // {
           proxyPass = "http://[::1]:8000";
         };
+        locations."/static/" = {
+          root = "/config";
+        };
       } // ssl;
       "intermittent-tracker.servo.org" = {
         locations."/" = proxy // {

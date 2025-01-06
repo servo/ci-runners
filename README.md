@@ -178,6 +178,14 @@ To build the base vm, first build a clean image:
     - Quit the **Keyboard Setup Assistant**
     - Once installed, shut down the guest: `virsh shutdown servo-macos13.clean`
 - Take another snapshot: `zfs snapshot tank/base/servo-macos13.clean@oobe`
+- Start the base guest: `virsh start servo-macos13.clean`
+- Log in with the password above
+- Press **Cmd**+**Space**, type `full disk access`, press **Enter**
+- Click the plus, type the password above, select **Applications** > **Utilities** > **Terminal**
+- Press **Cmd**+**Space**, type `terminal`, press **Enter**
+- Type `curl https://ci0.servo.org/static/macos13.sh | sudo sh` and press **Enter**
+- Shut down the guest: `virsh shutdown servo-macos13.clean`
+- Take another snapshot: `zfs snapshot tank/base/servo-macos13.clean@automated`
 
 Baking new images after deployment
 ----------------------------------
