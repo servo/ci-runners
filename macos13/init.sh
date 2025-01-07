@@ -1,7 +1,13 @@
 #!/usr/bin/env zsh
 set -euo pipefail -o bsdecho
 
-# Install Homebrew, including Xcode CLT (Command Line Tools)
+# Install Xcode CLT (Command Line Tools) non-interactively
+# <https://github.com/actions/runner-images/blob/3d5f09a90fd475a3531b0ef57325aa7e27b24595/images/macos/scripts/build/install-xcode-clt.sh>
+sudo -i mkdir -p /var/root/utils
+sudo -i touch /var/root/utils/utils.sh
+sudo -i /Volumes/a/init/install-xcode-clt.sh
+
+# Install Homebrew
 NONINTERACTIVE=1 /Volumes/a/init/install-homebrew.sh
 
 # Install rustup and the latest Rust
