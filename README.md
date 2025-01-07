@@ -152,7 +152,7 @@ To build the base vm, first build a clean image:
 - Create zvol and libvirt guest with random UUID and MAC address
     - `zfs create -V 90G tank/base/servo-macos13.clean`
     - `virsh define macos13/guest.xml`
-    - `virt-clone --preserve-data --check path_in_use=off -o servo-macos13.init -n servo-macos13.clean --nvram /var/lib/libvirt/images/OSX-KVM/OVMF_VARS.servo-macos13.clean.fd -f /var/lib/libvirt/images/OSX-KVM/OpenCore/OpenCore.qcow2 -f /dev/zvol/tank/base/servo-macos13.clean -f /var/lib/libvirt/images/OSX-KVM/BaseSystem.img`
+    - `virt-clone --preserve-data --check path_in_use=off -o servo-macos13.init -n servo-macos13.clean --nvram /var/lib/libvirt/images/OSX-KVM/OVMF_VARS.servo-macos13.clean.fd --skip-copy sda -f /dev/zvol/tank/base/servo-macos13.clean --skip-copy sdc`
     - `cp /var/lib/libvirt/images/OSX-KVM/{OVMF_VARS-1920x1080.fd,OVMF_VARS.servo-macos13.clean.fd}`
     - `virsh undefine --keep-nvram servo-macos13.init`
         - TODO: improve per-vm nvram management
@@ -199,7 +199,7 @@ To build the base vm, first build a clean image:
 - Take another snapshot: `zfs snapshot tank/base/servo-macos13.clean@automated`
 - Clone the clean zvol/guest to create the base zvol/guest:
     - `zfs clone tank/base/servo-macos13{.clean@automated,}`
-    - `virt-clone --preserve-data --check path_in_use=off -o servo-macos13.clean -n servo-macos13 --nvram /var/lib/libvirt/images/OSX-KVM/OVMF_VARS.servo-macos13.fd -f /var/lib/libvirt/images/OSX-KVM/OpenCore/OpenCore.qcow2 -f /dev/zvol/tank/base/servo-macos13 -f /var/lib/libvirt/images/OSX-KVM/BaseSystem.img`
+    - `virt-clone --preserve-data --check path_in_use=off -o servo-macos13.clean -n servo-macos13 --nvram /var/lib/libvirt/images/OSX-KVM/OVMF_VARS.servo-macos13.fd --skip-copy sda -f /dev/zvol/tank/base/servo-macos13 --skip-copy sdc`
     - `cp /var/lib/libvirt/images/OSX-KVM/OVMF_VARS.servo-macos13{.clean,}.fd`
 
 Baking new images after deployment

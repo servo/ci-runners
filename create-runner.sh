@@ -9,6 +9,7 @@ configuration_name=$1; shift
 github_runner_label=$1; shift
 configure_runner=$script_dir/$configuration_name/configure-runner.sh
 register_runner=$script_dir/$configuration_name/register-runner.sh
+virt_clone=$script_dir/$configuration_name/virt-clone.sh
 
 vm=$base_vm.$id
 >&2 printf '[*] Creating runner: %s\n' $vm
@@ -39,5 +40,5 @@ fi
 "$script_dir/mount-runner.sh" $vm $configure_runner "$runner_jitconfig"
 
 libvirt_vm=$SERVO_CI_LIBVIRT_PREFIX-$vm
-virt-clone --preserve-data --check path_in_use=off -o $base_vm -n $libvirt_vm -f /dev/zvol/$SERVO_CI_ZFS_PREFIX/$vm
+$virt_clone $base_vm $vm
 virsh start $libvirt_vm
