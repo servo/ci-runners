@@ -19,7 +19,7 @@
             <string>open</string>
             <string>-Wa</string><!-- wait, application -->
             <string>/System/Applications/Utilities/Terminal.app</string>
-            <string>/Volumes/a/init/boot.sh</string>
+            <string>/Volumes/a/init/init.sh</string>
     </array>
 </dict>
 </plist>
