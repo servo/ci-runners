@@ -11,7 +11,8 @@
     ];
 
   networking.hostName = "ci0"; # Define your hostname.
-  networking.domain = "servo.org";
+  # FIXME: breaks resolution of “ci0.servo.org” in libvirt guests
+  # networking.domain = "servo.org";
 
   # Needed by ZFS.
   # Generate with: LC_ALL=C < /dev/urandom tr -dC 0-9A-F | head -c 8
