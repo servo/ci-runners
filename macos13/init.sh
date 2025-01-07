@@ -8,7 +8,9 @@ sudo -i touch /var/root/utils/utils.sh
 sudo -i /Volumes/a/init/install-xcode-clt.sh
 
 # Install Homebrew
-NONINTERACTIVE=1 /Volumes/a/init/install-homebrew.sh
+if ! [ -e /usr/local/bin/brew ]; then
+    NONINTERACTIVE=1 /Volumes/a/init/install-homebrew.sh
+fi
 
 # Install rustup and the latest Rust
 if ! [ -e /Users/servo/.rustup ]; then
