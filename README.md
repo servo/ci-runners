@@ -197,6 +197,7 @@ To build the base vm, first build a clean image:
 - When the script finishes, press **Cmd**+**Q**
 - Shut down the guest: `virsh shutdown servo-macos13.clean`
 - Take another snapshot: `zfs snapshot tank/base/servo-macos13.clean@automated`
+- Enable per-snapshot block devices for the zvol: `zfs set snapdev=visible tank/base/servo-macos13.clean`
 - Clone the clean zvol/guest to create the base zvol/guest:
     - `zfs clone tank/base/servo-macos13{.clean@automated,}`
     - `virt-clone --preserve-data --check path_in_use=off -o servo-macos13.clean -n servo-macos13 --nvram /var/lib/libvirt/images/OSX-KVM/OVMF_VARS.servo-macos13.fd --skip-copy sda -f /dev/zvol/tank/base/servo-macos13 --skip-copy sdc`
