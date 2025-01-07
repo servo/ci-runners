@@ -12,6 +12,9 @@ if ! [ -e /usr/local/bin/brew ]; then
     NONINTERACTIVE=1 /Volumes/a/init/install-homebrew.sh
 fi
 
+# Install gtar(1)
+brew install gnu-tar
+
 # Install rustup and the latest Rust
 if ! [ -e /Users/servo/.rustup ]; then
     /Volumes/a/init/rustup-init.sh -y --quiet
