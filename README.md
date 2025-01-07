@@ -147,6 +147,8 @@ macOS 13 runner (wip)
 To build the base vm, first build a clean image:
 
 - Clone the OSX-KVM repo: `git clone https://github.com/kholia/OSX-KVM.git /var/lib/libvirt/images/OSX-KVM`
+- Download the BaseSystem.dmg for macOS Ventura: `( cd /var/lib/libvirt/images/OSX-KVM; ./fetch-macOS-v2.py )`
+- Convert it to BaseSystem.img: `dmg2img -i /var/lib/libvirt/images/OSX-KVM/BaseSystem.{dmg,img}`
 - Create zvol and libvirt guest with random UUID and MAC address
     - `zfs create -V 90G tank/base/servo-macos13.clean`
     - `virsh define macos13/guest.xml`
@@ -165,8 +167,14 @@ To build the base vm, first build a clean image:
     - Shut down the guest when you see **Select Your Country or Region**: `virsh shutdown servo-macos13.clean`
 - Take a snapshot: `zfs snapshot tank/base/servo-macos13.clean@fresh-install`
 - Boot base vm guest: `virsh start servo-macos13.clean`
+    - If latency is high:
+        - Press **Command**+**Option**+**F5**, then click **Full Keyboard Access**, then press **Enter**
+        - You can now press **Shift**+**Tab** to get to the buttons at the bottom of the wizard
     - **Select Your Country or Region** = United States
     - **Migration Assistant** = Not Now
+    - If latency is high, **Accessibility** > **Cognitive** then:
+        - > **Reduce Transparency** = Reduce Transparency
+        - > **Reduce Motion** = Reduce Motion
     - **Sign In with Your Apple ID** = Set Up Later
     - **Full name** = `servo`
     - **Account name** = `servo`
@@ -176,16 +184,23 @@ To build the base vm, first build a clean image:
     - Uncheck **Share Mac Analytics with Apple**
     - **Screen Time** = Set Up Later
     - Quit the **Keyboard Setup Assistant**
+    - If latency is high:
+        - Press **Cmd**+**Space**, type `full keyboard access`, turn it on, then press **Cmd**+**Q**
     - Once installed, shut down the guest: `virsh shutdown servo-macos13.clean`
 - Take another snapshot: `zfs snapshot tank/base/servo-macos13.clean@oobe`
 - Start the base guest: `virsh start servo-macos13.clean`
 - Log in with the password above
 - Press **Cmd**+**Space**, type `full disk access`, press **Enter**
-- Click the plus, type the password above, select **Applications** > **Utilities** > **Terminal**
+- Click the plus, type the password above, type `/System/Applications/Utilities/Terminal.app`, press **Enter** twice, press **Cmd**+**Q**
 - Press **Cmd**+**Space**, type `terminal`, press **Enter**
-- Type `curl https://ci0.servo.org/static/macos13.sh | sudo sh` and press **Enter**
+- Type `curl https://ci0.servo.org/static/macos13.sh | sudo sh`, press **Enter**, type the password above, press **Enter**
+- When the script finishes, press **Cmd**+**Q**
 - Shut down the guest: `virsh shutdown servo-macos13.clean`
 - Take another snapshot: `zfs snapshot tank/base/servo-macos13.clean@automated`
+- Clone the clean zvol/guest to create the base zvol/guest:
+    - `zfs clone tank/base/servo-macos13{.clean@automated,}`
+    - `virt-clone --preserve-data --check path_in_use=off -o servo-macos13.clean -n servo-macos13 --nvram /var/lib/libvirt/images/OSX-KVM/OVMF_VARS.servo-macos13.fd -f /var/lib/libvirt/images/OSX-KVM/OpenCore/OpenCore.qcow2 -f /dev/zvol/tank/base/servo-macos13 -f /var/lib/libvirt/images/OSX-KVM/BaseSystem.img`
+    - `cp /var/lib/libvirt/images/OSX-KVM/OVMF_VARS.servo-macos13{.clean,}.fd`
 
 Baking new images after deployment
 ----------------------------------

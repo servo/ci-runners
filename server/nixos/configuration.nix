@@ -66,6 +66,7 @@
   environment.systemPackages = with pkgs; [
     cdrkit  # for genisoimage
     clang
+    dmg2img
     gh
     git
     hivex
