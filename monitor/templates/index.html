@@ -58,7 +58,13 @@
         document.querySelector("main").innerHTML = await response.text();
         if (screenshotImg.complete) {
             try {
-                screenshotImg.src = force_reload(screenshotImg.src);
+                // To convince the browser to even attempt to reload the image, we need to
+                // cache-bust the <img src> by changing the query string (Chromium) or at least the
+                // fragment (Firefox). Normally changing the query string would break caching
+                // entirely, but our endpoint redirects `screenshot.png?=12345` to `screenshot.png`,
+                // so the browser can still send its If-Modified-Since.
+                // <https://stackoverflow.com/a/9505557>
+                screenshotImg.src = cache_bust(screenshotImg.src);
             } catch (e) {
                 // Do nothing; src is probably empty
             }
@@ -66,17 +72,15 @@
         setTimeout(update, pollInterval);
     }
 
-    function force_reload(url) {
-        // Force reload with timestamp in fragment (not sent to server)
+    function cache_bust(url) {
         const result = new URL(url);
-        result.hash = `${+new Date}`;
+        result.searchParams.set("", `${+new Date}`);
         return `${result}`;
     }
 
     addEventListener("click", event => {
         if (event.target.matches("a.screenshot") && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey) {
-            // Force reload with timestamp in fragment (not sent to server)
-            screenshotImg.src = force_reload(event.target.href);
+            screenshotImg.src = cache_bust(event.target.href);
             if (event.target.dataset.profileKey != null) {
                 document.querySelector("#screenshot legend").textContent = `image rebuild for ${event.target.dataset.profileKey}`;
             } else if (event.target.dataset.runnerId != null) {

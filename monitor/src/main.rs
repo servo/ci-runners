@@ -12,12 +12,13 @@ mod zfs;
 
 use core::str;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     fs::File,
     io::Read,
     net::IpAddr,
     path::Path,
     process::exit,
+    str::FromStr,
     sync::{LazyLock, RwLock},
     thread::{self},
     time::{Duration, UNIX_EPOCH},
@@ -26,7 +27,7 @@ use std::{
 use askama::Template;
 use crossbeam_channel::{Receiver, Sender};
 use dotenv::dotenv;
-use http::StatusCode;
+use http::{StatusCode, Uri};
 use jane_eyre::eyre::{self, eyre, Context, OptionExt};
 use mktemp::Temp;
 use serde_json::json;
@@ -34,6 +35,7 @@ use tracing::{error, info, trace, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 use warp::{
     filters::reply::header,
+    redirect::see_other,
     reject::{self, Reject, Rejection},
     reply::{self, with_header, Reply},
     Filter,
@@ -233,28 +235,53 @@ async fn main() -> eyre::Result<()> {
         })
         .with(header("Content-Type", JSON));
 
-    let profile_screenshot_route = warp::path!("profile" / String / "screenshot.png")
+    let profile_screenshot_route =
+        warp::path!("profile" / String / "screenshot.png")
+            .and(warp::filters::method::get())
+            .and(warp::filters::header::optional("If-None-Match"))
+            .and(warp::filters::query::query())
+            .and_then(
+                |profile_key: String,
+                 if_none_match: Option<String>,
+                 query: HashMap<String, String>| async move {
+                    if !query.is_empty() {
+                        // If the page cache-busts the <img src> to force the browser to revalidate,
+                        // redirect to the bare url, so the browser can send its If-Modified-Since
+                        // <https://stackoverflow.com/a/9505557>
+                        let url = Uri::from_str(&format!("/profile/{profile_key}/screenshot.png"))
+                            .wrap_err("failed to build Uri")
+                            .map_err(InternalError)?;
+                        return Ok(Box::new(see_other(url)) as Box<dyn Reply>);
+                    }
+                    let path = get_profile_data_path(&profile_key, Path::new("screenshot.png"))
+                        .wrap_err("Failed to compute path")
+                        .map_err(InternalError)?;
+                    serve_static_file(path, if_none_match)
+                },
+            )
+            .with(header("Content-Type", PNG));
+
+    let runner_screenshot_route = warp::path!("runner" / usize / "screenshot.png")
         .and(warp::filters::method::get())
         .and(warp::filters::header::optional("If-None-Match"))
+        .and(warp::filters::query::query())
         .and_then(
-            |profile_key: String, if_none_match: Option<String>| async move {
-                let path = get_profile_data_path(&profile_key, Path::new("screenshot.png"))
+            |runner_id, if_none_match: Option<String>, query: HashMap<String, String>| async move {
+                if !query.is_empty() {
+                    // If the page cache-busts the <img src> to force the browser to revalidate,
+                    // redirect to the bare url, so the browser can send its If-Modified-Since
+                    // <https://stackoverflow.com/a/9505557>
+                    let url = Uri::from_str(&format!("/runner/{runner_id}/screenshot.png"))
+                        .wrap_err("failed to build Uri")
+                        .map_err(InternalError)?;
+                    return Ok(Box::new(see_other(url)) as Box<dyn Reply>);
+                }
+                let path = get_runner_data_path(runner_id, Path::new("screenshot.png"))
                     .wrap_err("Failed to compute path")
                     .map_err(InternalError)?;
                 serve_static_file(path, if_none_match)
             },
         )
-        .with(header("Content-Type", PNG));
-
-    let runner_screenshot_route = warp::path!("runner" / usize / "screenshot.png")
-        .and(warp::filters::method::get())
-        .and(warp::filters::header::optional("If-None-Match"))
-        .and_then(|runner_id, if_none_match: Option<String>| async move {
-            let path = get_runner_data_path(runner_id, Path::new("screenshot.png"))
-                .wrap_err("Failed to compute path")
-                .map_err(InternalError)?;
-            serve_static_file(path, if_none_match)
-        })
         .with(header("Content-Type", PNG));
 
     let runner_screenshot_now_route = warp::path!("runner" / usize / "screenshot" / "now")
