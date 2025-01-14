@@ -2,7 +2,6 @@
 # usage: configure-runner.sh <runner_jitconfig> <vm>
 script_dir=${0:a:h}/..
 . "$script_dir/common.sh"
-cache_dir=$script_dir/cache
 runner_jitconfig=$1; shift
 vm=$1; shift
 

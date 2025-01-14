@@ -4,7 +4,6 @@ image_dir=${0:a:h}
 script_dir=${0:a:h}/..
 . "$script_dir/common.sh"
 trap print_undo_commands EXIT
-cache_dir=$script_dir/cache
 . "$script_dir/download.sh"
 . "$script_dir/inject.sh"
 undo_commands=$(mktemp)
@@ -12,7 +11,7 @@ image_name=servo-windows10
 snapshot_name=$1; shift
 
 >&2 echo '[*] Caching downloads'
-download "$cache_dir" https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.240-1/virtio-win-0.1.240.iso ebd48258668f7f78e026ed276c28a9d19d83e020ffa080ad69910dc86bbcbcc6
+download "$SERVO_CI_CACHE_PATH" https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.240-1/virtio-win-0.1.240.iso ebd48258668f7f78e026ed276c28a9d19d83e020ffa080ad69910dc86bbcbcc6
 
 >&2 echo '[*] Creating zvol (if needed)'
 zfs list -Ho name "$SERVO_CI_ZFS_CLONE_PREFIX/$image_name" || zfs create -V 90G "$SERVO_CI_ZFS_CLONE_PREFIX/$image_name"
@@ -30,7 +29,7 @@ virsh undefine -- "$image_name.init"
 dd bs=1M count=1 if=/dev/zero of="/dev/zvol/$SERVO_CI_ZFS_CLONE_PREFIX/$image_name"
 
 >&2 echo '[*] Writing disk images'
-inject /var/lib/libvirt/images "$cache_dir/virtio-win-0.1.240.iso"
+inject /var/lib/libvirt/images "$SERVO_CI_CACHE_PATH/virtio-win-0.1.240.iso"
 genisoimage -J -o "/var/lib/libvirt/images/$image_name.config.iso" "$image_dir/autounattend.xml"
 
 >&2 echo '[*] Starting guest, to install Windows'

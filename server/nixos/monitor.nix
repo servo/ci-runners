@@ -1,9 +1,10 @@
-{ lib, rustPlatform, makeWrapper, zsh }: let
+{ lib, rustPlatform, makeWrapper, git, openssh, zsh }: let
   fs = lib.fileset;
 
   sources = fs.intersection (fs.gitTracked ../..) (
     fs.unions [
       ../../monitor
+      ../../shared
       ../../macos13
       ../../ubuntu2204
       ../../windows10
@@ -43,6 +44,8 @@ in rustPlatform.buildRustPackage rec {
   ];
 
   buildInputs = [
+    git
+    openssh
     zsh
     # TODO: list other commands needed by scripts here
   ];
@@ -50,6 +53,7 @@ in rustPlatform.buildRustPackage rec {
   postInstall = ''
     cd ..  # cd back out of sourceRoot
     mkdir -p $out/lib/monitor
+    cp -R shared $out/lib/monitor
     cp -R macos13 $out/lib/monitor
     cp -R ubuntu2204 $out/lib/monitor
     cp -R windows10 $out/lib/monitor

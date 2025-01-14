@@ -3,6 +3,7 @@
 set -euo pipefail -o bsdecho
 
 export SERVO_CI_MONITOR_DATA_PATH=${SERVO_CI_MONITOR_DATA_PATH-$script_dir/monitor/data}
+export SERVO_CI_CACHE_PATH=${SERVO_CI_CACHE_PATH-$script_dir/cache}
 
 # usage: trap print_undo_commands EXIT
 print_undo_commands() {
