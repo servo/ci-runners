@@ -18,6 +18,7 @@ use crate::{
     github::ApiRunner,
     libvirt::{libvirt_prefix, update_screenshot},
     shell::SHELL,
+    LIB_MONITOR_DIR,
 };
 
 #[derive(Debug, Serialize)]
@@ -132,7 +133,8 @@ impl Runners {
             bail!("Tried to unregister an unregistered runner");
         };
         info!(runner_id = id, registration.id, "Unregistering runner");
-        let exit_status = Command::new("../unregister-runner.sh")
+        let exit_status = Command::new("./unregister-runner.sh")
+            .current_dir(*LIB_MONITOR_DIR)
             .arg(&registration.id.to_string())
             .spawn()
             .unwrap()
@@ -159,7 +161,8 @@ impl Runners {
             bail!("Tried to reserve an unregistered runner");
         };
         info!(runner_id = id, registration.id, "Reserving runner");
-        let exit_status = Command::new("../reserve-runner.sh")
+        let exit_status = Command::new("./reserve-runner.sh")
+            .current_dir(*LIB_MONITOR_DIR)
             .arg(&registration.id.to_string())
             .arg(unique_id)
             .arg(format!("{qualified_repo}/actions/runs/{run_id}"))

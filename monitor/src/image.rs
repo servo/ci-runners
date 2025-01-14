@@ -13,7 +13,7 @@ use jane_eyre::eyre::{self, bail};
 use subprocess::{CommunicateError, Exec, Redirection};
 use tracing::{error, info, warn};
 
-use crate::{profile::Profiles, runner::Runners, DOTENV};
+use crate::{profile::Profiles, runner::Runners, DOTENV, LIB_MONITOR_DIR};
 
 #[derive(Debug, Default)]
 pub struct Rebuilds {
@@ -153,7 +153,7 @@ fn rebuild_thread(
 ) -> eyre::Result<()> {
     info!(build_script_path = ?build_script_path.as_ref(), ?snapshot_name, "Starting image rebuild");
     let exec = Exec::cmd(build_script_path.as_ref())
-        .cwd("..")
+        .cwd(*LIB_MONITOR_DIR)
         .arg(snapshot_name);
 
     run_and_log_output_as_info(exec)

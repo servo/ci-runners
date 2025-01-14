@@ -55,6 +55,14 @@ use crate::{
     zfs::list_runner_volumes,
 };
 
+static LIB_MONITOR_DIR: LazyLock<&Path> = LazyLock::new(|| {
+    if let Some(lib_monitor_dir) = option_env!("LIB_MONITOR_DIR") {
+        Path::new(lib_monitor_dir)
+    } else {
+        Path::new("..")
+    }
+});
+
 static DOTENV: LazyLock<Dotenv> = LazyLock::new(|| {
     dotenv().expect("Failed to load variables from .env");
     Dotenv::load()
@@ -138,6 +146,8 @@ async fn main() -> eyre::Result<()> {
         .with(EnvFilter::builder().from_env_lossy())
         .init();
 
+    dotenv()?;
+    info!(LIB_MONITOR_DIR = ?*LIB_MONITOR_DIR);
     run_migrations()?;
 
     tokio::task::spawn(async move {

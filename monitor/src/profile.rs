@@ -17,7 +17,7 @@ use crate::{
     libvirt::update_screenshot,
     runner::{Runner, Runners, Status},
     zfs::snapshot_creation_time_unix,
-    DOTENV, TOML,
+    DOTENV, LIB_MONITOR_DIR, TOML,
 };
 
 #[derive(Debug)]
@@ -82,7 +82,8 @@ impl Profiles {
             );
         };
         info!(runner_id = id, profile.base_vm_name, "Creating runner");
-        let exit_status = Command::new("../create-runner.sh")
+        let exit_status = Command::new("./create-runner.sh")
+            .current_dir(*LIB_MONITOR_DIR)
             .args([
                 &id.to_string(),
                 &profile.base_vm_name,
@@ -103,7 +104,8 @@ impl Profiles {
 
     pub fn destroy_runner(&self, profile: &Profile, id: usize) -> eyre::Result<()> {
         info!(runner_id = id, profile.base_vm_name, "Destroying runner");
-        let exit_status = Command::new("../destroy-runner.sh")
+        let exit_status = Command::new("./destroy-runner.sh")
+            .current_dir(*LIB_MONITOR_DIR)
             .args([&profile.base_vm_name, &id.to_string()])
             .spawn()
             .unwrap()

@@ -8,7 +8,7 @@ use jane_eyre::eyre::{self, Context};
 use serde::{Deserialize, Serialize};
 use tracing::trace;
 
-use crate::DOTENV;
+use crate::{DOTENV, LIB_MONITOR_DIR};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ApiRunner {
@@ -76,7 +76,8 @@ impl<Response: Clone + Debug> Cache<Response> {
 }
 
 fn list_registered_runners() -> eyre::Result<Vec<ApiRunner>> {
-    let output = Command::new("../list-registered-runners.sh")
+    let output = Command::new("./list-registered-runners.sh")
+        .current_dir(*LIB_MONITOR_DIR)
         .stdout(Stdio::piped())
         .spawn()
         .unwrap()
