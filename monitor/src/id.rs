@@ -4,6 +4,7 @@ use std::{
     path::Path,
 };
 
+use atomic_write_file::AtomicWriteFile;
 use jane_eyre::eyre::{self, Context};
 use tracing::warn;
 
@@ -47,10 +48,9 @@ impl IdGen {
 
     fn write_last(&self, last: usize) -> eyre::Result<()> {
         let path = get_data_path(Path::new("last-runner-id"))?;
-        let new_path = get_data_path(Path::new("last-runner-id.new"))?;
-        let mut file = File::create(&new_path)?;
+        let mut file = AtomicWriteFile::open(&path)?;
         file.write_all(last.to_string().as_bytes())?;
-        std::fs::rename(&new_path, &path)?;
+        file.commit()?;
 
         Ok(())
     }
