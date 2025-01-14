@@ -119,7 +119,7 @@ impl Rebuilds {
                         let profile = profiles
                             .get_mut(&profile_key)
                             .ok_or_eyre("Failed to get profile")?;
-                        profile.base_image_snapshot = rebuild.snapshot_name;
+                        profile.set_base_image_snapshot(&rebuild.snapshot_name)?;
                     }
                     Ok(Err(report)) => error!(profile_key, %report, "Image rebuild thread error"),
                     Err(panic) => error!(profile_key, ?panic, "Image rebuild thread panic"),

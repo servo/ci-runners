@@ -1,9 +1,13 @@
 use std::{
     collections::BTreeMap,
+    fs::File,
+    io::{Read, Write},
+    path::Path,
     process::Command,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use atomic_write_file::AtomicWriteFile;
 use jane_eyre::eyre::{self, Context};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
@@ -44,7 +48,13 @@ pub struct RunnerCounts {
 }
 
 impl Profiles {
-    pub fn new(profiles: BTreeMap<String, Profile>) -> eyre::Result<Self> {
+    pub fn new(mut profiles: BTreeMap<String, Profile>) -> eyre::Result<Self> {
+        // When starting the monitor, check for data/profiles/<key>/base-image-snapshot,
+        // and use that instead of the base_image_snapshot setting in TOML.
+        for (_profile_key, profile) in profiles.iter_mut() {
+            profile.read_base_image_snapshot()?;
+        }
+
         Ok(Self { profiles })
     }
 
@@ -251,6 +261,28 @@ impl Profile {
     fn try_update_screenshot(&self) -> eyre::Result<()> {
         let output_dir = get_profile_data_path(&self.base_vm_name, None)?;
         update_screenshot(&self.base_vm_name, &output_dir)?;
+
+        Ok(())
+    }
+
+    pub fn set_base_image_snapshot(&mut self, base_image_snapshot: &str) -> eyre::Result<()> {
+        self.base_image_snapshot = base_image_snapshot.to_owned();
+
+        let path = get_profile_data_path(&self.base_vm_name, Path::new("base-image-snapshot"))?;
+        let mut file = AtomicWriteFile::open(&path)?;
+        write!(file, "{base_image_snapshot}")?;
+        file.commit()?;
+
+        Ok(())
+    }
+
+    fn read_base_image_snapshot(&mut self) -> eyre::Result<()> {
+        let path = get_profile_data_path(&self.base_vm_name, Path::new("base-image-snapshot"))?;
+        if let Ok(mut file) = File::open(&path) {
+            let mut base_image_snapshot = String::default();
+            file.read_to_string(&mut base_image_snapshot)?;
+            self.base_image_snapshot = base_image_snapshot;
+        }
 
         Ok(())
     }
