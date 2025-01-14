@@ -197,9 +197,8 @@
       # Start on boot.
       wantedBy = ["multi-user.target"];
 
-      path = ["/run/current-system/sw"];
       script = ''
-        RUST_LOG=info target/debug/monitor
+        RUST_LOG=info ${pkgs.callPackage ./monitor.nix {}}/bin/monitor
       '';
 
       serviceConfig = {

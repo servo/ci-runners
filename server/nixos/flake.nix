@@ -17,5 +17,6 @@
       system = "x86_64-linux";
       modules = [ ./configuration.nix ];
     };
+    packages.x86_64-linux.monitor = pkgsUnstable.callPackage ./monitor.nix {};
   };
 }
