@@ -49,7 +49,7 @@ use crate::{
     id::IdGen,
     image::Rebuilds,
     libvirt::list_runner_guests,
-    profile::RunnerCounts,
+    profile::{Profiles, RunnerCounts},
     runner::{Runner, Runners, Status},
     settings::{Dotenv, Toml},
     zfs::list_runner_volumes,
@@ -433,7 +433,7 @@ fn monitor_thread() -> eyre::Result<()> {
         IdGen::new_empty()
     });
 
-    let mut profiles = TOML.initial_profiles();
+    let mut profiles = Profiles::new(TOML.initial_profiles())?;
     let mut registrations_cache = Cache::default();
     let mut image_rebuilds = Rebuilds::default();
 

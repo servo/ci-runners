@@ -13,7 +13,7 @@ use jane_eyre::eyre::{self, bail, OptionExt};
 use subprocess::{CommunicateError, Exec, Redirection};
 use tracing::{error, info, warn};
 
-use crate::{profile::Profile, runner::Runners, DOTENV};
+use crate::{profile::Profiles, runner::Runners, DOTENV};
 
 #[derive(Debug, Default)]
 pub struct Rebuilds {
@@ -28,11 +28,7 @@ struct Rebuild {
 }
 
 impl Rebuilds {
-    pub fn run(
-        &mut self,
-        profiles: &mut BTreeMap<String, Profile>,
-        runners: &Runners,
-    ) -> eyre::Result<()> {
+    pub fn run(&mut self, profiles: &mut Profiles, runners: &Runners) -> eyre::Result<()> {
         let mut profiles_needing_rebuild = BTreeMap::default();
         let mut cached_servo_repo_was_just_updated = false;
 

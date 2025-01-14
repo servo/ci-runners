@@ -1,4 +1,5 @@
 use std::{
+    collections::BTreeMap,
     process::Command,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -14,6 +15,11 @@ use crate::{
     zfs::snapshot_creation_time_unix,
     DOTENV, TOML,
 };
+
+#[derive(Debug)]
+pub struct Profiles {
+    profiles: BTreeMap<String, Profile>,
+}
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Profile {
@@ -35,6 +41,24 @@ pub struct RunnerCounts {
     pub excess_idle: usize,
     pub wanted: usize,
     pub image_age: Option<Duration>,
+}
+
+impl Profiles {
+    pub fn new(profiles: BTreeMap<String, Profile>) -> eyre::Result<Self> {
+        Ok(Self { profiles })
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &Profile)> {
+        self.profiles.iter()
+    }
+
+    pub fn get(&self, profile_key: &str) -> Option<&Profile> {
+        self.profiles.get(profile_key)
+    }
+
+    pub fn get_mut(&mut self, profile_key: &str) -> Option<&mut Profile> {
+        self.profiles.get_mut(profile_key)
+    }
 }
 
 impl Profile {
