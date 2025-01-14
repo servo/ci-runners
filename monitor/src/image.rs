@@ -50,7 +50,7 @@ impl Rebuilds {
 
         // Determine which profiles need their images rebuilt.
         for (key, profile) in profiles.iter() {
-            let needs_rebuild = profile.image_needs_rebuild();
+            let needs_rebuild = profiles.image_needs_rebuild(profile);
             if needs_rebuild.unwrap_or(true) {
                 let runner_count = profile.runners(&runners).count();
                 if needs_rebuild.is_none() {

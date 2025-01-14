@@ -454,7 +454,7 @@ fn monitor_thread() -> eyre::Result<()> {
 
         let profile_runner_counts: BTreeMap<_, _> = profiles
             .iter()
-            .map(|(key, profile)| (key.clone(), profile.runner_counts(&runners)))
+            .map(|(key, profile)| (key.clone(), profiles.runner_counts(profile, &runners)))
             .collect();
         for (
             key,
@@ -490,7 +490,7 @@ fn monitor_thread() -> eyre::Result<()> {
                 }
             }
             if let Some(profile) = profiles.get(runner.base_vm_name()) {
-                if let Err(error) = profile.destroy_runner(id) {
+                if let Err(error) = profiles.destroy_runner(profile, id) {
                     warn!(?error, "Failed to destroy runner: {error}");
                 }
             }
@@ -535,7 +535,7 @@ fn monitor_thread() -> eyre::Result<()> {
             let excess_idle_runners = profiles.iter().flat_map(|(_key, profile)| {
                 profile
                     .idle_runners(&runners)
-                    .take(profile.excess_idle_runner_count(&runners))
+                    .take(profiles.excess_idle_runner_count(profile, &runners))
             });
             for (&id, runner) in invalid
                 .chain(done_or_unregistered)
@@ -548,10 +548,10 @@ fn monitor_thread() -> eyre::Result<()> {
 
             let profile_wanted_counts = profiles
                 .iter()
-                .map(|(_key, profile)| (profile, profile.wanted_runner_count(&runners)));
+                .map(|(_key, profile)| (profile, profiles.wanted_runner_count(profile, &runners)));
             for (profile, wanted_count) in profile_wanted_counts {
                 for _ in 0..wanted_count {
-                    if let Err(error) = profile.create_runner(id_gen.next()) {
+                    if let Err(error) = profiles.create_runner(profile, id_gen.next()) {
                         warn!(?error, "Failed to create runner: {error}");
                     }
                     registrations_cache.invalidate();
