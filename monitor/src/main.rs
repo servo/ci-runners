@@ -478,6 +478,11 @@ fn monitor_thread() -> eyre::Result<()> {
             runner.log_info();
         }
 
+        runners.update_screenshots();
+        for (_key, profile) in profiles.iter() {
+            profile.update_screenshot();
+        }
+
         let mut unregister_and_destroy = |id, runner: &Runner| {
             if runner.registration().is_some() {
                 if let Err(error) = runners.unregister_runner(id) {
@@ -561,10 +566,6 @@ fn monitor_thread() -> eyre::Result<()> {
                 &profile_runner_counts,
                 &runners,
             )?);
-            runners.update_screenshots();
-            for (_key, profile) in profiles.iter() {
-                profile.update_screenshot();
-            }
         }
 
         // Handle one request from the API.
