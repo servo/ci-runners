@@ -9,7 +9,7 @@ use std::{
 };
 
 use chrono::{SecondsFormat, Utc};
-use jane_eyre::eyre::{self, bail, OptionExt};
+use jane_eyre::eyre::{self, bail};
 use subprocess::{CommunicateError, Exec, Redirection};
 use tracing::{error, info, warn};
 
@@ -116,10 +116,7 @@ impl Rebuilds {
                 match rebuild.thread.join() {
                     Ok(Ok(())) => {
                         info!(profile_key, "Image rebuild thread exited");
-                        let profile = profiles
-                            .get_mut(&profile_key)
-                            .ok_or_eyre("Failed to get profile")?;
-                        profile.set_base_image_snapshot(&rebuild.snapshot_name)?;
+                        profiles.set_base_image_snapshot(&profile_key, &rebuild.snapshot_name)?;
                     }
                     Ok(Err(report)) => error!(profile_key, %report, "Image rebuild thread error"),
                     Err(panic) => error!(profile_key, ?panic, "Image rebuild thread panic"),

@@ -8,7 +8,7 @@ use std::{
 };
 
 use atomic_write_file::AtomicWriteFile;
-use jane_eyre::eyre::{self, Context};
+use jane_eyre::eyre::{self, bail, Context};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
 
@@ -23,13 +23,13 @@ use crate::{
 #[derive(Debug)]
 pub struct Profiles {
     profiles: BTreeMap<String, Profile>,
+    base_image_snapshots: BTreeMap<String, String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Profile {
     pub configuration_name: String,
     pub base_vm_name: String,
-    pub base_image_snapshot: String,
     pub github_runner_label: String,
     pub target_count: usize,
 }
@@ -48,14 +48,18 @@ pub struct RunnerCounts {
 }
 
 impl Profiles {
-    pub fn new(mut profiles: BTreeMap<String, Profile>) -> eyre::Result<Self> {
-        // When starting the monitor, check for data/profiles/<key>/base-image-snapshot,
-        // and use that instead of the base_image_snapshot setting in TOML.
-        for (_profile_key, profile) in profiles.iter_mut() {
-            profile.read_base_image_snapshot()?;
+    pub fn new(profiles: BTreeMap<String, Profile>) -> eyre::Result<Self> {
+        let mut base_image_snapshots = BTreeMap::default();
+        for profile_key in profiles.keys() {
+            if let Some(base_image_snapshot) = Self::read_base_image_snapshot(&profile_key)? {
+                base_image_snapshots.insert(profile_key.clone(), base_image_snapshot);
+            }
         }
 
-        Ok(Self { profiles })
+        Ok(Self {
+            profiles,
+            base_image_snapshots,
+        })
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&String, &Profile)> {
@@ -66,17 +70,23 @@ impl Profiles {
         self.profiles.get(profile_key)
     }
 
-    pub fn get_mut(&mut self, profile_key: &str) -> Option<&mut Profile> {
-        self.profiles.get_mut(profile_key)
+    pub fn base_image_snapshot(&self, profile_key: &str) -> Option<&String> {
+        self.base_image_snapshots.get(profile_key)
     }
 
     pub fn create_runner(&self, profile: &Profile, id: usize) -> eyre::Result<()> {
+        let Some(base_image_snapshot) = self.base_image_snapshot(&profile.base_vm_name) else {
+            bail!(
+                "Tried to create runner, but profile has no base image snapshot (profile {})",
+                profile.base_vm_name
+            );
+        };
         info!(runner_id = id, profile.base_vm_name, "Creating runner");
         let exit_status = Command::new("../create-runner.sh")
             .args([
                 &id.to_string(),
                 &profile.base_vm_name,
-                &profile.base_image_snapshot,
+                base_image_snapshot,
                 &profile.configuration_name,
                 &profile.github_runner_label,
             ])
@@ -237,23 +247,24 @@ impl Profiles {
     }
 
     pub fn image_age(&self, profile: &Profile) -> eyre::Result<Option<Duration>> {
+        let Some(base_image_snapshot) = self.base_image_snapshot(&profile.base_vm_name) else {
+            return Ok(None);
+        };
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .wrap_err("Failed to get current time")?;
-        let creation_time = match snapshot_creation_time_unix(
-            &profile.base_vm_name,
-            &profile.base_image_snapshot,
-        ) {
-            Ok(result) => result,
-            Err(error) => {
-                debug!(
-                    profile.base_vm_name,
-                    ?error,
-                    "Failed to get snapshot creation time"
-                );
-                return Ok(None);
-            }
-        };
+        let creation_time =
+            match snapshot_creation_time_unix(&profile.base_vm_name, base_image_snapshot) {
+                Ok(result) => result,
+                Err(error) => {
+                    debug!(
+                        profile.base_vm_name,
+                        ?error,
+                        "Failed to get snapshot creation time"
+                    );
+                    return Ok(None);
+                }
+            };
 
         Ok(Some(now - creation_time))
     }
@@ -276,11 +287,18 @@ impl Profile {
 
         Ok(())
     }
+}
 
-    pub fn set_base_image_snapshot(&mut self, base_image_snapshot: &str) -> eyre::Result<()> {
-        self.base_image_snapshot = base_image_snapshot.to_owned();
+impl Profiles {
+    pub fn set_base_image_snapshot(
+        &mut self,
+        profile_key: &str,
+        base_image_snapshot: &str,
+    ) -> eyre::Result<()> {
+        self.base_image_snapshots
+            .insert(profile_key.to_owned(), base_image_snapshot.to_owned());
 
-        let path = get_profile_data_path(&self.base_vm_name, Path::new("base-image-snapshot"))?;
+        let path = get_profile_data_path(profile_key, Path::new("base-image-snapshot"))?;
         let mut file = AtomicWriteFile::open(&path)?;
         write!(file, "{base_image_snapshot}")?;
         file.commit()?;
@@ -288,14 +306,14 @@ impl Profile {
         Ok(())
     }
 
-    fn read_base_image_snapshot(&mut self) -> eyre::Result<()> {
-        let path = get_profile_data_path(&self.base_vm_name, Path::new("base-image-snapshot"))?;
+    fn read_base_image_snapshot(profile_key: &str) -> eyre::Result<Option<String>> {
+        let path = get_profile_data_path(profile_key, Path::new("base-image-snapshot"))?;
         if let Ok(mut file) = File::open(&path) {
             let mut base_image_snapshot = String::default();
             file.read_to_string(&mut base_image_snapshot)?;
-            self.base_image_snapshot = base_image_snapshot;
+            return Ok(Some(base_image_snapshot));
         }
 
-        Ok(())
+        Ok(None)
     }
 }
