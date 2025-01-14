@@ -149,8 +149,7 @@ impl Runners {
         &self,
         id: usize,
         unique_id: &str,
-        user: &str,
-        repo: &str,
+        qualified_repo: &str,
         run_id: &str,
     ) -> eyre::Result<()> {
         let Some(runner) = self.runners.get(&id) else {
@@ -163,7 +162,7 @@ impl Runners {
         let exit_status = Command::new("../reserve-runner.sh")
             .arg(&registration.id.to_string())
             .arg(unique_id)
-            .arg(format!("{user}/{repo}/actions/runs/{run_id}"))
+            .arg(format!("{qualified_repo}/actions/runs/{run_id}"))
             .spawn()
             .unwrap()
             .wait()

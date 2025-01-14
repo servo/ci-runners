@@ -30,6 +30,7 @@ use dotenv::dotenv;
 use http::{StatusCode, Uri};
 use jane_eyre::eyre::{self, eyre, Context, OptionExt};
 use mktemp::Temp;
+use serde::Deserialize;
 use serde_json::json;
 use tracing::{error, info, trace, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -78,14 +79,12 @@ static PNG: &str = "image/png";
 /// - GET `/runner/<our runner id>/screenshot.png` => image/png
 #[derive(Debug)]
 enum Request {
-    /// POST `/<profile>/<unique id>/<user>/<repo>/<run id>` => `{"id", "runner"}` | `null`
+    /// POST `/<profile_key>/<unique id>/<user>/<repo>/<run id>` => `{"id", "runner"}` | `null`
+    /// POST `/profile/<profile_key>/take?unique_id&qualified_repo=<user>/<repo>&run_id` => `{"id", "runner"}` | `null`
     TakeRunner {
         response_tx: Sender<String>,
-        profile: String,
-        unique_id: String,
-        user: String,
-        repo: String,
-        run_id: String,
+        profile_key: String,
+        query: TakeRunnerQuery,
     },
 
     /// GET `/runner/<our runner id>/screenshot/now` => image/png
@@ -93,6 +92,12 @@ enum Request {
         response_tx: Sender<eyre::Result<Temp>>,
         runner_id: usize,
     },
+}
+#[derive(Debug, Deserialize)]
+struct TakeRunnerQuery {
+    unique_id: String,
+    qualified_repo: String,
+    run_id: String,
 }
 
 #[derive(Debug)]
@@ -215,17 +220,42 @@ async fn main() -> eyre::Result<()> {
             "Authorization",
             &DOTENV.monitor_api_token_authorization_value,
         ))
-        .and_then(|profile, unique_id, user, repo, run_id| async {
+        .and_then(|profile_key, unique_id, user, repo, run_id| async move {
             || -> eyre::Result<String> {
                 let (response_tx, response_rx) = crossbeam_channel::bounded(0);
                 REQUEST.sender.send_timeout(
                     Request::TakeRunner {
                         response_tx,
-                        profile,
-                        unique_id,
-                        user,
-                        repo,
-                        run_id,
+                        profile_key,
+                        query: TakeRunnerQuery {
+                            unique_id,
+                            qualified_repo: format!("{user}/{repo}"),
+                            run_id,
+                        },
+                    },
+                    DOTENV.monitor_thread_send_timeout,
+                )?;
+                Ok(response_rx.recv_timeout(DOTENV.monitor_thread_recv_timeout)?)
+            }()
+            .map_err(|error| reject::custom(ChannelError(error)))
+        })
+        .with(header("Content-Type", JSON));
+
+    let take_runner_route2 = warp::path!("profile" / String / "take")
+        .and(warp::filters::method::post())
+        .and(warp::filters::header::exact(
+            "Authorization",
+            &DOTENV.monitor_api_token_authorization_value,
+        ))
+        .and(warp::filters::query::query())
+        .and_then(|profile_key, query: TakeRunnerQuery| async {
+            || -> eyre::Result<String> {
+                let (response_tx, response_rx) = crossbeam_channel::bounded(0);
+                REQUEST.sender.send_timeout(
+                    Request::TakeRunner {
+                        response_tx,
+                        profile_key,
+                        query,
                     },
                     DOTENV.monitor_thread_send_timeout,
                 )?;
@@ -311,6 +341,7 @@ async fn main() -> eyre::Result<()> {
         .or(dashboard_html_route)
         .or(dashboard_json_route)
         .or(take_runner_route)
+        .or(take_runner_route2)
         .or(profile_screenshot_route)
         .or(runner_screenshot_route)
         .or(runner_screenshot_now_route);
@@ -543,11 +574,13 @@ fn monitor_thread() -> eyre::Result<()> {
             match request {
                 Request::TakeRunner {
                     response_tx,
-                    profile,
-                    unique_id,
-                    user,
-                    repo,
-                    run_id,
+                    profile_key: profile,
+                    query:
+                        TakeRunnerQuery {
+                            unique_id,
+                            qualified_repo,
+                            run_id,
+                        },
                 } => {
                     let response = if let Some((&id, runner)) =
                         runners.iter().find(|(_, runner)| {
@@ -555,7 +588,7 @@ fn monitor_thread() -> eyre::Result<()> {
                         }) {
                         registrations_cache.invalidate();
                         if runners
-                            .reserve_runner(id, &unique_id, &user, &repo, &run_id)
+                            .reserve_runner(id, &unique_id, &qualified_repo, &run_id)
                             .is_ok()
                         {
                             serde_json::to_string(&json!({
