@@ -73,6 +73,7 @@
     hivex
     htop
     jq
+    libguestfs-with-appliance  # for guestfish <https://github.com/NixOS/nixpkgs/issues/37540>
     ntfs3g
     python3
     ripgrep

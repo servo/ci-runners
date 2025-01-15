@@ -146,9 +146,15 @@ macOS 13 runner (wip)
 
 To build the base vm, first build a clean image:
 
-- Clone the OSX-KVM repo: `git clone https://github.com/kholia/OSX-KVM.git /var/lib/libvirt/images/OSX-KVM`
+- Clone the OSX-KVM repo: `git clone --recursive https://github.com/kholia/OSX-KVM.git /var/lib/libvirt/images/OSX-KVM`
 - Download the BaseSystem.dmg for macOS Ventura: `( cd /var/lib/libvirt/images/OSX-KVM; ./fetch-macOS-v2.py )`
 - Convert it to BaseSystem.img: `dmg2img -i /var/lib/libvirt/images/OSX-KVM/BaseSystem.{dmg,img}`
+- Reduce the OpenCore `Timeout` setting:
+    - `cd /var/lib/libvirt/images/OSX-KVM/OpenCore`
+    - `vim config.plist`
+    - Type `/<key>Timeout<`, press **Enter**, type `j0f>wcw5`, press **Escape**, type `:x`, press **Enter**
+    - `rm OpenCore.qcow2`
+    - `./opencore-image-ng.sh --cfg config.plist --img OpenCore.qcow2`
 - Create zvol and libvirt guest with random UUID and MAC address
     - `zfs create -V 90G tank/base/servo-macos13.clean`
     - `virsh define macos13/guest.xml`
