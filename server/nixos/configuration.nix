@@ -6,6 +6,7 @@
   hostName,
   hostId,  # Generate with: LC_ALL=C < /dev/urandom tr -dC 0-9A-F | head -c 8
   ipv6Address,
+  hasIntermittentTracker ? false,
 }:
 
 { config, lib, pkgs, ... }:
@@ -141,7 +142,7 @@
     certs."${hostName}.servo.org" = {
       email = "dazabani@igalia.com";
       webroot = "/var/lib/acme/acme-challenge";
-      extraDomainNames = [
+      extraDomainNames = lib.mkIf hasIntermittentTracker [
         "intermittent-tracker.servo.org"
         "staging.intermittent-tracker.servo.org"
       ];
@@ -177,16 +178,16 @@
           '';
         };
       } // ssl;
-      "intermittent-tracker.servo.org" = {
+      "intermittent-tracker.servo.org" = lib.mkIf hasIntermittentTracker ({
         locations."/" = proxy // {
           proxyPass = "http://127.0.0.1:5000";
         };
-      } // ssl;
-      "staging.intermittent-tracker.servo.org" = {
+      } // ssl);
+      "staging.intermittent-tracker.servo.org" = lib.mkIf hasIntermittentTracker ({
         locations."/" = proxy // {
           proxyPass = "http://127.0.0.1:5001";
         };
-      } // ssl;
+      } // ssl);
     };
   };
 
@@ -217,8 +218,8 @@
     # $ . .venv/bin/activate
     # $ uv pip install -r requirements.txt
     # $ cp config.json.example config.json
-    intermittent-tracker-staging = intermittent-tracker "/config/intermittent-tracker/staging";
-    intermittent-tracker-prod = intermittent-tracker "/config/intermittent-tracker/prod";
+    intermittent-tracker-staging = lib.mkIf hasIntermittentTracker (intermittent-tracker "/config/intermittent-tracker/staging");
+    intermittent-tracker-prod = lib.mkIf hasIntermittentTracker (intermittent-tracker "/config/intermittent-tracker/prod");
 
     monitor = {
       # Wait for networking

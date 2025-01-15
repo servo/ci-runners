@@ -19,6 +19,7 @@
         hostName = "ci0";
         hostId = "04AA04E2";
         ipv6Address = "2a01:4f9:3071:3063::2";
+        hasIntermittentTracker = true;
       }) ];
     };
     nixosConfigurations.ci1 = unstable.lib.nixosSystem {
