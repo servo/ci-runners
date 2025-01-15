@@ -96,6 +96,7 @@ $ virsh net-autostart cinet
 $ virsh net-start cinet
 
 $ rustup default stable
+$ mkdir ~/.cargo
 $ git clone https://github.com/servo/servo.git ~/servo
 $ mkdir /config /config/monitor
 $ cp ~/ci-runners/.env.example /config/monitor/.env
