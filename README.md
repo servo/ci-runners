@@ -57,13 +57,6 @@ $ ./first-time-install.sh ci0 /dev/nvme{0,1}n1
 $ reboot
 ```
 
-Reconnect over SSH again, then run the following:
-
-```
-$ git clone https://github.com/servo/ci-runners.git /config
-$ /config/server/update.sh
-```
-
 Setting up the monitor service
 ------------------------------
 
