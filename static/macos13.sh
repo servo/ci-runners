@@ -24,7 +24,7 @@ mv -v org.servo.ci.plist /Library/LaunchAgents
 # - More about the errors <https://apple.stackexchange.com/q/465930>
 # - More about the feature <https://apple.stackexchange.com/q/278372>
 # - Possibly related feature <https://superuser.com/q/1293690>
-find /Users/servo/Library/Saved\ Application\ State/com.apple.Terminal.savedState -depth +0 -delete
+find /Users/servo/Library/Saved\ Application\ State/com.apple.Terminal.savedState -depth +0 -delete || mkdir /Users/servo/Library/Saved\ Application\ State/com.apple.Terminal.savedState
 chflags uchg /Users/servo/Library/Saved\ Application\ State/com.apple.Terminal.savedState
 
 # Shut down the clean image guest
