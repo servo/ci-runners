@@ -109,42 +109,24 @@ Windows 10 runner
 
 Runners created from this image preinstall all dependencies (including those specified in the main repo, like GStreamer and Chocolatey deps), preload the main repo, and prebuild Servo in the release profile.
 
-To build the base vm image:
+To prepare a server for Windows 10 guests:
 
 - Download images into /var/lib/libvirt/images
     - Windows 10 (multi-edition ISO), English (United States): [Win10_22H2_English_x64v1.iso](https://www.microsoft.com/en-us/software-download/windows10ISO) (sha256 = a6f470ca6d331eb353b815c043e327a347f594f37ff525f17764738fe812852e)
-- Run the build script: `windows10/build-image.sh <pick a snapshot name>`
-    - FIXME: if Windows fails to autologon (stuck at lock screen): `virsh reboot servo-windows10.new`
-- Update the profile config in `monitor/monitor.toml` to point to the new zvol snapshot, e.g. `base_image_snapshot = "<snapshot name>"`
-- Restart the monitor: `systemctl restart monitor`
 
-To clone and start a new runner:
-
-```sh
-$ ./create-runner.sh servo-windows10 ready windows10
-```
+Building the base vm image is handled automatically by the monitor, with the help of `ubuntu2204/build-image.sh`.
 
 Ubuntu runner
 -------------
 
 Runners created from this image preinstall all dependencies (including those specified in the main repo, like mach bootstrap deps), preload the main repo, and prebuild Servo in the release profile.
 
-To build the base vm image:
+Building the base vm image is handled automatically by the monitor, with the help of `ubuntu2204/build-image.sh`.
 
-- Run the build script: `ubuntu2204/build-image.sh <pick a snapshot name>`
-- Update the profile config in `monitor/monitor.toml` to point to the new zvol snapshot, e.g. `base_image_snapshot = "<snapshot name>"`
-- Restart the monitor: `systemctl restart monitor`
+macOS 13 runner
+---------------
 
-To clone and start a new runner:
-
-```sh
-$ ./create-runner.sh servo-ubuntu2204 ready ubuntu2204
-```
-
-macOS 13 runner (wip)
----------------------
-
-To build the base vm, first build a clean image:
+To prepare a server for macOS 13 guests, build a clean image:
 
 - Clone the OSX-KVM repo: `git clone --recursive https://github.com/kholia/OSX-KVM.git /var/lib/libvirt/images/OSX-KVM`
 - Download the BaseSystem.dmg for macOS Ventura: `( cd /var/lib/libvirt/images/OSX-KVM; ./fetch-macOS-v2.py )`
@@ -202,10 +184,8 @@ To build the base vm, first build a clean image:
 - Type `curl https://ci0.servo.org/static/macos13.sh | sudo sh`, press **Enter**, type the password above, press **Enter**
 - When the guest shuts down, take another snapshot: `zfs snapshot tank/base/servo-macos13.clean@automated`
 - Enable per-snapshot block devices for the zvol: `zfs set snapdev=visible tank/base/servo-macos13.clean`
-- Clone the clean zvol/guest to create the base zvol/guest:
-    - `zfs clone tank/base/servo-macos13{.clean@automated,}`
-    - `virt-clone --preserve-data --check path_in_use=off -o servo-macos13.clean -n servo-macos13 --nvram /var/lib/libvirt/images/OSX-KVM/OVMF_VARS.servo-macos13.fd --skip-copy sda -f /dev/zvol/tank/base/servo-macos13 --skip-copy sdc`
-    - `cp /var/lib/libvirt/images/OSX-KVM/OVMF_VARS.servo-macos13{.clean,}.fd`
+
+Building the base vm image is handled automatically by the monitor, with the help of `macos13/build-image.sh`.
 
 Baking new images after deployment
 ----------------------------------
