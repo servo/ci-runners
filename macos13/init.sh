@@ -1,6 +1,12 @@
 #!/usr/bin/env zsh
 set -euo pipefail -o bsdecho
 
+# Resize the window to occupy more of the 1280x800 display
+# - Method based on <https://apple.stackexchange.com/a/290802>
+# - Another method for exclusive fullscreen <https://apple.stackexchange.com/a/58962>
+# - Another method with unclear automation <https://apple.stackexchange.com/a/228052>
+osascript -e 'tell application "Terminal"' -e 'activate' -e 'set the bounds of the first window to {0,0,1280,600}' -e 'end tell'
+
 # Install Xcode CLT (Command Line Tools) non-interactively
 # <https://github.com/actions/runner-images/blob/3d5f09a90fd475a3531b0ef57325aa7e27b24595/images/macos/scripts/build/install-xcode-clt.sh>
 sudo -i mkdir -p /var/root/utils
