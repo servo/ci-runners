@@ -14,6 +14,6 @@ cat <<'EOF' > /root/config.nix
 }
 EOF
 nix --extra-experimental-features 'nix-command flakes' run \
-  github:nix-community/nixos-generators/a220fc3a6e144f12f0c3dc3e4d01d44c2e6b0b85 -- \
+  github:nix-community/nixos-generators/74b8e31dd709760c86eed16b6c1d0b88d7360937 -- \
   -o /root/result -f kexec-bundle -c /root/config.nix
 /root/result
