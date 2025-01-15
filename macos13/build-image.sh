@@ -10,9 +10,6 @@ undo_commands=$(mktemp)
 image_name=servo-macos13
 snapshot_name=$1; shift
 
->&2 echo '[*] Caching downloads'
-download "$SERVO_CI_CACHE_PATH" https://cloud-images.ubuntu.com/jammy/20241217/jammy-server-cloudimg-amd64.img 0d8345a343c2547e55ac815342e6cb4a593aa5556872651eb47e6856a2bb0cdd
-
 >&2 echo '[*] Creating zvol (if needed)'
 # TODO: find a more efficient way to do an idempotent zfs-clone(8) that retains the clone’s old snapshots?
 zfs list -Ho name "$SERVO_CI_ZFS_CLONE_PREFIX/$image_name" || zfs create -V 90G "$SERVO_CI_ZFS_CLONE_PREFIX/$image_name"
