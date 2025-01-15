@@ -50,6 +50,10 @@ in rustPlatform.buildRustPackage rec {
     # TODO: list other commands needed by scripts here
   ];
 
+  # Some of the scripts run in the guest, like {macos13,ubuntu2204}/init.sh.
+  # Don’t patch shebangs, otherwise those scripts will be broken.
+  dontPatchShebangs = true;
+
   postInstall = ''
     cd ..  # cd back out of sourceRoot
     mkdir -p $out/lib/monitor
