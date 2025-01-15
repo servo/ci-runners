@@ -1,0 +1,62 @@
+#!/usr/bin/env fish
+# Author: Ruby Iris Juric <ruby@srxl.me>
+
+function show_help
+    echo "deploy - Simple nixos-rebuild wrapper for deploying remote machines"
+    echo ""
+    echo "Usage: ./deploy [-h] [-s ssh_server] hostname [rebuild_args]"
+    echo "Flags:"
+    echo "  -h/--help: Show this message"
+    echo "  -n/--new:  Deploy to a newly provisioned machine"
+    echo "  -s/--ssh:  The SSH address to deploy to. Defaults to the expression name if not supplied"
+    echo "  "
+    echo "Examples:"
+    echo "  Deploy to a machine called \"foo\":"
+    echo "  ./deploy foo"
+    echo ""
+    echo "  Deploy the \"foo\" configuration to a particular IP address:"
+    echo "  ./deploy -s 10.0.2.123 foo"
+    echo ""
+    echo "  Run \"nixos-rebuild -L test\" on \"foo\":"
+    echo "  ./deploy foo -L test"
+    exit
+end
+
+argparse --name=deploy -i h/help n/new 's/ssh=' -- $argv
+or return
+
+if [ -n "$_flag_h" ]
+    show_help
+end
+
+if [ -n "$_flag_s" ]
+    set host $_flag_s
+else if [ -n "$_flag_n" ]
+    set host gemstone-labs-new-deploy-target
+else
+    set host $argv[1]
+end
+
+if [ -z "$argv[1]" ]
+    echo "deploy: machine name must be specified"
+    exit 1
+end
+
+if [ -n "$argv[2..]" ]
+    set cmd $argv[2..]
+else
+    set cmd switch
+end
+
+set -x NIX_SSHOPTS -t
+
+if [ $host = gemstone-labs-new-deploy-target ]
+    set -a NIX_SSHOPTS "-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
+    sleep 10
+end
+
+nixos-rebuild --fast --use-remote-sudo --target-host root@$host --log-format internal-json -v --flake .#$argv[1] $cmd &| nom --json
+
+if [ $host = gsl-new-deploy-target ]
+    ssh $NIX_SSHOPTS root@$host reboot
+end

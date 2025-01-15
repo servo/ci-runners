@@ -34,10 +34,6 @@ Overview of the server scripts:
   <br>From the NixOS installer image, wipe the given disks and install NixOS.
 - `server/install-or-reinstall.sh <hostname> <path/to/mnt>`
   <br>From the NixOS installer image, install or reinstall NixOS to the given root filesystem mount, without wiping any disks. Won’t run correctly on the deployed server.
-- `server/deploy.sh`
-  <br>On the deployed server, deploy any NixOS config changes.
-- `server/update.sh`
-  <br>On the deployed server, pull the config from GitHub and deploy it.
 
 Start the [rescue system](https://docs.hetzner.com/robot/dedicated-server/troubleshooting/hetzner-rescue-system/), then run the following:
 
@@ -55,6 +51,15 @@ $ git clone https://github.com/servo/ci-runners.git
 $ cd ci-runners/server
 $ ./first-time-install.sh ci0 /dev/nvme{0,1}n1
 $ reboot
+```
+
+To deploy an updated config to any of the servers:
+
+```
+$ cd server/nixos
+$ ./deploy -s ci0.servo.org ci0
+$ ./deploy -s ci1.servo.org ci1
+$ ./deploy -s ci2.servo.org ci2
 ```
 
 Setting up the monitor service
