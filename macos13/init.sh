@@ -7,6 +7,11 @@ set -euo pipefail -o bsdecho
 # - Another method with unclear automation <https://apple.stackexchange.com/a/228052>
 osascript -e 'tell application "Terminal"' -e 'activate' -e 'set the bounds of the first window to {0,0,1280,600}' -e 'end tell'
 
+# Disable sleep and display sleep
+# <https://apple.stackexchange.com/a/458157>
+sudo pmset sleep 0
+sudo pmset displaysleep 0
+
 # Install Xcode CLT (Command Line Tools) non-interactively
 # <https://github.com/actions/runner-images/blob/3d5f09a90fd475a3531b0ef57325aa7e27b24595/images/macos/scripts/build/install-xcode-clt.sh>
 sudo -i mkdir -p /var/root/utils
