@@ -8,9 +8,11 @@ echo "build-users-group =" > /etc/nix/nix.conf
 curl -L https://nixos.org/nix/install | sh
 . $HOME/.nix-profile/etc/profile.d/nix.sh
 cat <<'EOF' > /root/config.nix
+{ pkgs }:
 {
   services.openssh.enable = true;
   users.users.root.openssh.authorizedKeys.keys = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICBvkS7z2RAWzqRByRsHHB8PoCjXrnyHtjpdTxmOdcom delan@azabani.com/2016-07-18/Ed25519"];
+  environment.systemPackages = with pkgs; [ git zsh jq ];
 }
 EOF
 nix --extra-experimental-features 'nix-command flakes' run \

@@ -51,7 +51,6 @@ $ ./start-nixos-installer.sh
 Reconnect over SSH (use `ssh -4` this time), then run the following:
 
 ```
-$ nix-shell -p git zsh jq
 $ git clone https://github.com/servo/ci-runners.git
 $ cd ci-runners/server
 $ ./first-time-install.sh ci0 /dev/nvme{0,1}n1
