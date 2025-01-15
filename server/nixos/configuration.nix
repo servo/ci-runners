@@ -11,10 +11,29 @@
 { config, lib, pkgs, ... }:
 
 {
-  imports =
-    [ # Include the results of the hardware scan.
-      ./hardware-configuration.nix
-    ];
+  # hardware-configuration.nix
+  boot.initrd.availableKernelModules = [ "nvme" "xhci_pci" "ahci" ];
+  boot.initrd.kernelModules = [ ];
+  boot.kernelModules = [ "kvm-amd" ];
+  boot.extraModulePackages = [ ];
+  fileSystems."/" =
+    { device = "tank/root";
+      fsType = "zfs";
+    };
+  fileSystems."/boot" =
+    { device = "/dev/disk/by-partlabel/ci0.esp0";
+      fsType = "vfat";
+      options = [ "fmask=0022" "dmask=0022" ];
+    };
+  fileSystems."/boot1" =
+    { device = "/dev/disk/by-partlabel/ci0.esp1";
+      fsType = "vfat";
+      options = [ "fmask=0022" "dmask=0022" ];
+    };
+  swapDevices = [ ];
+  networking.useDHCP = lib.mkDefault true;
+  nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
+  hardware.cpu.amd.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
 
   networking.hostName = hostName; # Define your hostname.
   # FIXME: breaks resolution of “ci0.servo.org” in libvirt guests
