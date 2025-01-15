@@ -121,7 +121,6 @@
   programs.mosh.enable = true;
   users.users.root.openssh.authorizedKeys.keys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICBvkS7z2RAWzqRByRsHHB8PoCjXrnyHtjpdTxmOdcom delan@azabani.com/2016-07-18/Ed25519"
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILXIh9BXwJRhFyupR6OGMT11vzXFf3igCng+nisSK3Px root@jupiter@delan@azabani.com"
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPag2UMaWyIEIsL0EbdvChBCcARVxNeJAplUZe70kXlr mrobinson@igalia.com"
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIPiTpwVkwvE8npI7Z944tmrFlPKDjDVbm1rI7m4lng7 me@mukilan"
   ];
