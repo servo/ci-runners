@@ -21,12 +21,12 @@
       fsType = "zfs";
     };
   fileSystems."/boot" =
-    { device = "/dev/disk/by-partlabel/ci0.esp0";
+    { device = "/dev/disk/by-partlabel/${hostName}.esp0";
       fsType = "vfat";
       options = [ "fmask=0022" "dmask=0022" ];
     };
   fileSystems."/boot1" =
-    { device = "/dev/disk/by-partlabel/ci0.esp1";
+    { device = "/dev/disk/by-partlabel/${hostName}.esp1";
       fsType = "vfat";
       options = [ "fmask=0022" "dmask=0022" ];
     };
