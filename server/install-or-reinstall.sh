@@ -5,8 +5,8 @@ if [ $# -lt 2 ]; then >&2 sed '2!d;2s/^# //;2q' "$0"; exit 1; fi
 set -xeuo pipefail -o bsdecho
 script_dir=${0:a:h}
 nixos_dir=$script_dir/nixos
-mnt_dir=$1
-hostname=$2
+hostname=$1
+mnt_dir=$2
 
 # Like `nixos-install --flake .\#$hostname`, but avoids the error in NixOS/nix#4081:
 # <https://github.com/NixOS/nix/issues/4081#issuecomment-753237142>
