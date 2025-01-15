@@ -178,9 +178,9 @@ To build the base vm, first build a clean image:
         - You can now press **Shift**+**Tab** to get to the buttons at the bottom of the wizard
     - **Select Your Country or Region** = United States
     - **Migration Assistant** = Not Now
-    - If latency is high, **Accessibility** > **Cognitive** then:
-        - > **Reduce Transparency** = Reduce Transparency
-        - > **Reduce Motion** = Reduce Motion
+    - If latency is high, **Accessibility** > **Vision** then:
+        - \> **Reduce Transparency** = Reduce Transparency
+        - \> **Reduce Motion** = Reduce Motion
     - **Sign In with Your Apple ID** = Set Up Later
     - **Full name** = `servo`
     - **Account name** = `servo`
