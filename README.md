@@ -187,16 +187,14 @@ To build the base vm, first build a clean image:
     - If latency is high:
         - Press **Cmd**+**Space**, type `full keyboard access`, turn it on, then press **Cmd**+**Q**
     - Once installed, shut down the guest: `virsh shutdown servo-macos13.clean`
-- Take another snapshot: `zfs snapshot tank/base/servo-macos13.clean@oobe`
+- When the guest shuts down, take another snapshot: `zfs snapshot tank/base/servo-macos13.clean@oobe`
 - Start the base guest: `virsh start servo-macos13.clean`
 - Log in with the password above
 - Press **Cmd**+**Space**, type `full disk access`, press **Enter**
 - Click the plus, type the password above, type `/System/Applications/Utilities/Terminal.app`, press **Enter** twice, press **Cmd**+**Q**
 - Press **Cmd**+**Space**, type `terminal`, press **Enter**
 - Type `curl https://ci0.servo.org/static/macos13.sh | sudo sh`, press **Enter**, type the password above, press **Enter**
-- When the script finishes, press **Cmd**+**Q**
-- Shut down the guest: `virsh shutdown servo-macos13.clean`
-- Take another snapshot: `zfs snapshot tank/base/servo-macos13.clean@automated`
+- When the guest shuts down, take another snapshot: `zfs snapshot tank/base/servo-macos13.clean@automated`
 - Enable per-snapshot block devices for the zvol: `zfs set snapdev=visible tank/base/servo-macos13.clean`
 - Clone the clean zvol/guest to create the base zvol/guest:
     - `zfs clone tank/base/servo-macos13{.clean@automated,}`
