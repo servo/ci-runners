@@ -48,7 +48,7 @@ $ apt install -y zsh
 $ ./start-nixos-installer.sh
 ```
 
-Reconnect over SSH, then run the following:
+Reconnect over SSH (use `ssh -4` this time), then run the following:
 
 ```
 $ nix-shell -p git zsh jq

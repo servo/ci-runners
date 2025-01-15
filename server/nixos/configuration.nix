@@ -2,6 +2,12 @@
 # your system. Help is available in the configuration.nix(5) man page, on
 # https://search.nixos.org/options and in the NixOS manual (`nixos-help`).
 
+{
+  hostName,
+  hostId,  # Generate with: LC_ALL=C < /dev/urandom tr -dC 0-9A-F | head -c 8
+  ipv6Address,
+}:
+
 { config, lib, pkgs, ... }:
 
 {
@@ -10,17 +16,17 @@
       ./hardware-configuration.nix
     ];
 
-  networking.hostName = "ci0"; # Define your hostname.
+  networking.hostName = hostName; # Define your hostname.
   # FIXME: breaks resolution of “ci0.servo.org” in libvirt guests
   # networking.domain = "servo.org";
 
   # Needed by ZFS.
   # Generate with: LC_ALL=C < /dev/urandom tr -dC 0-9A-F | head -c 8
-  networking.hostId = "04AA04E2";
+  networking.hostId = hostId;
 
   # <https://docs.hetzner.com/robot/dedicated-server/network/net-config-cent-os/#dedicated-root-servers-1>
   networking.interfaces.eth0.ipv6.addresses = [ {
-    address = "2a01:4f9:3071:3063::2";
+    address = ipv6Address;
     prefixLength = 64;
   } ];
   networking.defaultGateway6 = {
@@ -47,8 +53,8 @@
     # If we have /boot0 and /boot1, with an optional symlink from /boot to /boot0,
     # we generate a /boot0/grub/grub.cfg with “search --set=drive1 --label ci0”,
     # which makes no sense and does not work.
-    { path = "/boot"; devices = ["/dev/disk/by-partlabel/ci0.esp0"]; }
-    { path = "/boot1"; devices = ["/dev/disk/by-partlabel/ci0.esp1"]; }
+    { path = "/boot"; devices = ["/dev/disk/by-partlabel/${hostName}.esp0"]; }
+    { path = "/boot1"; devices = ["/dev/disk/by-partlabel/${hostName}.esp1"]; }
   ];
 
   # Install for x86_64-efi platform (UEFI), not i386-pc (BIOS/CSM).
@@ -113,7 +119,7 @@
 
   security.acme = {
     acceptTerms = true;
-    certs."ci0.servo.org" = {
+    certs."${hostName}.servo.org" = {
       email = "dazabani@igalia.com";
       webroot = "/var/lib/acme/acme-challenge";
       extraDomainNames = [
@@ -136,7 +142,7 @@
         '';
       };
       ssl = {
-        useACMEHost = "ci0.servo.org";
+        useACMEHost = "${hostName}.servo.org";
         forceSSL = true;
       };
     in {
