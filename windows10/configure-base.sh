@@ -11,7 +11,7 @@ download "$SERVO_CI_CACHE_PATH" https://www.python.org/ftp/python/3.10.11/python
 download "$SERVO_CI_CACHE_PATH/uv" https://astral.sh/uv/install.ps1 cdecd14306c3c8d1630a0b0a40fd459f64f53cc59e1ffebd6ebeea816404070c
 download "$SERVO_CI_CACHE_PATH" https://download.visualstudio.microsoft.com/download/pr/2d6bb6b2-226a-4baa-bdec-798822606ff1/8494001c276a4b96804cde7829c04d7f/ndp48-x86-x64-allos-enu.exe 68c9986a8dcc0214d909aa1f31bee9fb5461bb839edca996a75b08ddffc1483f
 download "$SERVO_CI_CACHE_PATH" https://github.com/microsoft/vswhere/releases/download/3.1.7/vswhere.exe c54f3b7c9164ea9a0db8641e81ecdda80c2664ef5a47c4191406f848cc07c662
-download "$SERVO_CI_CACHE_PATH" https://aka.ms/vs/17/release/vs_community.exe 5606944c31b01519f5932cdfa29f1cf1c2591a7ebe973987bd03504dbcc0bbf9
+download "$SERVO_CI_CACHE_PATH" https://aka.ms/vs/17/release/vs_community.exe 998a5da9bb07fab964cfb36724a8f61cc6b58a745d83f061224b7ad0c1cd78f1
 download "$SERVO_CI_CACHE_PATH" https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe 193d6c727e18734edbf7303180657e96e9d5a08432002b4e6c5bbe77c60cb3e8
 download "$SERVO_CI_CACHE_PATH" https://github.com/actions/runner/releases/download/v2.321.0/actions-runner-win-x64-2.321.0.zip 88d754da46f4053aec9007d172020c1b75ab2e2049c08aef759b643316580bbc
 download "$SERVO_CI_CACHE_PATH" https://github.com/git-for-windows/git/releases/download/v2.45.1.windows.1/Git-2.45.1-64-bit.exe 1b2b58fb516495feb70353aa91da230be0a2b4aa01acc3bc047ee1fe4846bc4e
