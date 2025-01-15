@@ -13,5 +13,5 @@ mnt_dir=$2
 cd "$nixos_dir"
 nix build .\#nixosConfigurations."$hostname".config.system.build.toplevel
 # `--no-root-password` means keep the root password from configuration.nix.
-nixos-install --no-root-password --root / --system ./result
+nixos-install --no-root-password --root "$mnt_dir" --system ./result
 rm result
