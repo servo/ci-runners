@@ -145,7 +145,11 @@
           proxyPass = "http://[::1]:8000";
         };
         locations."/static/" = {
-          root = "/config";
+          extraConfig = ''
+            # alias strips /static/ from url, unlike root
+            # trailing slash avoids [error] opendir() ".../stati" failed
+            alias ${pkgs.copyPathToStore ../../static}/;
+          '';
         };
       } // ssl;
       "intermittent-tracker.servo.org" = {
