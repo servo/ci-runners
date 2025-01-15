@@ -88,17 +88,19 @@ To set up the monitor service, run the following:
 ```
 $ zfs create tank/base
 $ zfs create tank/ci
+$ git clone https://github.com/servo/ci-runners.git ~/ci-runners
+$ cd ~/ci-runners
 $ virsh net-define cinet.xml
 $ virsh net-autostart cinet
 $ virsh net-start cinet
 
 $ rustup default stable
 $ git clone https://github.com/servo/servo.git ~/servo
-$ cp /config/.env.example /config/.env
-$ cp /config/monitor/monitor.toml.example /config/monitor/monitor.toml
-$ vim -p /config/.env /config/monitor/monitor.toml
-$ cd /config
-$ RUST_LOG=debug cargo run
+$ mkdir /config /config/monitor
+$ cp ~/ci-runners/.env.example /config/monitor/.env
+$ cp ~/ci-runners/monitor/monitor.toml.example /config/monitor/monitor.toml
+$ vim -p /config/monitor/.env /config/monitor/monitor.toml
+$ systemctl restart monitor
 ```
 
 Windows 10 runner
