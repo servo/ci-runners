@@ -89,10 +89,12 @@ static PNG: &str = "image/png";
 enum Request {
     /// POST `/<profile_key>/<unique id>/<user>/<repo>/<run id>` => `{"id", "runner"}` | `null`
     /// POST `/profile/<profile_key>/take?unique_id&qualified_repo=<user>/<repo>&run_id` => `{"id", "runner"}` | `null`
-    TakeRunner {
+    /// POST `/profile/<profile_key>/take/<count>?unique_id&qualified_repo=<user>/<repo>&run_id` => `[{"id", "runner"}]` | `null`
+    TakeRunners {
         response_tx: Sender<String>,
         profile_key: String,
         query: TakeRunnerQuery,
+        count: usize,
     },
 
     /// GET `/runner/<our runner id>/screenshot/now` => image/png
@@ -234,7 +236,7 @@ async fn main() -> eyre::Result<()> {
             || -> eyre::Result<String> {
                 let (response_tx, response_rx) = crossbeam_channel::bounded(0);
                 REQUEST.sender.send_timeout(
-                    Request::TakeRunner {
+                    Request::TakeRunners {
                         response_tx,
                         profile_key,
                         query: TakeRunnerQuery {
@@ -242,6 +244,7 @@ async fn main() -> eyre::Result<()> {
                             qualified_repo: format!("{user}/{repo}"),
                             run_id,
                         },
+                        count: 1,
                     },
                     DOTENV.monitor_thread_send_timeout,
                 )?;
@@ -262,14 +265,43 @@ async fn main() -> eyre::Result<()> {
             || -> eyre::Result<String> {
                 let (response_tx, response_rx) = crossbeam_channel::bounded(0);
                 REQUEST.sender.send_timeout(
-                    Request::TakeRunner {
+                    Request::TakeRunners {
                         response_tx,
                         profile_key,
                         query,
+                        count: 1,
                     },
                     DOTENV.monitor_thread_send_timeout,
                 )?;
                 Ok(response_rx.recv_timeout(DOTENV.monitor_thread_recv_timeout)?)
+            }()
+            .map_err(|error| reject::custom(ChannelError(error)))
+        })
+        .with(header("Content-Type", JSON));
+
+    let take_runners_route = warp::path!("profile" / String / "take" / usize)
+        .and(warp::filters::method::post())
+        .and(warp::filters::header::exact(
+            "Authorization",
+            &DOTENV.monitor_api_token_authorization_value,
+        ))
+        .and(warp::filters::query::query())
+        .and_then(|profile_key, count, query: TakeRunnerQuery| async move {
+            || -> eyre::Result<String> {
+                let (response_tx, response_rx) = crossbeam_channel::bounded(0);
+                REQUEST.sender.send_timeout(
+                    Request::TakeRunners {
+                        response_tx,
+                        profile_key,
+                        query,
+                        count,
+                    },
+                    DOTENV.monitor_thread_send_timeout,
+                )?;
+                Ok(response_rx.recv_timeout(
+                    // TODO: make this configurable?
+                    DOTENV.monitor_thread_recv_timeout + Duration::from_secs(count as u64),
+                )?)
             }()
             .map_err(|error| reject::custom(ChannelError(error)))
         })
@@ -352,6 +384,7 @@ async fn main() -> eyre::Result<()> {
         .or(dashboard_json_route)
         .or(take_runner_route)
         .or(take_runner_route2)
+        .or(take_runners_route)
         .or(profile_screenshot_route)
         .or(runner_screenshot_route)
         .or(runner_screenshot_now_route);
@@ -589,7 +622,7 @@ fn monitor_thread() -> eyre::Result<()> {
             info!(?request, "Received API request");
 
             match request {
-                Request::TakeRunner {
+                Request::TakeRunners {
                     response_tx,
                     profile_key: profile,
                     query:
@@ -598,26 +631,36 @@ fn monitor_thread() -> eyre::Result<()> {
                             qualified_repo,
                             run_id,
                         },
+                    count,
                 } => {
-                    let response = if let Some((&id, runner)) =
-                        runners.iter().find(|(_, runner)| {
+                    let mut result = vec![];
+                    let matching_runners = runners
+                        .iter()
+                        .filter(|(_, runner)| {
                             runner.status() == Status::Idle && runner.base_vm_name() == profile
-                        }) {
-                        registrations_cache.invalidate();
-                        if runners
-                            .reserve_runner(id, &unique_id, &qualified_repo, &run_id)
-                            .is_ok()
-                        {
-                            serde_json::to_string(&json!({
-                                "id": id,
-                                "runner": runner,
-                            }))?
-                        } else {
-                            // TODO: send error when reservation fails
-                            serde_json::to_string(&Option::<()>::None)?
+                        })
+                        .take(count)
+                        .collect::<Vec<_>>();
+                    if matching_runners.len() == count {
+                        for (&id, runner) in matching_runners {
+                            registrations_cache.invalidate();
+                            if runners
+                                .reserve_runner(id, &unique_id, &qualified_repo, &run_id)
+                                .is_ok()
+                            {
+                                result.push(json!({
+                                    "id": id,
+                                    "runner": runner,
+                                }));
+                            }
                         }
+                    }
+                    let response = if result.len() == count {
+                        serde_json::to_string(&result)?
                     } else {
                         // TODO: send error when no runners available
+                        // TODO: send error when not enough runners available
+                        // TODO: send error when any reservations fail
                         serde_json::to_string(&Option::<()>::None)?
                     };
                     response_tx
