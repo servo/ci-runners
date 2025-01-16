@@ -41,6 +41,12 @@ if ! [ -e /init/built_servo_once_successfully ]; then
     touch /init/built_servo_once_successfully
     poweroff
     exit
+else
+    cd /a/servo/servo
+    # Freshen git’s understanding of the working tree.
+    git status
+    # Freshen cargo’s understanding of the incremental build.
+    ./mach build --use-crown --locked --release --features layout_2013
 fi
 
 if [ -e /init/runner.sh ]; then
