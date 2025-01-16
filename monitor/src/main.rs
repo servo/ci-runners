@@ -641,25 +641,22 @@ fn monitor_thread() -> eyre::Result<()> {
                         })
                         .take(count)
                         .collect::<Vec<_>>();
-                    if matching_runners.len() == count {
-                        for (&id, runner) in matching_runners {
-                            registrations_cache.invalidate();
-                            if runners
-                                .reserve_runner(id, &unique_id, &qualified_repo, &run_id)
-                                .is_ok()
-                            {
-                                result.push(json!({
-                                    "id": id,
-                                    "runner": runner,
-                                }));
-                            }
+                    for (&id, runner) in matching_runners {
+                        registrations_cache.invalidate();
+                        if runners
+                            .reserve_runner(id, &unique_id, &qualified_repo, &run_id)
+                            .is_ok()
+                        {
+                            result.push(json!({
+                                "id": id,
+                                "runner": runner,
+                            }));
                         }
                     }
-                    let response = if result.len() == count {
+                    let response = if !result.is_empty() {
                         serde_json::to_string(&result)?
                     } else {
                         // TODO: send error when no runners available
-                        // TODO: send error when not enough runners available
                         // TODO: send error when any reservations fail
                         serde_json::to_string(&Option::<()>::None)?
                     };
