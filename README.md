@@ -62,6 +62,16 @@ $ ./deploy -s ci1.servo.org ci1
 $ ./deploy -s ci2.servo.org ci2
 ```
 
+To deploy, read monitor config, or write monitor config on one or more servers:
+
+```
+$ cd server/nixos
+$ ./do <deploy|read|write> [host ...]
+$ ./do deploy ci0 ci1 ci2
+$ ./do read ci0 ci1
+$ ./do write ci1 ci2
+```
+
 Setting up the monitor service
 ------------------------------
 

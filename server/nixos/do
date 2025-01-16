@@ -1,0 +1,28 @@
+#!/usr/bin/env zsh
+set -euo pipefail -o bsdecho
+action=$1; shift
+
+case "$action" in
+(deploy)
+    for host; do
+        ./deploy -s "$host".servo.org "$host"
+    done
+    ;;
+(read)
+    for host; do
+        mkdir -p -- "$host"
+        rsync root@"$host".servo.org:/config/monitor/{.env,monitor.toml} "$host"/
+    done
+    ;;
+(write)
+    for host; do
+        rsync "$host"/{.env,monitor.toml} root@"$host".servo.org:/config/monitor/
+    done
+    for host; do
+        ssh root@"$host".servo.org systemctl restart monitor
+    done
+    for host; do
+        printf '>>> %s\n' https://"$host".servo.org
+    done
+    ;;
+esac
