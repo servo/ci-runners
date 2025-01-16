@@ -7,7 +7,7 @@ trap print_undo_commands EXIT
 . "$script_dir/download.sh"
 . "$script_dir/inject.sh"
 undo_commands=$(mktemp)
-image_name=servo-ubuntu2204
+image_name=servo-ubuntu2204-wpt
 snapshot_name=$1; shift
 
 >&2 echo '[*] Caching downloads'

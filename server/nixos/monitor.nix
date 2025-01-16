@@ -7,6 +7,7 @@
       ../../shared
       ../../macos13
       ../../ubuntu2204
+      ../../ubuntu2204-wpt
       ../../windows10
       ../../common.sh
       ../../create-runner.sh
@@ -60,6 +61,7 @@ in rustPlatform.buildRustPackage rec {
     cp -R shared $out/lib/monitor
     cp -R macos13 $out/lib/monitor
     cp -R ubuntu2204 $out/lib/monitor
+    cp -R ubuntu2204-wpt $out/lib/monitor
     cp -R windows10 $out/lib/monitor
     cp -R common.sh $out/lib/monitor
     cp -R create-runner.sh $out/lib/monitor
