@@ -62,7 +62,7 @@ $ ./deploy -s ci1.servo.org ci1
 $ ./deploy -s ci2.servo.org ci2
 ```
 
-To deploy, read monitor config, or write monitor config on one or more servers:
+To deploy, read monitor config, write monitor config, or run a command on one or more servers:
 
 ```
 $ cd server/nixos
@@ -70,6 +70,16 @@ $ ./do <deploy|read|write> [host ...]
 $ ./do deploy ci0 ci1 ci2
 $ ./do read ci0 ci1
 $ ./do write ci1 ci2
+
+$ ./do run [host ...] -- <command ...>
+$ ./do run ci0 ci2 -- virsh edit servo-ubuntu2204
+```
+
+To monitor system logs or process activity on any of the servers:
+
+```
+$ ./do logs <host>
+$ ./do htop <host>
 ```
 
 Setting up the monitor service

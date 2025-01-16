@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-set -euo pipefail -o bsdecho
+set -euo pipefail -o bsdecho -o shwordsplit
 action=$1; shift
 
 case "$action" in
@@ -24,5 +24,29 @@ case "$action" in
     for host; do
         printf '>>> %s\n' https://"$host".servo.org
     done
+    ;;
+(run)
+    hosts=
+    for arg; do
+        case "$arg" in
+        (--)
+            shift
+            break
+            ;;
+        (*)
+            hosts="$hosts $arg"
+            shift
+            ;;
+        esac
+    done
+    for host in $hosts; do
+        mosh root@"$host".servo.org -- "$@"
+    done
+    ;;
+(logs)
+    mosh root@"$1".servo.org tmux new 'journalctl -af'
+    ;;
+(htop)
+    mosh root@"$1".servo.org tmux new 'htop'
     ;;
 esac
