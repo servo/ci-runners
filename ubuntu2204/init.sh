@@ -27,6 +27,10 @@ sudo apt install -y xvfb
 # Install Python, for checkouts without servo#34504
 sudo apt install -y python-is-python3
 
+# FIXME: 17 tests require this
+# <https://github.com/servo/servo/issues/35029>
+sudo apt purge -y fonts-droid-fallback
+
 # Install uv and ensure it is on PATH
 if ! [ -e /root/.local/bin/uv ]; then
     /init/install-uv.sh
