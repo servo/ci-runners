@@ -31,6 +31,10 @@ sudo apt install -y python-is-python3
 # <https://github.com/servo/servo/issues/35029>
 sudo apt purge -y fonts-droid-fallback
 
+# FIXME: 2 tests require this
+# <https://github.com/servo/servo/issues/35030>
+sudo apt install -y fonts-noto-color-emoji
+
 # Install uv and ensure it is on PATH
 if ! [ -e /root/.local/bin/uv ]; then
     /init/install-uv.sh
