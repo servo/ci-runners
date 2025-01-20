@@ -208,17 +208,3 @@ To prepare a server for macOS 13 guests, build a clean image:
 - Enable per-snapshot block devices for the zvol: `zfs set snapdev=visible tank/base/servo-macos13.clean`
 
 Building the base vm image is handled automatically by the monitor, with the help of `macos13/build-image.sh`.
-
-Baking new images after deployment
-----------------------------------
-
-- Restart the monitor with `SERVO_CI_DONT_CREATE_RUNNERS`, to free up some resources
-- Update the Servo repo on the host: `git -C ~/servo pull`
-- Redo the “build the base image” steps for the image to be built, stopping before the `zfs destroy` step
-- Create a test profile in monitor/src/main.rs, pointing to the test image
-- Restart the monitor without `SERVO_CI_DONT_CREATE_RUNNERS`
-- Run a try job with that test image: `./mach try win -r upstream`
-- If all goes well
-    - Remove the test profile monitor/src/main.rs
-    - Restart the monitor without `SERVO_CI_DONT_CREATE_RUNNERS`
-    - Do the rest of the “build the base image” steps
