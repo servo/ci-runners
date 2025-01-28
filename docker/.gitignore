@@ -1,0 +1,14 @@
+hos_commandline_tools/commandline-tools*.zip
+# We could also commit this instead of downloading.
+hos_builder/githubcli-archive-keyring.gpg
+
+# Todo: We should get hdc from the SDK or commandline tools instead.
+runner/hdc.tar
+# These are essentially secrets - hence the image shouldn't be published,
+# and the workflow using the image closely reviewed. The secrets themselves
+# are only developer keys, so not much harm would be done if they were leaked though.
+runner/hdckey
+runner/hdckey.pub
+runner/ohos-config.tar
+runner/sign.sh
+runner/signing-configs.json
