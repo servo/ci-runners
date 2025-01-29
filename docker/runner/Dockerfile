@@ -6,10 +6,10 @@ FROM hos_commandline_tools:${HOS_COMMANDLINE_TOOLS_VERSION} AS commandline_tools
 FROM servo_gha_runner:${GITHUB_ACTIONS_RUNNER_VERSION}
 
 USER root
-# Java is required for signing the hap
+# Java is required for signing the hap, libatomic1 for hdc
 RUN apt-get update && \
     apt-get -y install --no-install-recommends \
-        openjdk-11-jre-headless \
+        openjdk-11-jre-headless libatomic1 \
     && rm -rf /var/cache/apt/lists
 
 ARG USERNAME
