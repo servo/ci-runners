@@ -3,3 +3,4 @@
 /monitor/target/
 /monitor/monitor.toml
 /.env
+/docker/docker_jit_monitor/target/
