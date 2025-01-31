@@ -47,8 +47,8 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
         --profile=minimal \
         --component rustfmt clippy cargo llvm-tools rustc-dev rustdocs
 
-# todo: delete registy
-RUN /home/${USERNAME}/.cargo/bin/cargo install cargo-chef taplo-cli cargo-deny --locked
+RUN /home/${USERNAME}/.cargo/bin/cargo install cargo-chef taplo-cli cargo-deny bindgen-cli --locked \
+    && rm -rf /home/${USERNAME}/.cargo/git /home/${USERNAME}/.cargo/registry
 
 FROM base_fetcher AS uv
 
