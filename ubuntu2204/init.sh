@@ -45,11 +45,10 @@ if ! [ -e /init/built_servo_once_successfully ]; then
     cd /a/servo/servo
     ./mach bootstrap --force
     # Build the same way as a typical Linux build job, to allow for incremental builds.
-    export CARGO_LOG=cargo::core::compiler::fingerprint=info
-    ./mach build --use-crown --locked --release --features layout_2013  -v 2>&1 | tee /init/build0.log
+    ./mach build --use-crown --locked --release --features layout_2013
     # Some hacks that seem to help with incremental builds.
     git status
-    ./mach build --use-crown --locked --release --features layout_2013  -v 2>&1 | tee /init/build1.log
+    ./mach build --use-crown --locked --release --features layout_2013
     touch /init/built_servo_once_successfully
     poweroff
     exit
@@ -59,7 +58,7 @@ else
     git status
     # Freshen cargo’s understanding of the incremental build.
     export CARGO_LOG=cargo::core::compiler::fingerprint=info
-    ./mach build --use-crown --locked --release --features layout_2013  -v 2>&1 | tee /init/build2.log
+    ./mach build --use-crown --locked --release --features layout_2013
 fi
 
 if [ -e /init/runner.sh ]; then
