@@ -21,6 +21,8 @@ choco install -y support\windows\chocolatey.config
 echo "`$env:LIBCLANG_PATH in runner image = $env:LIBCLANG_PATH" > C:\init\incremental_build_debug.txt
 echo "`$env:PATH in runner image = $env:PATH" >> C:\init\incremental_build_debug.txt
 
-# Build the same way as a typical Windows build job, to allow for incremental builds.
 $env:RUSTUP_WINDOWS_PATH_ADD_BIN = 1
+# Build the same way as a typical Windows libservo job, to allow for incremental builds.
+cargo build -p libservo --all-targets --release --target-dir target\libservo
+# Build the same way as a typical Windows build job, to allow for incremental builds.
 .\mach build --use-crown --locked --release --features layout_2013

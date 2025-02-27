@@ -44,7 +44,9 @@ export PATH=$HOME/.local/bin:$PATH
 if ! [ -e /Volumes/a/init/built_servo_once_successfully ]; then
     cd /Volumes/a/a/servo/servo
     ./mach bootstrap --force
-    # Build the same way as a typical Linux build job, to allow for incremental builds.
+    # Build the same way as a typical macOS libservo job, to allow for incremental builds.
+    cargo build -p libservo --all-targets --release --target-dir target/libservo
+    # Build the same way as a typical macOS build job, to allow for incremental builds.
     ./mach build --use-crown --locked --release --features layout_2013
     touch /Volumes/a/init/built_servo_once_successfully
     sudo shutdown -h now
