@@ -45,7 +45,11 @@ ARG RUST_VERSION
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
         | sh -s -- -y --default-toolchain ${RUST_VERSION} \ 
         --profile=minimal \
-        --component rustfmt clippy cargo llvm-tools rustc-dev rustdocs
+        --component rustfmt \
+        --component clippy \
+        --component cargo \
+        --component llvm-tools \
+        --component rustc-dev
 
 RUN /home/${USERNAME}/.cargo/bin/cargo install cargo-chef taplo-cli cargo-deny bindgen-cli --locked \
     && rm -rf /home/${USERNAME}/.cargo/git /home/${USERNAME}/.cargo/registry

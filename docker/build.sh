@@ -4,9 +4,9 @@ set -eu
 
 SERVO_GIT_HASH=$(git ls-remote https://github.com/servo/servo.git --branches refs/heads/main | awk '{ print $1}')
 HOS_COMMANDLINE_TOOLS_VERSION="5.0.3.906"
-GITHUB_ACTIONS_RUNNER_VERSION="2.321.0"
-RUST_VERSION="1.83.0"
-UV_VERSION="0.5.10"
+GITHUB_ACTIONS_RUNNER_VERSION="2.322.0"
+RUST_VERSION="1.85.0"
+UV_VERSION="0.6.4"
 IMAGE_USERNAME=servo_ci
 
 
