@@ -35,9 +35,9 @@ if (!(Test-Path C:\Users\Administrator\.local\bin\uv.exe)) {
     . C:\init\install-uv.ps1
 }
 
-# Install rustup and Rust 1.80.1
+# Install rustup and the latest Rust
 if (!(Test-Path C:\Users\Administrator\.rustup)) {
-    C:\init\rustup-init.exe --default-toolchain 1.80.1 -y --quiet
+    C:\init\rustup-init.exe -y --quiet
 }
 
 # Install .NET 4.8 for Chocolatey

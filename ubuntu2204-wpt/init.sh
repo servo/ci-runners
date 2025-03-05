@@ -9,9 +9,9 @@ if ! dpkg -s "$@" > /dev/null 2>&1; then
     apt install -y "$@"
 fi
 
-# Install rustup and Rust 1.80.1
+# Install rustup and the latest Rust
 if ! [ -e /root/.rustup ]; then
-    /init/rustup-init.sh --default-toolchain 1.80.1 -y --quiet
+    /init/rustup-init.sh -y --quiet
 fi
 
 # ~/.cargo/env requires HOME to be set
@@ -47,6 +47,10 @@ export PATH=$HOME/.local/bin:$PATH
 
 if ! [ -e /init/built_servo_once_successfully ]; then
     cd /a/servo/servo
+
+    # Install the Rust toolchain, for checkouts without servo#35795
+    rustup show active-toolchain || rustup toolchain install
+
     ./mach bootstrap --force
     # Build the same way as a typical Linux build job, to allow for incremental builds.
     export CARGO_LOG=cargo::core::compiler::fingerprint=info

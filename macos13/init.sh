@@ -43,6 +43,10 @@ export PATH=$HOME/.local/bin:$PATH
 
 if ! [ -e /Volumes/a/init/built_servo_once_successfully ]; then
     cd /Volumes/a/a/servo/servo
+
+    # Install the Rust toolchain, for checkouts without servo#35795
+    rustup show active-toolchain || rustup toolchain install
+
     ./mach bootstrap --force
     # Build the same way as a typical macOS libservo job, to allow for incremental builds.
     cargo build -p libservo --all-targets --release --target-dir target/libservo

@@ -15,6 +15,12 @@ git reset --hard
 choco install -y support\windows\chocolatey.config
 . C:\init\refreshenv.ps1
 
+# Install the Rust toolchain, for checkouts without servo#35795
+rustup show active-toolchain
+if ($LASTEXITCODE -ne 0) {
+    rustup toolchain install
+}
+
 .\mach bootstrap --skip-platform
 
 # Save a copy of the environment variables that can break incremental builds, for debugging.
