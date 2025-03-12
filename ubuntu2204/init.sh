@@ -51,10 +51,10 @@ if ! [ -e /init/built_servo_once_successfully ]; then
     # Build the same way as a typical Linux libservo job, to allow for incremental builds.
     cargo build -p libservo --all-targets --release --target-dir target/libservo
     # Build the same way as a typical Linux build job, to allow for incremental builds.
-    ./mach build --use-crown --locked --release --features layout_2013
+    ./mach build --use-crown --locked --release
     # Some hacks that seem to help with incremental builds.
     git status
-    ./mach build --use-crown --locked --release --features layout_2013
+    ./mach build --use-crown --locked --release
     touch /init/built_servo_once_successfully
     poweroff
     exit
@@ -64,7 +64,7 @@ else
     git status
     # Freshen cargo’s understanding of the incremental build.
     export CARGO_LOG=cargo::core::compiler::fingerprint=info
-    ./mach build --use-crown --locked --release --features layout_2013
+    ./mach build --use-crown --locked --release
 fi
 
 if [ -e /init/runner.sh ]; then

@@ -31,4 +31,4 @@ $env:RUSTUP_WINDOWS_PATH_ADD_BIN = 1
 # Build the same way as a typical Windows libservo job, to allow for incremental builds.
 cargo build -p libservo --all-targets --release --target-dir target\libservo
 # Build the same way as a typical Windows build job, to allow for incremental builds.
-.\mach build --use-crown --locked --release --features layout_2013
+.\mach build --use-crown --locked --release
