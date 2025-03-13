@@ -51,7 +51,7 @@ if ! [ -e /Volumes/a/init/built_servo_once_successfully ]; then
     # Build the same way as a typical macOS libservo job, to allow for incremental builds.
     cargo build -p libservo --all-targets --release --target-dir target/libservo
     # Build the same way as a typical macOS build job, to allow for incremental builds.
-    ./mach build --use-crown --locked --release --features layout_2013
+    ./mach build --use-crown --locked --release
     touch /Volumes/a/init/built_servo_once_successfully
     sudo shutdown -h now
     exit
