@@ -7,22 +7,22 @@ script_dir=${0:a:h}/..
 
 >&2 echo '[*] Caching downloads'
 mkdir -p -- "$SERVO_CI_CACHE_PATH"
-download "$SERVO_CI_CACHE_PATH" https://static.rust-lang.org/rustup/rustup-init.sh 32a680a84cf76014915b3f8aa44e3e40731f3af92cd45eb0fcc6264fd257c428
-download "$SERVO_CI_CACHE_PATH" https://github.com/actions/runner/releases/download/v2.321.0/actions-runner-linux-x64-2.321.0.tar.gz ba46ba7ce3a4d7236b16fbe44419fb453bc08f866b24f04d549ec89f1722a29e
-download "$SERVO_CI_CACHE_PATH/uv" https://astral.sh/uv/install.sh 388b22971ac90864ce4b12a209014ae99b16088a80a107fab1c01f0c9e50751d
+download "$SERVO_CI_CACHE_PATH/rustup-linux" https://static.rust-lang.org/rustup/archive/1.28.1/x86_64-unknown-linux-gnu/rustup-init a3339fb004c3d0bb9862ba0bce001861fe5cbde9c10d16591eb3f39ee6cd3e7f
+download "$SERVO_CI_CACHE_PATH" https://github.com/actions/runner/releases/download/v2.323.0/actions-runner-linux-x64-2.323.0.tar.gz 0dbc9bf5a58620fc52cb6cc0448abcca964a8d74b5f39773b7afcad9ab691e19
+download "$SERVO_CI_CACHE_PATH" https://github.com/astral-sh/uv/releases/download/0.6.9/uv-installer.sh f1288cc7987c8e098131e1895e18bb5e232021424e7332609ec3ded0a9509799
 
 >&2 echo '[*] Injecting init script'
 mkdir -p init
 inject etc/rc.local "$script_dir/ubuntu2204/init.sh"
-inject init "$SERVO_CI_CACHE_PATH/rustup-init.sh"
-inject init/install-uv.sh "$SERVO_CI_CACHE_PATH/uv/install.sh"
-chmod +x init/rustup-init.sh init/install-uv.sh
+inject init "$SERVO_CI_CACHE_PATH/rustup-linux/rustup-init"
+inject init "$SERVO_CI_CACHE_PATH/uv-installer.sh"
+chmod +x init/rustup-init init/uv-installer.sh
 
 >&2 echo '[*] Injecting GitHub Actions runner'
 # See also: <https://github.com/servo/servo/settings/actions/runners/new?arch=x64&os=linux>
 rm -Rf actions-runner  # FIXME: necessary to avoid errors starting runner?
 mkdir -p actions-runner
-( cd actions-runner; tar xf "$SERVO_CI_CACHE_PATH/actions-runner-linux-x64-2.321.0.tar.gz" )
+( cd actions-runner; tar xf "$SERVO_CI_CACHE_PATH/actions-runner-linux-x64-2.323.0.tar.gz" )
 
 >&2 echo '[*] Creating working directory for builds (C:\a)'
 mkdir -p a

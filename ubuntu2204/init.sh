@@ -11,7 +11,7 @@ fi
 
 # Install rustup and the latest Rust
 if ! [ -e /root/.rustup ]; then
-    /init/rustup-init.sh -y --quiet
+    /init/rustup-init -y --quiet
 fi
 
 # ~/.cargo/env requires HOME to be set
@@ -37,7 +37,7 @@ sudo apt install -y fonts-noto-color-emoji
 
 # Install uv and ensure it is on PATH
 if ! [ -e /root/.local/bin/uv ]; then
-    /init/install-uv.sh
+    /init/uv-installer.sh
 fi
 export PATH=$HOME/.local/bin:$PATH
 

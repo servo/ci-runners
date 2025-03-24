@@ -11,7 +11,7 @@ image_name=servo-ubuntu2204
 snapshot_name=$1; shift
 
 >&2 echo '[*] Caching downloads'
-download "$SERVO_CI_CACHE_PATH" https://cloud-images.ubuntu.com/jammy/20241217/jammy-server-cloudimg-amd64.img 0d8345a343c2547e55ac815342e6cb4a593aa5556872651eb47e6856a2bb0cdd
+download "$SERVO_CI_CACHE_PATH" https://cloud-images.ubuntu.com/jammy/20250318/jammy-server-cloudimg-amd64.img c1997c121bf49f4896b4ede94843e163d2e823390f8788eeda6f7e9e4bea40b8
 
 >&2 echo '[*] Converting qcow2 image to raw image'
 qemu-img convert -f qcow2 -O raw "$SERVO_CI_CACHE_PATH/jammy-server-cloudimg-amd64.img" "$SERVO_CI_CACHE_PATH/jammy-server-cloudimg-amd64.raw"
