@@ -5,4 +5,5 @@ script_dir=${0:a:h}
 id=$1; shift
 
 gh api --method DELETE -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" \
-    "$SERVO_CI_GITHUB_API_SCOPE/actions/runners/$id"
+    "$SERVO_CI_GITHUB_API_SCOPE/actions/runners/$id" \
+| cat  # avoid pager when attached to tty
