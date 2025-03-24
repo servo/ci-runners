@@ -185,9 +185,16 @@ fn run_and_log_output_as_info(exec: Exec) -> eyre::Result<()> {
                     break child.wait()?;
                 } else if !stdout.is_empty() {
                     for line in stdout.split(|&b| b == b'\n') {
+                        if line.is_empty() {
+                            info!(line = %"");
+                        }
                         let line = str::from_utf8(line).map_err(|_| line);
                         match line {
-                            Ok(string) => info!(line = %string),
+                            Ok(string) => {
+                                for chunk in string.split('\r') {
+                                    info!(line = %chunk);
+                                }
+                            }
                             Err(bytes) => info!(?bytes),
                         }
                     }
