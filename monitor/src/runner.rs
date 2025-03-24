@@ -118,7 +118,7 @@ impl Runners {
         self.runners.iter()
     }
 
-    pub fn by_profile<'s>(&'s self, key: &'s str) -> impl Iterator<Item = (&usize, &Runner)> {
+    pub fn by_profile<'s>(&'s self, key: &'s str) -> impl Iterator<Item = (&'s usize, &'s Runner)> {
         self.runners
             .iter()
             .filter(move |(_, runner)| runner.base_vm_name() == key)
