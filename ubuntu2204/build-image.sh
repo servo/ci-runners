@@ -9,6 +9,7 @@ trap print_undo_commands EXIT
 undo_commands=$(mktemp)
 image_name=servo-ubuntu2204
 snapshot_name=$1; shift
+cd -- "$script_dir"
 
 >&2 echo '[*] Caching downloads'
 download "$SERVO_CI_CACHE_PATH" https://cloud-images.ubuntu.com/jammy/20250318/jammy-server-cloudimg-amd64.img c1997c121bf49f4896b4ede94843e163d2e823390f8788eeda6f7e9e4bea40b8

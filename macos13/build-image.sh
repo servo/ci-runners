@@ -9,6 +9,7 @@ trap print_undo_commands EXIT
 undo_commands=$(mktemp)
 image_name=servo-macos13
 snapshot_name=$1; shift
+cd -- "$script_dir"
 
 >&2 echo '[*] Creating zvol (if needed)'
 # TODO: find a more efficient way to do an idempotent zfs-clone(8) that retains the clone’s old snapshots?

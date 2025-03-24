@@ -9,6 +9,7 @@ trap print_undo_commands EXIT
 undo_commands=$(mktemp)
 image_name=servo-windows10
 snapshot_name=$1; shift
+cd -- "$script_dir"
 
 >&2 echo '[*] Caching downloads'
 download "$SERVO_CI_CACHE_PATH" https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.240-1/virtio-win-0.1.240.iso ebd48258668f7f78e026ed276c28a9d19d83e020ffa080ad69910dc86bbcbcc6

@@ -1,16 +1,15 @@
 use core::str;
 use std::{
     collections::BTreeMap,
-    io::ErrorKind,
+    io::{BufRead, BufReader, Read},
     mem::take,
     path::Path,
     thread::{self, JoinHandle},
-    time::Duration,
 };
 
 use chrono::{SecondsFormat, Utc};
-use jane_eyre::eyre::{self, bail};
-use subprocess::{CommunicateError, Exec, Redirection};
+use cmd_lib::spawn_with_output;
+use jane_eyre::eyre;
 use tracing::{error, info, warn};
 
 use crate::{profile::Profiles, runner::Runners, DOTENV, LIB_MONITOR_DIR};
@@ -87,7 +86,9 @@ impl Rebuilds {
 
         // Kick off image rebuild threads for profiles needing it.
         for (key, profile) in profiles_needing_rebuild {
-            let build_script_path = Path::new(&profile.configuration_name).join("build-image.sh");
+            let build_script_path = Path::new(&*LIB_MONITOR_DIR)
+                .join(&profile.configuration_name)
+                .join("build-image.sh");
             let snapshot_name = Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true);
 
             let key_for_thread = key.clone();
@@ -134,13 +135,14 @@ impl Rebuilds {
 #[tracing::instrument]
 fn servo_update_thread() -> eyre::Result<()> {
     info!("Starting repo update");
-    fn git() -> Exec {
-        Exec::cmd("git").cwd(&DOTENV.main_repo_path)
-    }
 
-    run_and_log_output_as_info(git().args(&["reset", "--hard"]))?;
-    run_and_log_output_as_info(git().args(&["fetch", "origin", "main"]))?;
-    run_and_log_output_as_info(git().args(&["switch", "--detach", "FETCH_HEAD"]))?;
+    let main_repo_path = &DOTENV.main_repo_path;
+    let pipe = || |reader| log_output_as_info(reader);
+    spawn_with_output!(git -C $main_repo_path reset --hard 2>&1)?.wait_with_pipe(&mut pipe())?;
+    spawn_with_output!(git -C $main_repo_path fetch origin main 2>&1)?
+        .wait_with_pipe(&mut pipe())?;
+    spawn_with_output!(git -C $main_repo_path switch --detach FETCH_HEAD 2>&1)?
+        .wait_with_pipe(&mut pipe())?;
 
     Ok(())
 }
@@ -151,60 +153,65 @@ fn rebuild_thread(
     build_script_path: impl AsRef<Path>,
     snapshot_name: &str,
 ) -> eyre::Result<()> {
-    info!(build_script_path = ?build_script_path.as_ref(), ?snapshot_name, "Starting image rebuild");
-    let exec = Exec::cmd(build_script_path.as_ref())
-        .cwd(*LIB_MONITOR_DIR)
-        .arg(snapshot_name);
-
-    run_and_log_output_as_info(exec)
-}
-
-fn run_and_log_output_as_info(exec: Exec) -> eyre::Result<()> {
-    let mut child = exec
-        .stdout(Redirection::Pipe)
-        .stderr(Redirection::Merge)
-        .popen()?;
-    let mut communicator = child
-        .communicate_start(None)
-        .limit_time(Duration::from_secs(1));
-    let exit_status = loop {
-        match communicator.read() {
-            Err(error) if error.kind() != ErrorKind::TimedOut => {
-                warn!(?error, "Error reading from child process");
-                break child.wait()?;
-            }
-            // Err(empty) or Err(non-empty) means we timed out, and there may be more output in future.
-            // Ok(non-empty) means we got some output. Hopefully this avoids giving us partial lines?
-            // Ok(empty) means there is definitely no more output.
-            ref result @ (Ok(ref capture) | Err(CommunicateError { ref capture, .. })) => {
-                let (Some(stdout), None) = capture else {
-                    unreachable!("Guaranteed by child definition")
-                };
-                if result.is_ok() && stdout.is_empty() {
-                    // There is definitely no more output
-                    break child.wait()?;
-                } else if !stdout.is_empty() {
-                    for line in stdout.split(|&b| b == b'\n') {
-                        if line.is_empty() {
-                            info!(line = %"");
-                        }
-                        let line = str::from_utf8(line).map_err(|_| line);
-                        match line {
-                            Ok(string) => {
-                                for chunk in string.split('\r') {
-                                    info!(line = %chunk);
-                                }
-                            }
-                            Err(bytes) => info!(?bytes),
-                        }
-                    }
-                }
-            }
-        }
-    };
-    if !exit_status.success() {
-        bail!("Command exited with status {:?}", exit_status);
-    }
+    let build_script_path = build_script_path.as_ref();
+    info!(build_script_path = ?build_script_path, ?snapshot_name, "Starting image rebuild");
+    let pipe = || |reader| log_output_as_info(reader);
+    spawn_with_output!($build_script_path $snapshot_name 2>&1)?.wait_with_pipe(&mut pipe())?;
 
     Ok(())
+}
+
+/// Log the given output to tracing.
+///
+/// Unlike cmd_lib’s built-in logging:
+/// - it handles CR-based progress output correctly, such as in `curl`, `dd`, and `rsync`
+/// - it uses `tracing` instead of `log`, so the logs show the correct target and any span context
+///   given via `#[tracing::instrument]`
+///
+/// This only works with `spawn_with_output!()`, and `wait_with_pipe()` only works with stdout, so
+/// if you want to log both stdout and stderr, use `spawn_with_output!(... 2>&1)`.
+fn log_output_as_info(reader: Box<dyn Read>) {
+    let mut reader = BufReader::new(reader);
+    let mut buffer = vec![];
+    loop {
+        // Unconditionally try to read more data, since the BufReader buffer is empty
+        let result = match reader.fill_buf() {
+            Ok(buffer) => buffer,
+            Err(error) => {
+                warn!(?error, "Error reading from child process");
+                break;
+            }
+        };
+        // Add the result onto our own buffer
+        buffer.extend(result);
+        // Empty the BufReader
+        let read_len = result.len();
+        reader.consume(read_len);
+
+        // Log output to tracing. Take whole “lines” at every LF or CR (for progress bars etc),
+        // but leave any incomplete lines in our buffer so we can try to complete them.
+        while let Some(offset) = buffer.iter().position(|&b| b == b'\n' || b == b'\r') {
+            let line = &buffer[..offset];
+            let line = str::from_utf8(line).map_err(|_| line);
+            match line {
+                Ok(string) => info!(line = %string),
+                Err(bytes) => info!(?bytes),
+            }
+            buffer = buffer.split_off(offset + 1);
+        }
+
+        if read_len == 0 {
+            break;
+        }
+    }
+
+    // Log any remaining incomplete line to tracing.
+    if !buffer.is_empty() {
+        let line = &buffer;
+        let line = str::from_utf8(line).map_err(|_| line);
+        match line {
+            Ok(string) => info!(line = %string),
+            Err(bytes) => info!(?bytes),
+        }
+    }
 }
