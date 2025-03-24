@@ -21,6 +21,13 @@ This repo contains:
     - `monitor` is the service
     - `.env.example` contains the settings
 
+Current SSH host keys
+---------------------
+
+- ci0.servo.org = `SHA256:aoy+JW6hlkTwQDqdPZFY6/gDf1faOQGH5Zwft75Odrc` (ED25519)
+- ci1.servo.org = `SHA256:ri52Ae31OABqL/xCss42cJd0n1qqhxDD9HvbOm59y8o` (ED25519)
+- ci2.servo.org = `SHA256:qyetP4wIOHrzngj1SIpyEnAHJNttW+Rd1CzvJaf0x6M` (ED25519)
+
 Setting up a server on Hetzner
 ------------------------------
 
