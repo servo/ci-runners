@@ -244,5 +244,6 @@
 
   networking.firewall.allowedTCPPorts = [
     80 443  # nginx
+    8000  # monitor (for guests)
   ];
 }

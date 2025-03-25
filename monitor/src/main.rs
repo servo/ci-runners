@@ -31,6 +31,7 @@ use mktemp::Temp;
 use rocket::{fs::NamedFile, get, http::ContentType, post, response::content::RawJson};
 use serde::Deserialize;
 use serde_json::json;
+use tokio::try_join;
 use tracing::{debug, error, info, trace, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
@@ -303,27 +304,30 @@ async fn main() -> eyre::Result<()> {
         }
     });
 
-    let _rocket = rocket::custom(
-        rocket::Config::figment()
-            .merge(("port", 8000))
-            .merge(("address", "::")),
-    )
-    .mount(
-        "/",
-        rocket::routes![
-            index_route,
-            dashboard_html_route,
-            dashboard_json_route,
-            take_runner_route,
-            take_runners_route,
-            profile_screenshot_route,
-            runner_screenshot_route,
-            runner_screenshot_now_route,
-            runner_github_jitconfig_route,
-        ],
-    )
-    .launch()
-    .await;
+    let rocket = |listen_addr: &str| {
+        rocket::custom(
+            rocket::Config::figment()
+                .merge(("port", 8000))
+                .merge(("address", listen_addr)),
+        )
+        .mount(
+            "/",
+            rocket::routes![
+                index_route,
+                dashboard_html_route,
+                dashboard_json_route,
+                take_runner_route,
+                take_runners_route,
+                profile_screenshot_route,
+                runner_screenshot_route,
+                runner_screenshot_now_route,
+                runner_github_jitconfig_route,
+            ],
+        )
+        .launch()
+    };
+
+    try_join!(rocket("::1"), rocket("192.168.100.1"))?;
 
     Ok(())
 }
