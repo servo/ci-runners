@@ -31,7 +31,7 @@ use dotenv::dotenv;
 use http::{StatusCode, Uri};
 use jane_eyre::eyre::{self, eyre, Context, OptionExt};
 use mktemp::Temp;
-use rocket::get;
+use rocket::{get, response::content::RawJson};
 use serde::Deserialize;
 use serde_json::json;
 use tracing::{error, info, trace, warn};
@@ -164,6 +164,20 @@ fn dashboard_html_route() -> rocket_eyre::Result<String> {
         .map_err(EyreReport::ServiceUnavailable)?)
 }
 
+#[get("/dashboard.json")]
+fn dashboard_json_route() -> rocket_eyre::Result<RawJson<String>> {
+    let result = DASHBOARD
+        .read()
+        .map_err(|e| eyre!("Failed to acquire RwLock: {e:?}"))
+        .map_err(EyreReport::ServiceUnavailable)?
+        .as_ref()
+        .map(|x| x.json.clone())
+        .ok_or_eyre("Monitor thread is still starting or not responding")
+        .map_err(EyreReport::ServiceUnavailable)?;
+
+    Ok(RawJson(result))
+}
+
 #[rocket::main]
 async fn main() -> eyre::Result<()> {
     jane_eyre::install()?;
@@ -203,23 +217,7 @@ async fn main() -> eyre::Result<()> {
 
     let dashboard_html_route = warp::path!("dashboard.html").and(warp::filters::method::get());
 
-    let dashboard_json_route = warp::path!("dashboard.json")
-        .and(warp::filters::method::get())
-        .and_then(|| async {
-            DASHBOARD
-                .read()
-                .map_err(|e| {
-                    reject::custom(NotReadyError(eyre!("Failed to acquire RwLock: {e:?}")))
-                })?
-                .as_ref()
-                .map(|x| x.json.clone())
-                .ok_or_else(|| {
-                    reject::custom(NotReadyError(eyre!(
-                        "Monitor thread is still starting or not responding"
-                    )))
-                })
-        })
-        .with(header("Content-Type", JSON));
+    let dashboard_json_route = warp::path!("dashboard.json").and(warp::filters::method::get());
 
     let take_runner_route = warp::path!(String / String / String / String / String)
         .and(warp::filters::method::post())
@@ -394,7 +392,10 @@ async fn main() -> eyre::Result<()> {
             .merge(("port", 8000))
             .merge(("address", "::")),
     )
-    .mount("/", rocket::routes![index_route, dashboard_html_route])
+    .mount(
+        "/",
+        rocket::routes![index_route, dashboard_html_route, dashboard_json_route],
+    )
     .launch()
     .await;
 
