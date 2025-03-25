@@ -35,7 +35,7 @@ use tracing::{debug, error, info, trace, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 use crate::{
-    auth::ApiKeyGuard,
+    auth::{ApiKeyGuard, RemoteAddr},
     dashboard::Dashboard,
     data::{get_profile_data_path, get_runner_data_path, run_migrations},
     github::{list_registered_runners_for_host, Cache},
@@ -90,6 +90,12 @@ enum Request {
     Screenshot {
         response_tx: Sender<eyre::Result<Temp>>,
         runner_id: usize,
+    },
+
+    /// - GET `/github-jitconfig` => application/json
+    GithubJitconfig {
+        response_tx: Sender<Option<String>>,
+        remote_addr: RemoteAddr,
     },
 }
 #[derive(Debug, Deserialize)]
@@ -247,6 +253,21 @@ fn runner_screenshot_now_route(runner_id: usize) -> rocket_eyre::Result<(Content
     Ok((ContentType::PNG, File::open(path)?))
 }
 
+#[get("/github-jitconfig")]
+fn runner_github_jitconfig_route(remote_addr: RemoteAddr) -> rocket_eyre::Result<RawJson<String>> {
+    let (response_tx, response_rx) = crossbeam_channel::bounded(0);
+    REQUEST.sender.send_timeout(
+        Request::GithubJitconfig {
+            response_tx,
+            remote_addr,
+        },
+        DOTENV.monitor_thread_send_timeout,
+    )?;
+    let result = json!(response_rx.recv_timeout(DOTENV.monitor_thread_recv_timeout)?);
+
+    Ok(RawJson(result.to_string()))
+}
+
 #[rocket::main]
 async fn main() -> eyre::Result<()> {
     jane_eyre::install()?;
@@ -298,6 +319,7 @@ async fn main() -> eyre::Result<()> {
             profile_screenshot_route,
             runner_screenshot_route,
             runner_screenshot_now_route,
+            runner_github_jitconfig_route,
         ],
     )
     .launch()
@@ -510,6 +532,14 @@ fn monitor_thread() -> eyre::Result<()> {
                 } => {
                     response_tx
                         .send(runners.screenshot_runner(runner_id))
+                        .expect("Failed to send Response to API thread");
+                }
+                Request::GithubJitconfig {
+                    response_tx,
+                    remote_addr,
+                } => {
+                    response_tx
+                        .send(runners.github_jitconfig(remote_addr).map(|x| x.to_owned()))
                         .expect("Failed to send Response to API thread");
                 }
             }

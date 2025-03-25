@@ -20,6 +20,12 @@ pub struct ApiRunner {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ApiGenerateJitconfigResponse {
+    pub runner: ApiRunner,
+    pub encoded_jit_config: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ApiRunnerLabel {
     pub name: String,
 }

@@ -1,12 +1,14 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Debug,
-    fs,
+    fs::{self, File},
+    net::Ipv4Addr,
     path::{Path, PathBuf},
     process::Command,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use cmd_lib::run_fun;
 use itertools::Itertools;
 use jane_eyre::eyre::{self, bail, eyre};
 use mktemp::Temp;
@@ -14,8 +16,9 @@ use serde::Serialize;
 use tracing::{error, info, trace, warn};
 
 use crate::{
+    auth::RemoteAddr,
     data::get_runner_data_path,
-    github::ApiRunner,
+    github::{ApiGenerateJitconfigResponse, ApiRunner},
     libvirt::{libvirt_prefix, update_screenshot},
     shell::SHELL,
     LIB_MONITOR_DIR,
@@ -34,6 +37,8 @@ pub struct Runner {
     registration: Option<ApiRunner>,
     guest_name: Option<String>,
     volume_name: Option<String>,
+    ipv4_address: Option<Ipv4Addr>,
+    github_jitconfig: Option<String>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -102,7 +107,19 @@ impl Runners {
         }
         for (id, guest_name) in guest_ids.iter().zip(guest_names) {
             if let Some(runner) = runners.get_mut(id) {
+                let ipv4_address = match run_fun!(virsh domifaddr --source arp $guest_name | sed 1,2d | awk "{print $4}")
+                {
+                    Ok(result) => result
+                        .trim()
+                        .strip_suffix("/0")
+                        .and_then(|x| x.parse::<Ipv4Addr>().ok()),
+                    Err(error) => {
+                        warn!(?error, "Failed to get IPv4 address of guest");
+                        None
+                    }
+                };
                 runner.guest_name = Some(guest_name);
+                runner.ipv4_address = ipv4_address;
             }
         }
         for (id, volume_name) in volume_ids.iter().zip(volume_names) {
@@ -221,6 +238,18 @@ impl Runners {
 
         Ok(())
     }
+
+    pub fn github_jitconfig(&self, remote_addr: RemoteAddr) -> Option<&str> {
+        for (_id, runner) in self.runners.iter() {
+            if let Some(ipv4_address) = runner.ipv4_address {
+                if remote_addr == ipv4_address {
+                    return runner.github_jitconfig.as_deref();
+                }
+            }
+        }
+
+        None
+    }
 }
 
 impl Runner {
@@ -232,12 +261,28 @@ impl Runner {
         let created_time = fs::metadata(created_time)?.modified()?;
         trace!(?created_time, "[{id}]");
 
+        let github_jitconfig = || -> eyre::Result<String> {
+            let result = get_runner_data_path(id, Path::new("github-api-registration"))?;
+            let result: ApiGenerateJitconfigResponse =
+                serde_json::from_reader(File::open(result)?)?;
+            Ok(result.encoded_jit_config)
+        };
+        let github_jitconfig = match github_jitconfig() {
+            Ok(result) => Some(result),
+            Err(error) => {
+                warn!(?error, "Failed to get GitHub jitconfig of runner");
+                None
+            }
+        };
+
         Ok(Self {
             id,
             created_time,
             registration: None,
             guest_name: None,
             volume_name: None,
+            ipv4_address: None,
+            github_jitconfig: github_jitconfig,
         })
     }
 

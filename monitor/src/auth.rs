@@ -1,3 +1,5 @@
+use std::net::{IpAddr, Ipv4Addr};
+
 use rocket::{
     http::Status,
     request::{FromRequest, Outcome},
@@ -25,6 +27,34 @@ impl<'req> FromRequest<'req> for ApiKeyGuard<'req> {
                     Outcome::Error((Status::Forbidden, ()))
                 }
             }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct RemoteAddr {
+    client_ip: Option<IpAddr>,
+    real_ip: Option<IpAddr>,
+}
+
+#[rocket::async_trait]
+impl<'req> FromRequest<'req> for RemoteAddr {
+    type Error = ();
+
+    async fn from_request(request: &'req Request<'_>) -> Outcome<Self, Self::Error> {
+        Outcome::Success(Self {
+            client_ip: request.client_ip(),
+            real_ip: request.real_ip(),
+        })
+    }
+}
+
+impl PartialEq<Ipv4Addr> for RemoteAddr {
+    fn eq(&self, other: &Ipv4Addr) -> bool {
+        match self.real_ip.or(self.client_ip) {
+            Some(IpAddr::V4(ipv4)) => ipv4 == *other,
+            Some(IpAddr::V6(ipv6)) => ipv6 == other.to_ipv6_mapped(),
+            None => false,
         }
     }
 }
