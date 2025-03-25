@@ -107,7 +107,7 @@ impl Runners {
         }
         for (id, guest_name) in guest_ids.iter().zip(guest_names) {
             if let Some(runner) = runners.get_mut(id) {
-                let ipv4_address = match run_fun!(virsh domifaddr --source arp $guest_name | sed 1,2d | awk "{print $4}")
+                let ipv4_address = match run_fun!(virsh domifaddr $guest_name | sed 1,2d | awk "{print $4}")
                 {
                     Ok(result) => result
                         .trim()
