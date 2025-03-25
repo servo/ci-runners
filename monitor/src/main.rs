@@ -250,6 +250,15 @@ async fn profile_screenshot_route(profile_key: String) -> rocket_eyre::Result<Na
     Ok(NamedFile::open(path).await?)
 }
 
+#[get("/runner/<runner_id>/screenshot.png")]
+async fn runner_screenshot_route(runner_id: usize) -> rocket_eyre::Result<NamedFile> {
+    let path = get_runner_data_path(runner_id, Path::new("screenshot.png"))
+        .wrap_err("Failed to compute path")
+        .map_err(EyreReport::InternalServerError)?;
+
+    Ok(NamedFile::open(path).await?)
+}
+
 #[rocket::main]
 async fn main() -> eyre::Result<()> {
     jane_eyre::install()?;
@@ -300,28 +309,8 @@ async fn main() -> eyre::Result<()> {
     let profile_screenshot_route =
         warp::path!("profile" / String / "screenshot.png").and(warp::filters::method::get());
 
-    let runner_screenshot_route = warp::path!("runner" / usize / "screenshot.png")
-        .and(warp::filters::method::get())
-        .and(warp::filters::header::optional("If-None-Match"))
-        .and(warp::filters::query::query())
-        .and_then(
-            |runner_id, if_none_match: Option<String>, query: HashMap<String, String>| async move {
-                if !query.is_empty() {
-                    // If the page cache-busts the <img src> to force the browser to revalidate,
-                    // redirect to the bare url, so the browser can send its If-Modified-Since
-                    // <https://stackoverflow.com/a/9505557>
-                    let url = Uri::from_str(&format!("/runner/{runner_id}/screenshot.png"))
-                        .wrap_err("failed to build Uri")
-                        .map_err(InternalError)?;
-                    return Ok(Box::new(see_other(url)) as Box<dyn Reply>);
-                }
-                let path = get_runner_data_path(runner_id, Path::new("screenshot.png"))
-                    .wrap_err("Failed to compute path")
-                    .map_err(InternalError)?;
-                serve_static_file(path, if_none_match)
-            },
-        )
-        .with(header("Content-Type", PNG));
+    let runner_screenshot_route =
+        warp::path!("runner" / usize / "screenshot.png").and(warp::filters::method::get());
 
     let runner_screenshot_now_route = warp::path!("runner" / usize / "screenshot" / "now")
         .and(warp::filters::method::get())
@@ -374,6 +363,7 @@ async fn main() -> eyre::Result<()> {
             take_runner_route,
             take_runners_route,
             profile_screenshot_route,
+            runner_screenshot_route,
         ],
     )
     .launch()
