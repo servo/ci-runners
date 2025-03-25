@@ -35,6 +35,10 @@ sudo apt purge -y fonts-droid-fallback
 # <https://github.com/servo/servo/issues/35030>
 sudo apt install -y fonts-noto-color-emoji
 
+# FIXME: 3 tests require this
+# <https://github.com/servo/servo/pull/34770#issuecomment-2647805573>
+sudo apt install -y fonts-noto-cjk
+
 # Install uv and ensure it is on PATH
 if ! [ -e /root/.local/bin/uv ]; then
     /init/uv-installer.sh
@@ -63,7 +67,6 @@ else
     # Freshen git’s understanding of the working tree.
     git status
     # Freshen cargo’s understanding of the incremental build.
-    export CARGO_LOG=cargo::core::compiler::fingerprint=info
     ./mach build --use-crown --locked --release
 fi
 
