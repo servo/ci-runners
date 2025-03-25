@@ -28,7 +28,7 @@ brew install gnu-tar
 
 # Install rustup and the latest Rust
 if ! [ -e /Users/servo/.rustup ]; then
-    /Volumes/a/init/rustup-init.sh -y --quiet
+    /Volumes/a/init/rustup-init -y --quiet
 fi
 
 # ~/.cargo/env requires HOME to be set
@@ -37,7 +37,7 @@ export HOME=/Users/servo
 
 # Install uv and ensure it is on PATH
 if ! [ -e /Users/servo/.local/bin/uv ]; then
-    /Volumes/a/init/install-uv.sh
+    /Volumes/a/init/uv-installer.sh
 fi
 export PATH=$HOME/.local/bin:$PATH
 
