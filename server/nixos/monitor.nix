@@ -34,7 +34,7 @@ in rustPlatform.buildRustPackage rec {
   sourceRoot = "/build/source/monitor";
 
   # don't forget to update this hash when Cargo.lock or ${version} changes!
-  cargoHash = "sha256-pm5plXdFstpHr01ORspGXtGBT1e693zAlnRO88LdGRM=";
+  cargoHash = "sha256-cSQLIwhgkfihKOLzg9LD/1GTkNSyBJaDDTdfu5IzvdI=";
 
   postConfigure = ''
     export LIB_MONITOR_DIR=$out/lib/monitor
