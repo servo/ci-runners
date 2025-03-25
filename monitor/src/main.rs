@@ -32,7 +32,11 @@ use dotenv::dotenv;
 use http::{StatusCode, Uri};
 use jane_eyre::eyre::{self, eyre, Context, OptionExt};
 use mktemp::Temp;
-use rocket::{get, response::content::RawJson};
+use rocket::{
+    fs::{FileServer, NamedFile},
+    get,
+    response::content::RawJson,
+};
 use serde::Deserialize;
 use serde_json::json;
 use tracing::{error, info, trace, warn};
@@ -237,6 +241,15 @@ fn take_runners_route(
     Ok(RawJson(result))
 }
 
+#[get("/profile/<profile_key>/screenshot.png")]
+async fn profile_screenshot_route(profile_key: String) -> rocket_eyre::Result<NamedFile> {
+    let path = get_profile_data_path(&profile_key, Path::new("screenshot.png"))
+        .wrap_err("Failed to compute path")
+        .map_err(EyreReport::InternalServerError)?;
+
+    Ok(NamedFile::open(path).await?)
+}
+
 #[rocket::main]
 async fn main() -> eyre::Result<()> {
     jane_eyre::install()?;
@@ -285,30 +298,7 @@ async fn main() -> eyre::Result<()> {
         warp::path!("profile" / String / "take" / usize).and(warp::filters::method::post());
 
     let profile_screenshot_route =
-        warp::path!("profile" / String / "screenshot.png")
-            .and(warp::filters::method::get())
-            .and(warp::filters::header::optional("If-None-Match"))
-            .and(warp::filters::query::query())
-            .and_then(
-                |profile_key: String,
-                 if_none_match: Option<String>,
-                 query: HashMap<String, String>| async move {
-                    if !query.is_empty() {
-                        // If the page cache-busts the <img src> to force the browser to revalidate,
-                        // redirect to the bare url, so the browser can send its If-Modified-Since
-                        // <https://stackoverflow.com/a/9505557>
-                        let url = Uri::from_str(&format!("/profile/{profile_key}/screenshot.png"))
-                            .wrap_err("failed to build Uri")
-                            .map_err(InternalError)?;
-                        return Ok(Box::new(see_other(url)) as Box<dyn Reply>);
-                    }
-                    let path = get_profile_data_path(&profile_key, Path::new("screenshot.png"))
-                        .wrap_err("Failed to compute path")
-                        .map_err(InternalError)?;
-                    serve_static_file(path, if_none_match)
-                },
-            )
-            .with(header("Content-Type", PNG));
+        warp::path!("profile" / String / "screenshot.png").and(warp::filters::method::get());
 
     let runner_screenshot_route = warp::path!("runner" / usize / "screenshot.png")
         .and(warp::filters::method::get())
@@ -383,6 +373,7 @@ async fn main() -> eyre::Result<()> {
             dashboard_json_route,
             take_runner_route,
             take_runners_route,
+            profile_screenshot_route,
         ],
     )
     .launch()
