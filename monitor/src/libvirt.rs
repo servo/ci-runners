@@ -2,29 +2,18 @@ use core::str;
 use std::{
     fs::{create_dir_all, rename},
     path::Path,
-    process::{Command, Stdio},
 };
 
-use jane_eyre::eyre::{self, eyre, Context};
+use cmd_lib::run_fun;
+use jane_eyre::eyre::{self, eyre};
 
-use crate::{shell::SHELL, DOTENV, LIB_MONITOR_DIR};
+use crate::{shell::SHELL, DOTENV};
 
 pub fn list_runner_guests() -> eyre::Result<Vec<String>> {
-    let output = Command::new("./list-libvirt-guests.sh")
-        .current_dir(*LIB_MONITOR_DIR)
-        .stdout(Stdio::piped())
-        .spawn()
-        .unwrap()
-        .wait_with_output()
-        .unwrap();
-    if !output.status.success() {
-        eyre::bail!("Command exited with status {}", output.status);
-    }
-
     // Output is not filtered by prefix, so we must filter it ourselves.
     let prefix = libvirt_prefix();
-    let result = str::from_utf8(&output.stdout)
-        .wrap_err("Failed to decode UTF-8")?
+    let result = run_fun!(virsh list --name --all)?;
+    let result = result
         .split_terminator('\n')
         .filter(|name| name.starts_with(&prefix))
         .map(str::to_owned);

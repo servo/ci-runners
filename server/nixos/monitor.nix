@@ -14,7 +14,6 @@
       ../../destroy-runner.sh
       ../../download.sh
       ../../inject.sh
-      ../../list-libvirt-guests.sh
       ../../list-registered-runners.sh
       ../../list-runner-volumes.sh
       ../../mount-runner.sh
@@ -68,7 +67,6 @@ in rustPlatform.buildRustPackage rec {
     cp -R destroy-runner.sh $out/lib/monitor
     cp -R download.sh $out/lib/monitor
     cp -R inject.sh $out/lib/monitor
-    cp -R list-libvirt-guests.sh $out/lib/monitor
     cp -R list-registered-runners.sh $out/lib/monitor
     cp -R list-runner-volumes.sh $out/lib/monitor
     cp -R mount-runner.sh $out/lib/monitor
