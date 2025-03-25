@@ -35,11 +35,12 @@ use mktemp::Temp;
 use rocket::{
     fs::{FileServer, NamedFile},
     get,
+    http::ContentType,
     response::content::RawJson,
 };
 use serde::Deserialize;
 use serde_json::json;
-use tracing::{error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 use warp::{
     filters::reply::header,
@@ -259,6 +260,23 @@ async fn runner_screenshot_route(runner_id: usize) -> rocket_eyre::Result<NamedF
     Ok(NamedFile::open(path).await?)
 }
 
+#[get("/runner/<runner_id>/screenshot/now")]
+fn runner_screenshot_now_route(runner_id: usize) -> rocket_eyre::Result<(ContentType, File)> {
+    let (response_tx, response_rx) = crossbeam_channel::bounded(0);
+    REQUEST.sender.send_timeout(
+        Request::Screenshot {
+            response_tx,
+            runner_id,
+        },
+        DOTENV.monitor_thread_send_timeout,
+    )?;
+    let path = response_rx.recv_timeout(DOTENV.monitor_thread_recv_timeout)??;
+    debug!(?path);
+
+    // Moving `path` into File ensures Temp is not dropped until close
+    Ok((ContentType::PNG, File::open(path)?))
+}
+
 #[rocket::main]
 async fn main() -> eyre::Result<()> {
     jane_eyre::install()?;
@@ -312,27 +330,8 @@ async fn main() -> eyre::Result<()> {
     let runner_screenshot_route =
         warp::path!("runner" / usize / "screenshot.png").and(warp::filters::method::get());
 
-    let runner_screenshot_now_route = warp::path!("runner" / usize / "screenshot" / "now")
-        .and(warp::filters::method::get())
-        .and_then(|runner_id| async move {
-            || -> eyre::Result<Vec<u8>> {
-                let (response_tx, response_rx) = crossbeam_channel::bounded(0);
-                REQUEST.sender.send_timeout(
-                    Request::Screenshot {
-                        response_tx,
-                        runner_id,
-                    },
-                    DOTENV.monitor_thread_send_timeout,
-                )?;
-                let path = response_rx.recv_timeout(DOTENV.monitor_thread_recv_timeout)??;
-                let mut file = File::open(&path)?; // borrow to avoid dropping Temp
-                let mut result = vec![];
-                file.read_to_end(&mut result)?;
-                Ok(result)
-            }()
-            .map_err(|error| reject::custom(ChannelError(error)))
-        })
-        .with(header("Content-Type", PNG));
+    let runner_screenshot_now_route =
+        warp::path!("runner" / usize / "screenshot" / "now").and(warp::filters::method::get());
 
     // Successful responses are in their own types. Error responses are in plain text.
     let routes = index_route
@@ -364,6 +363,7 @@ async fn main() -> eyre::Result<()> {
             take_runners_route,
             profile_screenshot_route,
             runner_screenshot_route,
+            runner_screenshot_now_route,
         ],
     )
     .launch()
