@@ -28,7 +28,7 @@ use crossbeam_channel::{Receiver, Sender};
 use dotenv::dotenv;
 use jane_eyre::eyre::{self, eyre, Context, OptionExt};
 use mktemp::Temp;
-use rocket::{fs::NamedFile, get, http::ContentType, response::content::RawJson};
+use rocket::{fs::NamedFile, get, http::ContentType, post, response::content::RawJson};
 use serde::Deserialize;
 use serde_json::json;
 use tracing::{debug, error, info, trace, warn};
@@ -154,7 +154,7 @@ fn dashboard_json_route() -> rocket_eyre::Result<RawJson<String>> {
     Ok(RawJson(result))
 }
 
-#[get("/profile/<profile_key>/take?<unique_id>&<qualified_repo>&<run_id>")]
+#[post("/profile/<profile_key>/take?<unique_id>&<qualified_repo>&<run_id>")]
 fn take_runner_route(
     profile_key: String,
     unique_id: String,
@@ -181,7 +181,7 @@ fn take_runner_route(
     Ok(RawJson(result))
 }
 
-#[get("/profile/<profile_key>/take/<count>?<unique_id>&<qualified_repo>&<run_id>")]
+#[post("/profile/<profile_key>/take/<count>?<unique_id>&<qualified_repo>&<run_id>")]
 fn take_runners_route(
     profile_key: String,
     count: usize,
