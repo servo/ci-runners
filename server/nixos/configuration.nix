@@ -119,6 +119,8 @@
     settings.PasswordAuthentication = false;
   };
   programs.mosh.enable = true;
+
+  # Keep this in sync with ubuntu2204/user-data
   users.users.root.openssh.authorizedKeys.keys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGEpS5yFUgXwOf9rkw/TdZgoWkfAgLYwABGiK7qAWsHR root@ci0"
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICBvkS7z2RAWzqRByRsHHB8PoCjXrnyHtjpdTxmOdcom delan@azabani.com/2016-07-18/Ed25519"
