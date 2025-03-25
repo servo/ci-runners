@@ -206,6 +206,37 @@ fn take_runner_route(
     Ok(RawJson(result))
 }
 
+#[get("/profile/<profile_key>/take/<count>?<unique_id>&<qualified_repo>&<run_id>")]
+fn take_runners_route(
+    profile_key: String,
+    count: usize,
+    unique_id: String,
+    qualified_repo: String,
+    run_id: String,
+    _auth: ApiKeyGuard,
+) -> rocket_eyre::Result<RawJson<String>> {
+    let (response_tx, response_rx) = crossbeam_channel::bounded(0);
+    REQUEST.sender.send_timeout(
+        Request::TakeRunners {
+            response_tx,
+            profile_key,
+            query: TakeRunnerQuery {
+                unique_id,
+                qualified_repo,
+                run_id,
+            },
+            count,
+        },
+        DOTENV.monitor_thread_send_timeout,
+    )?;
+    let result = response_rx.recv_timeout(
+        // TODO: make this configurable?
+        DOTENV.monitor_thread_recv_timeout + Duration::from_secs(count as u64),
+    )?;
+
+    Ok(RawJson(result))
+}
+
 #[rocket::main]
 async fn main() -> eyre::Result<()> {
     jane_eyre::install()?;
@@ -250,33 +281,8 @@ async fn main() -> eyre::Result<()> {
     let take_runner_route =
         warp::path!("profile" / String / "take").and(warp::filters::method::post());
 
-    let take_runners_route = warp::path!("profile" / String / "take" / usize)
-        .and(warp::filters::method::post())
-        .and(warp::filters::header::exact(
-            "Authorization",
-            &DOTENV.monitor_api_token_authorization_value,
-        ))
-        .and(warp::filters::query::query())
-        .and_then(|profile_key, count, query: TakeRunnerQuery| async move {
-            || -> eyre::Result<String> {
-                let (response_tx, response_rx) = crossbeam_channel::bounded(0);
-                REQUEST.sender.send_timeout(
-                    Request::TakeRunners {
-                        response_tx,
-                        profile_key,
-                        query,
-                        count,
-                    },
-                    DOTENV.monitor_thread_send_timeout,
-                )?;
-                Ok(response_rx.recv_timeout(
-                    // TODO: make this configurable?
-                    DOTENV.monitor_thread_recv_timeout + Duration::from_secs(count as u64),
-                )?)
-            }()
-            .map_err(|error| reject::custom(ChannelError(error)))
-        })
-        .with(header("Content-Type", JSON));
+    let take_runners_route =
+        warp::path!("profile" / String / "take" / usize).and(warp::filters::method::post());
 
     let profile_screenshot_route =
         warp::path!("profile" / String / "screenshot.png")
@@ -375,7 +381,8 @@ async fn main() -> eyre::Result<()> {
             index_route,
             dashboard_html_route,
             dashboard_json_route,
-            take_runner_route
+            take_runner_route,
+            take_runners_route,
         ],
     )
     .launch()
