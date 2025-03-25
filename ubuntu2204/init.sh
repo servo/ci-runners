@@ -39,6 +39,9 @@ sudo apt install -y fonts-noto-color-emoji
 # <https://github.com/servo/servo/pull/34770#issuecomment-2647805573>
 sudo apt install -y fonts-noto-cjk
 
+# Used further below
+sudo apt install -y jq
+
 # Install uv and ensure it is on PATH
 if ! [ -e /root/.local/bin/uv ]; then
     /init/uv-installer.sh
@@ -70,6 +73,8 @@ else
     ./mach build --use-crown --locked --release
 fi
 
-if [ -e /init/runner.sh ]; then
-    . /init/runner.sh
-fi
+> /init/runner.sh echo 'export RUNNER_ALLOW_RUNASROOT=1'
+>> /init/runner.sh printf '/actions-runner/run.sh --jitconfig '
+curl -fsS http://192.168.100.1:8000/github-jitconfig | jq -er . >> /init/runner.sh
+chmod +x /init/runner.sh
+/init/runner.sh  # Only runs if curl and jq succeeded
