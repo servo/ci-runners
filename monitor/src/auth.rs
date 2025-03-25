@@ -6,7 +6,10 @@ use rocket::{
 
 use crate::DOTENV;
 
-pub struct ApiKeyGuard<'req>(/* only FromRequest can construct */ &'req str);
+pub struct ApiKeyGuard<'req> {
+    /// Only FromRequest can construct this.
+    _value: &'req str,
+}
 
 #[rocket::async_trait]
 impl<'req> FromRequest<'req> for ApiKeyGuard<'req> {
@@ -17,7 +20,7 @@ impl<'req> FromRequest<'req> for ApiKeyGuard<'req> {
             None => Outcome::Error((Status::Unauthorized, ())),
             Some(value) => {
                 if value == DOTENV.monitor_api_token_authorization_value {
-                    Outcome::Success(ApiKeyGuard(value))
+                    Outcome::Success(ApiKeyGuard { _value: value })
                 } else {
                     Outcome::Error((Status::Forbidden, ()))
                 }

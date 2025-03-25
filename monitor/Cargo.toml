@@ -4,9 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-askama = { version = "0.12.1", features = ["with-rocket", "with-warp"] }
+askama = { version = "0.12.1", features = ["with-rocket"] }
 askama_rocket = "0.12.0"
-askama_warp = "0.13.0"
 atomic-write-file = { version = "0.2.2", features = ["unnamed-tmpfile"] }
 chrono = "0.4.39"
 cmd_lib = "1.9.5"
@@ -24,4 +23,3 @@ tokio = { version = "1.40.0", features = ["full"] }
 toml = "0.8.15"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-warp = "0.3.7"

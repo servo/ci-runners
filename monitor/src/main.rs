@@ -14,41 +14,25 @@ mod zfs;
 
 use core::str;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::BTreeMap,
     fs::File,
-    io::Read,
-    net::IpAddr,
     path::Path,
     process::exit,
-    str::FromStr,
     sync::{LazyLock, RwLock},
     thread::{self},
-    time::{Duration, UNIX_EPOCH},
+    time::Duration,
 };
 
 use askama::Template;
 use crossbeam_channel::{Receiver, Sender};
 use dotenv::dotenv;
-use http::{StatusCode, Uri};
 use jane_eyre::eyre::{self, eyre, Context, OptionExt};
 use mktemp::Temp;
-use rocket::{
-    fs::{FileServer, NamedFile},
-    get,
-    http::ContentType,
-    response::content::RawJson,
-};
+use rocket::{fs::NamedFile, get, http::ContentType, response::content::RawJson};
 use serde::Deserialize;
 use serde_json::json;
 use tracing::{debug, error, info, trace, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
-use warp::{
-    filters::reply::header,
-    redirect::see_other,
-    reject::{self, Reject, Rejection},
-    reply::{self, with_header, Reply},
-    Filter,
-};
 
 use crate::{
     auth::ApiKeyGuard,
@@ -83,10 +67,6 @@ static TOML: LazyLock<Toml> =
 
 static DASHBOARD: RwLock<Option<Dashboard>> = RwLock::new(None);
 
-static HTML: &str = "text/html; charset=utf-8";
-static JSON: &str = "application/json; charset=utf-8";
-static PNG: &str = "image/png";
-
 /// Requests that are handled synchronously by the monitor thread.
 ///
 /// The requests that can be handled without the monitor thread are as follows:
@@ -118,16 +98,6 @@ struct TakeRunnerQuery {
     qualified_repo: String,
     run_id: String,
 }
-
-#[derive(Debug)]
-struct NotReadyError(eyre::Report);
-impl Reject for NotReadyError {}
-#[derive(Debug)]
-struct ChannelError(eyre::Report);
-impl Reject for ChannelError {}
-#[derive(Debug)]
-struct InternalError(eyre::Report);
-impl Reject for InternalError {}
 
 struct Channel<T> {
     sender: Sender<T>,
@@ -312,42 +282,6 @@ async fn main() -> eyre::Result<()> {
         }
     });
 
-    let index_route = warp::path!().and(warp::filters::method::get());
-
-    let dashboard_html_route = warp::path!("dashboard.html").and(warp::filters::method::get());
-
-    let dashboard_json_route = warp::path!("dashboard.json").and(warp::filters::method::get());
-
-    let take_runner_route =
-        warp::path!("profile" / String / "take").and(warp::filters::method::post());
-
-    let take_runners_route =
-        warp::path!("profile" / String / "take" / usize).and(warp::filters::method::post());
-
-    let profile_screenshot_route =
-        warp::path!("profile" / String / "screenshot.png").and(warp::filters::method::get());
-
-    let runner_screenshot_route =
-        warp::path!("runner" / usize / "screenshot.png").and(warp::filters::method::get());
-
-    let runner_screenshot_now_route =
-        warp::path!("runner" / usize / "screenshot" / "now").and(warp::filters::method::get());
-
-    // Successful responses are in their own types. Error responses are in plain text.
-    let routes = index_route
-        .or(dashboard_html_route)
-        .or(dashboard_json_route)
-        .or(take_runner_route)
-        .or(take_runners_route)
-        .or(profile_screenshot_route)
-        .or(runner_screenshot_route)
-        .or(runner_screenshot_now_route);
-    let routes = routes.recover(recover);
-
-    // warp::serve(routes)
-    //     .run(("::1".parse::<IpAddr>()?, 8000))
-    //     .await;
-
     let _rocket = rocket::custom(
         rocket::Config::figment()
             .merge(("port", 8000))
@@ -370,75 +304,6 @@ async fn main() -> eyre::Result<()> {
     .await;
 
     Ok(())
-}
-
-async fn recover(error: Rejection) -> Result<impl Reply, std::convert::Infallible> {
-    Ok(if let Some(error) = error.find::<NotReadyError>() {
-        error!(
-            ?error,
-            "NotReadyError: responding with HTTP 503 Service Unavailable: {}", error.0
-        );
-        reply::with_status(format!("{}", error.0), StatusCode::SERVICE_UNAVAILABLE)
-    } else if let Some(error) = error.find::<ChannelError>() {
-        error!(
-            ?error,
-            "ChannelError: responding with HTTP 500 Internal Server Error: {}", error.0
-        );
-        reply::with_status(
-            format!("Channel error: {}", error.0),
-            StatusCode::INTERNAL_SERVER_ERROR,
-        )
-    } else if let Some(error) = error.find::<InternalError>() {
-        error!(
-            ?error,
-            "InternalError: responding with HTTP 500 Internal Server Error: {}", error.0
-        );
-        reply::with_status(
-            format!("Internal error: {}", error.0),
-            StatusCode::INTERNAL_SERVER_ERROR,
-        )
-    } else {
-        error!(
-            ?error,
-            "Unknown error: responding with HTTP 500 Internal Server Error",
-        );
-        reply::with_status(
-            format!("Unknown error: {error:?}"),
-            StatusCode::INTERNAL_SERVER_ERROR,
-        )
-    })
-}
-
-fn serve_static_file(
-    path: impl AsRef<Path>,
-    if_none_match: Option<String>,
-) -> Result<Box<dyn Reply>, Rejection> {
-    let mut file = File::open(path)
-        .wrap_err("Failed to open file")
-        .map_err(InternalError)?;
-    let metadata = file
-        .metadata()
-        .wrap_err("Failed to get metadata")
-        .map_err(InternalError)?;
-    let mtime = metadata
-        .modified()
-        .wrap_err("Failed to get mtime")
-        .map_err(InternalError)?
-        .duration_since(UNIX_EPOCH)
-        .wrap_err("Failed to compute mtime")
-        .map_err(InternalError)?
-        .as_millis();
-    let etag = format!(r#""{mtime}""#);
-
-    Ok::<_, Rejection>(if if_none_match.is_some_and(|inm| inm == etag) {
-        Box::new(StatusCode::NOT_MODIFIED) as Box<dyn Reply>
-    } else {
-        let mut result = vec![];
-        file.read_to_end(&mut result)
-            .wrap_err("Failed to read file")
-            .map_err(InternalError)?;
-        Box::new(with_header(result, "ETag", etag)) as Box<dyn Reply>
-    })
 }
 
 /// The monitor thread is our single source of truth.
