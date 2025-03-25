@@ -152,6 +152,18 @@ fn index_route() -> rocket_eyre::Result<IndexTemplate> {
         .map_err(EyreReport::ServiceUnavailable)?)
 }
 
+#[get("/dashboard.html")]
+fn dashboard_html_route() -> rocket_eyre::Result<String> {
+    Ok(DASHBOARD
+        .read()
+        .map_err(|e| eyre!("Failed to acquire RwLock: {e:?}"))
+        .map_err(EyreReport::ServiceUnavailable)?
+        .as_ref()
+        .map(|d| d.html.clone())
+        .ok_or_eyre("Monitor thread is still starting or not responding")
+        .map_err(EyreReport::ServiceUnavailable)?)
+}
+
 #[rocket::main]
 async fn main() -> eyre::Result<()> {
     jane_eyre::install()?;
@@ -189,23 +201,7 @@ async fn main() -> eyre::Result<()> {
 
     let index_route = warp::path!().and(warp::filters::method::get());
 
-    let dashboard_html_route = warp::path!("dashboard.html")
-        .and(warp::filters::method::get())
-        .and_then(|| async {
-            DASHBOARD
-                .read()
-                .map_err(|e| {
-                    reject::custom(NotReadyError(eyre!("Failed to acquire RwLock: {e:?}")))
-                })?
-                .as_ref()
-                .map(|d| d.html.clone())
-                .ok_or_else(|| {
-                    reject::custom(NotReadyError(eyre!(
-                        "Monitor thread is still starting or not responding"
-                    )))
-                })
-        })
-        .with(header("Content-Type", HTML));
+    let dashboard_html_route = warp::path!("dashboard.html").and(warp::filters::method::get());
 
     let dashboard_json_route = warp::path!("dashboard.json")
         .and(warp::filters::method::get())
@@ -398,7 +394,7 @@ async fn main() -> eyre::Result<()> {
             .merge(("port", 8000))
             .merge(("address", "::")),
     )
-    .mount("/", rocket::routes![index_route])
+    .mount("/", rocket::routes![index_route, dashboard_html_route])
     .launch()
     .await;
 
