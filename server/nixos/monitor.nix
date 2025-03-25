@@ -1,4 +1,14 @@
-{ lib, rustPlatform, makeWrapper, git, openssh, zsh }: let
+{
+  lib,
+  rustPlatform,
+  makeWrapper,
+  gawk,
+  git,
+  gnused,
+  libvirt,
+  openssh,
+  zsh,
+}: let
   fs = lib.fileset;
 
   sources = fs.intersection (fs.gitTracked ../..) (
@@ -44,7 +54,10 @@ in rustPlatform.buildRustPackage rec {
   ];
 
   buildInputs = [
+    gawk
     git
+    gnused
+    libvirt
     openssh
     zsh
     # TODO: list other commands needed by scripts here
