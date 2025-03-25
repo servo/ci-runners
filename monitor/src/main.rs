@@ -135,13 +135,13 @@ pub struct IndexTemplate {
     pub content: String,
 }
 
-#[tokio::main]
+#[rocket::main]
 async fn main() -> eyre::Result<()> {
     jane_eyre::install()?;
     if std::env::var_os("RUST_LOG").is_none() {
         // EnvFilter Builder::with_default_directive doesn’t support multiple directives,
         // so we need to apply defaults ourselves.
-        std::env::set_var("RUST_LOG", "monitor=info,warp::server=info");
+        std::env::set_var("RUST_LOG", "monitor=info,rocket=info");
     }
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer().with_writer(std::io::stderr))
@@ -390,9 +390,17 @@ async fn main() -> eyre::Result<()> {
         .or(runner_screenshot_now_route);
     let routes = routes.recover(recover);
 
-    warp::serve(routes)
-        .run(("::1".parse::<IpAddr>()?, 8000))
-        .await;
+    // warp::serve(routes)
+    //     .run(("::1".parse::<IpAddr>()?, 8000))
+    //     .await;
+
+    let _rocket = rocket::custom(
+        rocket::Config::figment()
+            .merge(("port", 8000))
+            .merge(("address", "::")),
+    )
+    .launch()
+    .await;
 
     Ok(())
 }
