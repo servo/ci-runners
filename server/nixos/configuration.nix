@@ -232,7 +232,7 @@
       wantedBy = ["multi-user.target"];
 
       script = ''
-        RUST_LOG=info ${pkgs.callPackage ./monitor.nix {}}/bin/monitor
+        RUST_LOG=monitor=info,cmd_lib::child=info ${pkgs.callPackage ./monitor.nix {}}/bin/monitor
       '';
 
       serviceConfig = {
