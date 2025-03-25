@@ -86,6 +86,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "askama_rocket"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ebf814a0f98928b2ea4a0625ad7563d737ecf0707260b8360f4ad2a4b51918e6"
+dependencies = [
+ "askama",
+ "rocket",
+]
+
+[[package]]
 name = "askama_warp"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1024,6 +1034,7 @@ name = "monitor"
 version = "0.1.0"
 dependencies = [
  "askama",
+ "askama_rocket",
  "askama_warp",
  "atomic-write-file",
  "chrono",

@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-askama = { version = "0.12.1", features = ["with-warp"] }
+askama = { version = "0.12.1", features = ["with-rocket", "with-warp"] }
+askama_rocket = "0.12.0"
 askama_warp = "0.13.0"
 atomic-write-file = { version = "0.2.2", features = ["unnamed-tmpfile"] }
 chrono = "0.4.39"
