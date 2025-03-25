@@ -211,6 +211,8 @@ To prepare a server for macOS 13 guests, build a clean image:
 - Click the plus, type the password above, type `/System/Applications/Utilities/Terminal.app`, press **Enter** twice, press **Cmd**+**Q**
 - Press **Cmd**+**Space**, type `terminal`, press **Enter**
 - Type `curl https://ci0.servo.org/static/macos13.sh | sudo sh`, press **Enter**, type the password above, press **Enter**
+- When prompted: quit Terminal, click **Open System Settings**, click **Allow**, type the password above, press **Enter**, press **Cmd**+**Q**
+- Shut down the guest: `virsh shutdown servo-macos13.clean`
 - When the guest shuts down, take another snapshot: `zfs snapshot tank/base/servo-macos13.clean@automated`
 - Enable per-snapshot block devices for the zvol: `zfs set snapdev=visible tank/base/servo-macos13.clean`
 
