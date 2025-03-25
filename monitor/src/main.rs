@@ -90,7 +90,6 @@ static PNG: &str = "image/png";
 /// - GET `/runner/<our runner id>/screenshot.png` => image/png
 #[derive(Debug)]
 enum Request {
-    /// POST `/<profile_key>/<unique id>/<user>/<repo>/<run id>` => `{"id", "runner"}` | `null`
     /// POST `/profile/<profile_key>/take?unique_id&qualified_repo=<user>/<repo>&run_id` => `{"id", "runner"}` | `null`
     /// POST `/profile/<profile_key>/take/<count>?unique_id&qualified_repo=<user>/<repo>&run_id` => `[{"id", "runner"}]` | `null`
     TakeRunners {
@@ -219,35 +218,7 @@ async fn main() -> eyre::Result<()> {
 
     let dashboard_json_route = warp::path!("dashboard.json").and(warp::filters::method::get());
 
-    let take_runner_route = warp::path!(String / String / String / String / String)
-        .and(warp::filters::method::post())
-        .and(warp::filters::header::exact(
-            "Authorization",
-            &DOTENV.monitor_api_token_authorization_value,
-        ))
-        .and_then(|profile_key, unique_id, user, repo, run_id| async move {
-            || -> eyre::Result<String> {
-                let (response_tx, response_rx) = crossbeam_channel::bounded(0);
-                REQUEST.sender.send_timeout(
-                    Request::TakeRunners {
-                        response_tx,
-                        profile_key,
-                        query: TakeRunnerQuery {
-                            unique_id,
-                            qualified_repo: format!("{user}/{repo}"),
-                            run_id,
-                        },
-                        count: 1,
-                    },
-                    DOTENV.monitor_thread_send_timeout,
-                )?;
-                Ok(response_rx.recv_timeout(DOTENV.monitor_thread_recv_timeout)?)
-            }()
-            .map_err(|error| reject::custom(ChannelError(error)))
-        })
-        .with(header("Content-Type", JSON));
-
-    let take_runner_route2 = warp::path!("profile" / String / "take")
+    let take_runner_route = warp::path!("profile" / String / "take")
         .and(warp::filters::method::post())
         .and(warp::filters::header::exact(
             "Authorization",
@@ -376,7 +347,6 @@ async fn main() -> eyre::Result<()> {
         .or(dashboard_html_route)
         .or(dashboard_json_route)
         .or(take_runner_route)
-        .or(take_runner_route2)
         .or(take_runners_route)
         .or(profile_screenshot_route)
         .or(runner_screenshot_route)
