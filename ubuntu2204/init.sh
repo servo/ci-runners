@@ -1,9 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 
-# Install bootstrap tools, but only if one or more are not already installed.
+set -- git curl python3-pip python3-venv  # Bootstrap tools
+set -- "$@" libssl-dev  # taplo-cli -> openssl-sys -> openssl.pc
+set -- "$@" xvfb  # linux.yml -> xvfb-run
+set -- "$@" python-is-python3  # Install Python, for checkouts without servo#34504
+set -- "$@" fonts-noto-color-emoji  # FIXME: 2 tests require this <https://github.com/servo/servo/issues/35030>
+set -- "$@" fonts-noto-cjk  # FIXME: 3 tests require this <https://github.com/servo/servo/pull/34770#issuecomment-2647805573>
+set -- "$@" jq  # Used further below
+
+# Install distro packages, but only if one or more are not already installed.
 # Update the package lists first, to avoid failures when rebaking old images.
-set -- git curl python3-pip python3-venv
 if ! dpkg -s "$@" > /dev/null 2>&1; then
     apt update
     apt install -y "$@"
@@ -18,29 +25,9 @@ fi
 export HOME=/root
 . /root/.cargo/env
 
-# taplo-cli -> openssl-sys -> openssl.pc
-sudo apt install -y libssl-dev
-
-# linux.yml -> xvfb-run
-sudo apt install -y xvfb
-
-# Install Python, for checkouts without servo#34504
-sudo apt install -y python-is-python3
-
 # FIXME: 17 tests require this
 # <https://github.com/servo/servo/issues/35029>
 sudo apt purge -y fonts-droid-fallback
-
-# FIXME: 2 tests require this
-# <https://github.com/servo/servo/issues/35030>
-sudo apt install -y fonts-noto-color-emoji
-
-# FIXME: 3 tests require this
-# <https://github.com/servo/servo/pull/34770#issuecomment-2647805573>
-sudo apt install -y fonts-noto-cjk
-
-# Used further below
-sudo apt install -y jq
 
 # Install uv and ensure it is on PATH
 if ! [ -e /root/.local/bin/uv ]; then
