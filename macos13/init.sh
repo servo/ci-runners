@@ -23,8 +23,10 @@ if ! [ -e /usr/local/bin/brew ]; then
     NONINTERACTIVE=1 /Volumes/a/init/install-homebrew.sh
 fi
 
-# Install gtar(1)
-brew install gnu-tar
+set -- gnu-tar  # Install gtar(1)
+set -- "$@" jq  # Used further below
+
+brew install "$@"
 
 # Install rustup and the latest Rust
 if ! [ -e /Users/servo/.rustup ]; then
@@ -57,6 +59,8 @@ if ! [ -e /Volumes/a/init/built_servo_once_successfully ]; then
     exit
 fi
 
-if [ -e /Volumes/a/init/runner.sh ]; then
-    . /Volumes/a/init/runner.sh
-fi
+> /Volumes/a/init/runner.sh echo 'export RUNNER_ALLOW_RUNASROOT=1'
+>> /Volumes/a/init/runner.sh printf '/actions-runner/run.sh --jitconfig '
+curl -fsS http://192.168.100.1:8000/github-jitconfig | jq -er . >> /Volumes/a/init/runner.sh
+chmod +x /Volumes/a/init/runner.sh
+/Volumes/a/init/runner.sh  # Only runs if curl and jq succeeded
