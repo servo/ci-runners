@@ -15,8 +15,9 @@ mod zfs;
 use core::str;
 use std::{
     collections::BTreeMap,
+    env,
     fs::File,
-    path::Path,
+    path::{Path, PathBuf},
     process::exit,
     sync::{LazyLock, RwLock},
     thread::{self},
@@ -56,6 +57,11 @@ static LIB_MONITOR_DIR: LazyLock<&Path> = LazyLock::new(|| {
     } else {
         Path::new("..")
     }
+});
+
+static IMAGE_DEPS_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
+    let image_deps_dir = env::var_os("IMAGE_DEPS_DIR").expect("IMAGE_DEPS_DIR not set!");
+    PathBuf::from(&image_deps_dir)
 });
 
 static DOTENV: LazyLock<Dotenv> = LazyLock::new(|| {
@@ -272,10 +278,10 @@ fn runner_github_jitconfig_route(remote_addr: RemoteAddr) -> rocket_eyre::Result
 #[rocket::main]
 async fn main() -> eyre::Result<()> {
     jane_eyre::install()?;
-    if std::env::var_os("RUST_LOG").is_none() {
+    if env::var_os("RUST_LOG").is_none() {
         // EnvFilter Builder::with_default_directive doesn’t support multiple directives,
         // so we need to apply defaults ourselves.
-        std::env::set_var("RUST_LOG", "monitor=info,rocket=info,cmd_lib::child=info");
+        env::set_var("RUST_LOG", "monitor=info,rocket=info,cmd_lib::child=info");
     }
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer().with_writer(std::io::stderr))
@@ -284,6 +290,7 @@ async fn main() -> eyre::Result<()> {
 
     dotenv()?;
     info!(LIB_MONITOR_DIR = ?*LIB_MONITOR_DIR);
+    info!(IMAGE_DEPS_DIR = ?*IMAGE_DEPS_DIR);
     run_migrations()?;
 
     tokio::task::spawn(async move {

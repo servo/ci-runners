@@ -39,5 +39,10 @@
       }) ];
     };
     packages.x86_64-linux.monitor = pkgsUnstable.callPackage server/nixos/monitor.nix {};
+    packages.x86_64-linux.image-deps = pkgsUnstable.callPackage server/nixos/image-deps.nix {};
+    devShells.x86_64-linux.default = import ./shell.nix {
+      inherit (pkgsUnstable) pkgs;
+      image-deps = self.packages.x86_64-linux.image-deps;
+    };
   };
 }

@@ -1,4 +1,6 @@
 {
+  callPackage,
+  fetchurl,
   lib,
   rustPlatform,
   makeWrapper,
@@ -47,6 +49,7 @@ in rustPlatform.buildRustPackage rec {
 
   postConfigure = ''
     export LIB_MONITOR_DIR=$out/lib/monitor
+    export IMAGE_DEPS_DIR=${callPackage ./image-deps.nix {}}
   '';
 
   nativeBuildInputs = [
