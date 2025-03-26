@@ -32,7 +32,7 @@ if (!(Test-Path $env:LOCALAPPDATA\Programs\Python\Python310\python.exe)) {
 # Install uv. Note that actually running uv relies on $env:USERPROFILE\.local\bin being on PATH,
 # and that directory gets added to PATH by Chocolatey and refreshenv (see refreshenv.ps1).
 if (!(Test-Path C:\Users\Administrator\.local\bin\uv.exe)) {
-    . C:\init\install-uv.ps1
+    . C:\init\uv-installer.ps1
 }
 
 # Install rustup and the latest Rust
