@@ -1,8 +1,10 @@
 {
+  monitorCrate,
+
   callPackage,
   fetchurl,
   lib,
-  rustPlatform,
+  stdenv,
   makeWrapper,
   gawk,
   git,
@@ -34,7 +36,7 @@
       ../../unregister-runner.sh
     ]
   );
-in rustPlatform.buildRustPackage rec {
+in stdenv.mkDerivation rec {
   pname = "monitor";
   version = "0.1.0";
 
@@ -57,6 +59,7 @@ in rustPlatform.buildRustPackage rec {
   ];
 
   buildInputs = [
+    monitorCrate
     gawk
     git
     gnused
@@ -69,6 +72,11 @@ in rustPlatform.buildRustPackage rec {
   # Some of the scripts run in the guest, like {macos13,ubuntu2204}/init.sh.
   # Don’t patch shebangs, otherwise those scripts will be broken.
   dontPatchShebangs = true;
+
+  installPhase = ''
+    mkdir -p $out/bin
+    ln -s ${monitorCrate}/bin/monitor $out/bin/monitor
+  '';
 
   postInstall = ''
     cd ..  # cd back out of sourceRoot
