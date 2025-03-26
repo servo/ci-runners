@@ -62,6 +62,6 @@ fi
 
 > /init/runner.sh echo 'export RUNNER_ALLOW_RUNASROOT=1'
 >> /init/runner.sh printf '/actions-runner/run.sh --jitconfig '
-curl -fsS http://192.168.100.1:8000/github-jitconfig | jq -er . >> /init/runner.sh
+curl -fsS --max-time 5 --retry 99 http://192.168.100.1:8000/github-jitconfig | jq -er . >> /init/runner.sh
 chmod +x /init/runner.sh
 /init/runner.sh  # Only runs if curl and jq succeeded
