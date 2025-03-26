@@ -542,6 +542,13 @@ fn monitor_thread() -> eyre::Result<()> {
                     response_tx,
                     remote_addr,
                 } => {
+                    // The monitor runs a loop like (1) update our lists of resources, including guest IPv4 addresses,
+                    // (2) wait for up to 5 seconds for a message, (3) handle one message. If the DHCP lease and the
+                    // GET /github-jitconfig request both happen in step (2) without step (1) in between, we won’t know
+                    // the IPv4 address, so let’s update the IPv4 addresses before continuing.
+                    let mut runners = runners;
+                    runners.update_ipv4_addresses();
+
                     response_tx
                         .send(runners.github_jitconfig(remote_addr).map(|x| x.to_owned()))
                         .expect("Failed to send Response to API thread");

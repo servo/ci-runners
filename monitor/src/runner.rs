@@ -239,6 +239,21 @@ impl Runners {
 
         None
     }
+
+    pub fn update_ipv4_addresses(&mut self) {
+        for (&id, runner) in self.runners.iter_mut() {
+            if let Some(guest_name) = runner.guest_name.as_deref() {
+                let ipv4_address = get_ipv4_address(guest_name);
+                if ipv4_address != runner.ipv4_address {
+                    info!(
+                        "IPv4 address changed for runner {id}: {:?} -> {:?}",
+                        runner.ipv4_address, ipv4_address
+                    );
+                }
+                runner.ipv4_address = ipv4_address;
+            }
+        }
+    }
 }
 
 impl Runner {
