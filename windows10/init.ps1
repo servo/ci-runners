@@ -88,6 +88,9 @@ if (!(Test-Path C:\init\built_servo_once_successfully)) {
     exit
 }
 
-if (Test-Path C:\init\runner.ps1) {
-    . C:\init\runner.ps1
+# Use the actual curl shipped in Windows 1804+, not the alias for Invoke-WebRequest
+$jitconfig = curl.exe -fsS http://192.168.100.1:8000/github-jitconfig | ConvertFrom-Json
+if ($jitconfig -ne $null) {
+    . C:\init\refreshenv.ps1
+    C:\actions-runner\run.cmd --jitconfig $jitconfig
 }
