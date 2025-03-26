@@ -51,11 +51,11 @@ use crate::{
     zfs::list_runner_volumes,
 };
 
-static LIB_MONITOR_DIR: LazyLock<&Path> = LazyLock::new(|| {
-    if let Some(lib_monitor_dir) = option_env!("LIB_MONITOR_DIR") {
-        Path::new(lib_monitor_dir)
+static LIB_MONITOR_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
+    if let Some(lib_monitor_dir) = env::var_os("LIB_MONITOR_DIR") {
+        PathBuf::from(&lib_monitor_dir)
     } else {
-        Path::new("..")
+        PathBuf::from("..")
     }
 });
 

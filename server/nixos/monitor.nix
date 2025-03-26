@@ -1,7 +1,7 @@
 {
   monitorCrate,
+  image-deps,
 
-  callPackage,
   fetchurl,
   lib,
   stdenv,
@@ -49,11 +49,6 @@ in stdenv.mkDerivation rec {
   # don't forget to update this hash when Cargo.lock or ${version} changes!
   cargoHash = "sha256-cSQLIwhgkfihKOLzg9LD/1GTkNSyBJaDDTdfu5IzvdI=";
 
-  postConfigure = ''
-    export LIB_MONITOR_DIR=$out/lib/monitor
-    export IMAGE_DEPS_DIR=${callPackage ./image-deps.nix {}}
-  '';
-
   nativeBuildInputs = [
     makeWrapper
   ];
@@ -76,9 +71,6 @@ in stdenv.mkDerivation rec {
   installPhase = ''
     mkdir -p $out/bin
     ln -s ${monitorCrate}/bin/monitor $out/bin/monitor
-  '';
-
-  postInstall = ''
     cd ..  # cd back out of sourceRoot
     mkdir -p $out/lib/monitor
     cp -R shared $out/lib/monitor
@@ -100,6 +92,8 @@ in stdenv.mkDerivation rec {
   '';
 
   postFixup = ''
-    wrapProgram $out/bin/monitor --set PATH ${lib.makeBinPath buildInputs}
+    wrapProgram $out/bin/monitor --set PATH ${lib.makeBinPath buildInputs} \
+      --set LIB_MONITOR_DIR $out/lib/monitor \
+      --set IMAGE_DEPS_DIR ${image-deps}
   '';
 }

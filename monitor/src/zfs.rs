@@ -10,7 +10,7 @@ use crate::{shell::SHELL, DOTENV, LIB_MONITOR_DIR};
 
 pub fn list_runner_volumes() -> eyre::Result<Vec<String>> {
     let output = Command::new("./list-runner-volumes.sh")
-        .current_dir(*LIB_MONITOR_DIR)
+        .current_dir(&*LIB_MONITOR_DIR)
         .stdout(Stdio::piped())
         .spawn()
         .unwrap()

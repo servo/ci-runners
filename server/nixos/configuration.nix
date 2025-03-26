@@ -7,6 +7,7 @@
   hostId,  # Generate with: LC_ALL=C < /dev/urandom tr -dC 0-9A-F | head -c 8
   ipv6Address,
   hasIntermittentTracker ? false,
+  monitor,
 }:
 
 { config, lib, pkgs, ... }:
@@ -232,7 +233,7 @@
       wantedBy = ["multi-user.target"];
 
       script = ''
-        RUST_LOG=monitor=info,cmd_lib::child=info ${pkgs.callPackage ./monitor.nix {}}/bin/monitor
+        RUST_LOG=monitor=info,cmd_lib::child=info ${monitor}/bin/monitor
       '';
 
       serviceConfig = {

@@ -140,7 +140,7 @@ impl Runners {
         };
         info!(runner_id = id, registration.id, "Unregistering runner");
         let exit_status = Command::new("./unregister-runner.sh")
-            .current_dir(*LIB_MONITOR_DIR)
+            .current_dir(&*LIB_MONITOR_DIR)
             .arg(&registration.id.to_string())
             .spawn()
             .unwrap()
@@ -168,7 +168,7 @@ impl Runners {
         };
         info!(runner_id = id, registration.id, "Reserving runner");
         let exit_status = Command::new("./reserve-runner.sh")
-            .current_dir(*LIB_MONITOR_DIR)
+            .current_dir(&*LIB_MONITOR_DIR)
             .arg(&registration.id.to_string())
             .arg(unique_id)
             .arg(format!("{qualified_repo}/actions/runs/{run_id}"))

@@ -83,7 +83,7 @@ impl<Response: Clone + Debug> Cache<Response> {
 
 fn list_registered_runners() -> eyre::Result<Vec<ApiRunner>> {
     let output = Command::new("./list-registered-runners.sh")
-        .current_dir(*LIB_MONITOR_DIR)
+        .current_dir(&*LIB_MONITOR_DIR)
         .stdout(Stdio::piped())
         .spawn()
         .unwrap()

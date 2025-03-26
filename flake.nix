@@ -26,6 +26,7 @@
         hostId = "04AA04E2";
         ipv6Address = "2a01:4f9:3071:3063::2";
         hasIntermittentTracker = true;
+        monitor = self.packages.x86_64-linux.monitor;
       }) ];
     };
     nixosConfigurations.ci1 = unstable.lib.nixosSystem {
@@ -34,6 +35,7 @@
         hostName = "ci1";
         hostId = "47264830";
         ipv6Address = "2a01:4f9:3100:1d2b::2";
+        monitor = self.packages.x86_64-linux.monitor;
       }) ];
     };
     nixosConfigurations.ci2 = unstable.lib.nixosSystem {
@@ -42,10 +44,12 @@
         hostName = "ci2";
         hostId = "A2BB6C74";
         ipv6Address = "2a01:4f9:3100:1963::2";
+        monitor = self.packages.x86_64-linux.monitor;
       }) ];
     };
     packages.x86_64-linux.monitor = pkgsUnstable.callPackage server/nixos/monitor.nix {
       monitorCrate = monitor.rootCrate.build;
+      image-deps = self.packages.x86_64-linux.image-deps;
     };
     packages.x86_64-linux.image-deps = pkgsUnstable.callPackage server/nixos/image-deps.nix {};
     devShells.x86_64-linux.default = import ./shell.nix {
