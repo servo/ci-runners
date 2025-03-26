@@ -1,6 +1,6 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
-    fmt::Debug,
+    fmt::{Debug, Display},
     fs::{self, File},
     net::Ipv4Addr,
     path::{Path, PathBuf},
@@ -107,7 +107,6 @@ impl Runners {
         for (id, guest_name) in guest_ids.iter().zip(guest_names) {
             if let Some(runner) = runners.get_mut(id) {
                 let ipv4_address = get_ipv4_address(&guest_name);
-                info!("IPv4 address of {id} is {ipv4_address:?}");
                 runner.guest_name = Some(guest_name);
                 runner.ipv4_address = ipv4_address;
             }
@@ -281,15 +280,20 @@ impl Runner {
     }
 
     pub fn log_info(&self) {
+        fn fmt_option_display<T: Display>(x: Option<T>) -> String {
+            x.map_or("None".to_owned(), |x| format!("{}", x))
+        }
         fn fmt_option_debug<T: Debug>(x: Option<T>) -> String {
             x.map_or("None".to_owned(), |x| format!("{:?}", x))
         }
         info!(
-            "[{}] profile {}, status {:?}, age {}, reserved for {}",
+            "[{}] profile {}, ipv4 {}, status {:?}, age {}, jitconfig {}, reserved for {}",
             self.id,
             self.base_vm_name(),
+            fmt_option_display(self.ipv4_address),
             self.status(),
             fmt_option_debug(self.age().ok()),
+            self.github_jitconfig.as_ref().map_or("no", |_| "yes"),
             fmt_option_debug(self.reserved_since().ok().flatten()),
         );
         if let Some(registration) = self.registration() {
