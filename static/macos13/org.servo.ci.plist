@@ -20,7 +20,7 @@
             <string>-Wa</string><!-- wait, application -->
             <string>/System/Applications/Utilities/Terminal.app</string>
             <!-- In practice, this actually runs as servo, not root -->
-            <string>/Users/servo/boot.sh</string>
+            <string>/Volumes/a/init/init.sh</string>
     </array>
 </dict>
 </plist>

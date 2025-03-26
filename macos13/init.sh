@@ -12,8 +12,16 @@ osascript -e 'tell application "Terminal"' -e 'activate' -e 'set the bounds of t
 sudo pmset sleep 0
 sudo pmset displaysleep 0
 
-# Fix brew error “The following directories are not writable by your user: /usr/local/share/man/man8”
-sudo chown -R servo /usr/local/share/man/man8
+# Install Xcode CLT (Command Line Tools) non-interactively
+# <https://github.com/actions/runner-images/blob/3d5f09a90fd475a3531b0ef57325aa7e27b24595/images/macos/scripts/build/install-xcode-clt.sh>
+sudo -i mkdir -p /var/root/utils
+sudo -i touch /var/root/utils/utils.sh
+sudo -i /Volumes/a/init/install-xcode-clt.sh
+
+# Install Homebrew
+if ! [ -e /usr/local/bin/brew ]; then
+    NONINTERACTIVE=1 /Volumes/a/init/install-homebrew.sh
+fi
 
 # Install gtar(1)
 brew install gnu-tar
