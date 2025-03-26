@@ -1,11 +1,13 @@
 use core::str;
 use std::{
     fs::{create_dir_all, rename},
+    net::Ipv4Addr,
     path::Path,
 };
 
 use cmd_lib::run_fun;
 use jane_eyre::eyre::{self, eyre};
+use tracing::warn;
 
 use crate::{shell::SHELL, DOTENV};
 
@@ -44,4 +46,46 @@ pub fn update_screenshot(guest_name: &str, output_dir: &Path) -> Result<(), eyre
     rename(new_path, path)?;
 
     Ok(())
+}
+
+pub fn get_ipv4_address(guest_name: &str) -> Option<Ipv4Addr> {
+    let output = run_fun!(virsh domifaddr $guest_name);
+    match output {
+        Ok(output) => parse_virsh_domifaddr_output(&output),
+        Err(error) => {
+            warn!(?error, "Failed to get IPv4 address of guest");
+            None
+        }
+    }
+}
+
+fn parse_virsh_domifaddr_output(output: &str) -> Option<Ipv4Addr> {
+    let first_row = output.lines().nth(2)?;
+    let address_with_subnet = first_row.split_ascii_whitespace().nth(3)?;
+    let (address, _subnet) = address_with_subnet.split_once('/')?;
+
+    address.parse::<Ipv4Addr>().ok()
+}
+
+#[test]
+fn test_parse_virsh_domifaddr_output() {
+    use std::str::FromStr;
+    // `--source lease` case
+    assert_eq!(
+        parse_virsh_domifaddr_output(
+            r" Name       MAC address          Protocol     Address
+-------------------------------------------------------------------------------
+ vnet6130   52:54:00:1c:1f:5e    ipv4         192.168.100.195/24"
+        ),
+        Some(Ipv4Addr::from_str("192.168.100.195").expect("Guaranteed by argument"))
+    );
+    // `--source arp` case
+    assert_eq!(
+        parse_virsh_domifaddr_output(
+            r" Name       MAC address          Protocol     Address
+-------------------------------------------------------------------------------
+ vnet91     52:54:00:95:5e:68    ipv4         192.168.100.189/0"
+        ),
+        Some(Ipv4Addr::from_str("192.168.100.189").expect("Guaranteed by argument"))
+    );
 }

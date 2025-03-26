@@ -8,7 +8,6 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use cmd_lib::run_fun;
 use itertools::Itertools;
 use jane_eyre::eyre::{self, bail, eyre};
 use mktemp::Temp;
@@ -19,7 +18,7 @@ use crate::{
     auth::RemoteAddr,
     data::get_runner_data_path,
     github::{ApiGenerateJitconfigResponse, ApiRunner},
-    libvirt::{libvirt_prefix, update_screenshot},
+    libvirt::{get_ipv4_address, libvirt_prefix, update_screenshot},
     shell::SHELL,
     LIB_MONITOR_DIR,
 };
@@ -107,17 +106,8 @@ impl Runners {
         }
         for (id, guest_name) in guest_ids.iter().zip(guest_names) {
             if let Some(runner) = runners.get_mut(id) {
-                let ipv4_address = match run_fun!(virsh domifaddr $guest_name | sed 1,2d | awk "{print $4}")
-                {
-                    Ok(result) => result
-                        .trim()
-                        .strip_suffix("/0")
-                        .and_then(|x| x.parse::<Ipv4Addr>().ok()),
-                    Err(error) => {
-                        warn!(?error, "Failed to get IPv4 address of guest");
-                        None
-                    }
-                };
+                let ipv4_address = get_ipv4_address(&guest_name);
+                info!("IPv4 address of {id} is {ipv4_address:?}");
                 runner.guest_name = Some(guest_name);
                 runner.ipv4_address = ipv4_address;
             }
