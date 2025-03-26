@@ -261,7 +261,7 @@ fn runner_screenshot_now_route(runner_id: usize) -> rocket_eyre::Result<(Content
 }
 
 #[get("/github-jitconfig")]
-fn runner_github_jitconfig_route(remote_addr: RemoteAddr) -> rocket_eyre::Result<RawJson<String>> {
+fn github_jitconfig_route(remote_addr: RemoteAddr) -> rocket_eyre::Result<RawJson<String>> {
     let (response_tx, response_rx) = crossbeam_channel::bounded(0);
     REQUEST.sender.send_timeout(
         Request::GithubJitconfig {
@@ -328,7 +328,7 @@ async fn main() -> eyre::Result<()> {
                 profile_screenshot_route,
                 runner_screenshot_route,
                 runner_screenshot_now_route,
-                runner_github_jitconfig_route,
+                github_jitconfig_route,
             ],
         )
         .launch()
