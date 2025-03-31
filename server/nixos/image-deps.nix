@@ -18,8 +18,8 @@ in linkFarm "image-deps" {
     hash = "sha256-XdP0I+jzh6R6xTpeNV4P4QXwqTFNeCPeoJjcpw4b0sk=";
   };
   "macos13/uv-installer.sh" = fetchurl {
-    url = "https://github.com/astral-sh/uv/releases/download/0.6.9/uv-installer.sh";
-    hash = "sha256-8SiMx5h8jgmBMeGJXhi7XiMgIUJOczJgnsPe0KlQl5k=";
+    url = "https://github.com/astral-sh/uv/releases/download/0.5.18/uv-installer.sh";
+    hash = "sha256-OIsilxrJCGTOSxKiCQFK6ZsWCIqAoQf6scAfDJ5QdR0=";
   };
   "macos13/install-xcode-clt.sh" = fetchurl {
     url = "https://raw.githubusercontent.com/actions/runner-images/3d5f09a90fd475a3531b0ef57325aa7e27b24595/images/macos/scripts/build/install-xcode-clt.sh";
