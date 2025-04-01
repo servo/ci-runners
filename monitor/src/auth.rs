@@ -65,7 +65,7 @@ impl PartialEq<Ipv4Addr> for RemoteAddr {
 impl Display for RemoteAddr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if let Some(ip) = self.real_ip.or(self.client_ip) {
-            write!(f, "{}", ip);
+            write!(f, "{}", ip)?;
         }
         Ok(())
     }
