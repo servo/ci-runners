@@ -59,8 +59,13 @@ if ! [ -e /Volumes/a/init/built_servo_once_successfully ]; then
     exit
 fi
 
+# Unpack the GitHub Actions runner on APFS (it contains symlinks)
+mkdir -p ~/actions-runner
+cd ~/actions-runner
+tar xf /Volumes/a/init/actions-runner-osx-x64.tar.gz
+
 > /Volumes/a/init/runner.sh echo 'export RUNNER_ALLOW_RUNASROOT=1'
->> /Volumes/a/init/runner.sh printf '/actions-runner/run.sh --jitconfig '
+>> /Volumes/a/init/runner.sh printf '~/actions-runner/run.sh --jitconfig '
 curl -fsS --max-time 5 --retry 99 --retry-all-errors http://192.168.100.1:8000/github-jitconfig | jq -er . >> /Volumes/a/init/runner.sh
 chmod +x /Volumes/a/init/runner.sh
 /Volumes/a/init/runner.sh  # Only runs if curl and jq succeeded
