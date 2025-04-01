@@ -3,13 +3,14 @@ use std::{
     fmt::{Debug, Display},
     fs::{self, File},
     net::Ipv4Addr,
-    path::{Path, PathBuf},
+    path::Path,
     process::Command,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use cmd_lib::run_cmd;
 use itertools::Itertools;
-use jane_eyre::eyre::{self, bail, eyre};
+use jane_eyre::eyre::{self, bail};
 use mktemp::Temp;
 use serde::Serialize;
 use tracing::{error, info, trace, warn};
@@ -19,7 +20,6 @@ use crate::{
     data::get_runner_data_path,
     github::{ApiGenerateJitconfigResponse, ApiRunner},
     libvirt::{get_ipv4_address, libvirt_prefix, update_screenshot},
-    shell::SHELL,
     LIB_MONITOR_DIR,
 };
 
@@ -191,20 +191,10 @@ impl Runners {
             bail!("Tried to screenshot a runner with no libvirt guest: {id}");
         };
         let result = Temp::new_file()?;
-        let exit_status = SHELL
-            .lock()
-            .map_err(|e| eyre!("Mutex poisoned: {e:?}"))?
-            .run(
-                include_str!("screenshot-guest.sh"),
-                [PathBuf::from(guest_name), result.clone()],
-            )?
-            .spawn()?
-            .wait()?;
-        if exit_status.success() {
-            Ok(result)
-        } else {
-            eyre::bail!("Command exited with status {}", exit_status);
-        }
+        let output_path = result.clone();
+        run_cmd!(virsh screenshot -- $guest_name $output_path)?;
+
+        Ok(result)
     }
 
     pub fn update_screenshots(&self) {

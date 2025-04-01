@@ -5,11 +5,11 @@ use std::{
     path::Path,
 };
 
-use cmd_lib::run_fun;
-use jane_eyre::eyre::{self, eyre};
+use cmd_lib::{run_cmd, run_fun};
+use jane_eyre::eyre;
 use tracing::warn;
 
-use crate::{shell::SHELL, DOTENV};
+use crate::DOTENV;
 
 pub fn list_runner_guests() -> eyre::Result<Vec<String>> {
     // Output is not filtered by prefix, so we must filter it ourselves.
@@ -30,18 +30,7 @@ pub fn libvirt_prefix() -> String {
 pub fn update_screenshot(guest_name: &str, output_dir: &Path) -> Result<(), eyre::Error> {
     create_dir_all(output_dir)?;
     let new_path = output_dir.join("screenshot.png.new");
-    let exit_status = SHELL
-        .lock()
-        .map_err(|e| eyre!("Mutex poisoned: {e:?}"))?
-        .run(
-            include_str!("screenshot-guest.sh"),
-            [Path::new(guest_name), &new_path],
-        )?
-        .spawn()?
-        .wait()?;
-    if !exit_status.success() {
-        eyre::bail!("Command exited with status {}", exit_status);
-    }
+    run_cmd!(virsh screenshot -- $guest_name $new_path)?;
     let path = output_dir.join("screenshot.png");
     rename(new_path, path)?;
 
