@@ -6,7 +6,7 @@ use std::{
 use jane_eyre::eyre;
 use tracing::info;
 
-use crate::DOTENV;
+use crate::{profile::Profile, DOTENV, LIB_MONITOR_DIR};
 
 pub fn get_data_path<'p>(path: impl Into<Option<&'p Path>>) -> eyre::Result<PathBuf> {
     let data = if let Some(path) = &DOTENV.monitor_data_path {
@@ -45,6 +45,18 @@ pub fn get_profile_data_path<'p>(
         Some(path) => profile_data.join(path),
         None => profile_data,
     })
+}
+
+pub fn get_profile_configuration_path<'p>(
+    profile: &Profile,
+    path: impl Into<Option<&'p Path>>,
+) -> PathBuf {
+    let profile_data = Path::new(&*LIB_MONITOR_DIR).join(&profile.configuration_name);
+
+    match path.into() {
+        Some(path) => profile_data.join(path),
+        None => profile_data,
+    }
 }
 
 #[tracing::instrument]

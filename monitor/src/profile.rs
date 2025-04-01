@@ -2,6 +2,7 @@ use std::{
     collections::BTreeMap,
     fs::File,
     io::{Read, Write},
+    net::Ipv4Addr,
     path::Path,
     process::Command,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -13,8 +14,9 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
 
 use crate::{
-    data::get_profile_data_path,
-    libvirt::update_screenshot,
+    auth::RemoteAddr,
+    data::{get_profile_configuration_path, get_profile_data_path},
+    libvirt::{get_ipv4_address, update_screenshot},
     runner::{Runner, Runners, Status},
     zfs::snapshot_creation_time_unix,
     DOTENV, LIB_MONITOR_DIR, TOML,
@@ -24,6 +26,7 @@ use crate::{
 pub struct Profiles {
     profiles: BTreeMap<String, Profile>,
     base_image_snapshots: BTreeMap<String, String>,
+    ipv4_addresses: BTreeMap<String, Option<Ipv4Addr>>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -32,6 +35,15 @@ pub struct Profile {
     pub base_vm_name: String,
     pub github_runner_label: String,
     pub target_count: usize,
+    #[serde(default)]
+    pub image_type: ImageType,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub enum ImageType {
+    #[default]
+    BuildImageScript,
+    Rust,
 }
 
 #[derive(Debug, Serialize)]
@@ -59,6 +71,7 @@ impl Profiles {
         Ok(Self {
             profiles,
             base_image_snapshots,
+            ipv4_addresses: BTreeMap::default(),
         })
     }
 
@@ -317,5 +330,35 @@ impl Profiles {
         }
 
         Ok(None)
+    }
+
+    pub fn update_ipv4_addresses(&mut self) {
+        for (key, profile) in self.profiles.iter() {
+            let ipv4_address = get_ipv4_address(&profile.base_vm_name);
+            let entry = self.ipv4_addresses.entry(key.clone()).or_default();
+            if ipv4_address != *entry {
+                info!(
+                    "IPv4 address changed for profile guest {key}: {:?} -> {:?}",
+                    *entry, ipv4_address
+                );
+            }
+            *entry = ipv4_address;
+        }
+    }
+
+    pub fn boot_script(&self, remote_addr: RemoteAddr) -> eyre::Result<String> {
+        for (key, ipv4_address) in self.ipv4_addresses.iter() {
+            if let Some(ipv4_address) = ipv4_address {
+                if remote_addr == *ipv4_address {
+                    let profile = self.profiles.get(key).expect("Guaranteed by Profiles impl");
+                    let path = get_profile_configuration_path(profile, Path::new("boot-script.sh"));
+                    let mut result = String::default();
+                    File::open(path)?.read_to_string(&mut result)?;
+                    return Ok(result);
+                }
+            }
+        }
+
+        bail!("No profile guest found with IP address: {}", remote_addr)
     }
 }
