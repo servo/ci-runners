@@ -1,18 +1,24 @@
 use core::str;
 use std::{
     collections::BTreeMap,
+    fs::{create_dir_all, File},
+    io::{Seek, SeekFrom, Write},
     mem::take,
     path::Path,
     thread::{self, JoinHandle},
 };
 
 use chrono::{SecondsFormat, Utc};
-use cmd_lib::spawn_with_output;
-use jane_eyre::eyre;
+use cmd_lib::{run_cmd, spawn_with_output};
+use jane_eyre::eyre::{self, bail};
 use tracing::{error, info, warn};
 
 use crate::{
-    profile::Profiles, runner::Runners, shell::log_output_as_info, DOTENV, LIB_MONITOR_DIR,
+    data::get_profile_configuration_path,
+    profile::{Profile, Profiles},
+    runner::Runners,
+    shell::log_output_as_info,
+    DOTENV, IMAGE_DEPS_DIR, LIB_MONITOR_DIR,
 };
 
 #[derive(Debug, Default)]
@@ -87,20 +93,30 @@ impl Rebuilds {
 
         // Kick off image rebuild threads for profiles needing it.
         for (key, profile) in profiles_needing_rebuild {
-            let build_script_path = Path::new(&*LIB_MONITOR_DIR)
-                .join(&profile.configuration_name)
-                .join("build-image.sh");
             let snapshot_name = Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true);
 
             let key_for_thread = key.clone();
             let snapshot_name_for_thread = snapshot_name.clone();
-            let thread = thread::spawn(move || {
-                rebuild_thread(
-                    &key_for_thread,
-                    build_script_path,
-                    &snapshot_name_for_thread,
-                )
-            });
+            let thread = match profile.image_type {
+                crate::profile::ImageType::BuildImageScript => {
+                    let build_script_path = Path::new(&*LIB_MONITOR_DIR)
+                        .join(&profile.configuration_name)
+                        .join("build-image.sh");
+                    thread::spawn(move || {
+                        rebuild_with_build_image_script(
+                            &key_for_thread,
+                            build_script_path,
+                            &snapshot_name_for_thread,
+                        )
+                    })
+                }
+                crate::profile::ImageType::Rust => {
+                    let profile = profile.clone();
+                    thread::spawn(move || {
+                        rebuild_with_rust(&key_for_thread, profile, &snapshot_name_for_thread)
+                    })
+                }
+            };
 
             self.rebuilds.insert(
                 key.to_owned(),
@@ -149,7 +165,7 @@ fn servo_update_thread() -> eyre::Result<()> {
 }
 
 #[tracing::instrument(skip(build_script_path, snapshot_name))]
-fn rebuild_thread(
+fn rebuild_with_build_image_script(
     profile_key: &str,
     build_script_path: impl AsRef<Path>,
     snapshot_name: &str,
@@ -160,4 +176,64 @@ fn rebuild_thread(
     spawn_with_output!($build_script_path $snapshot_name 2>&1)?.wait_with_pipe(&mut pipe())?;
 
     Ok(())
+}
+
+#[tracing::instrument(skip(profile, snapshot_name))]
+fn rebuild_with_rust(
+    profile_key: &str,
+    profile: Profile,
+    snapshot_name: &str,
+) -> Result<(), eyre::Error> {
+    info!(?snapshot_name, "Starting image rebuild");
+
+    let base_vm_name = &profile.base_vm_name;
+    if run_cmd!(virsh domstate -- $base_vm_name).is_ok() {
+        // FIXME make this idempotent in a less noisy way?
+        let _ = run_cmd!(virsh destroy -- $base_vm_name);
+        run_cmd!(virsh undefine -- $base_vm_name)?;
+    }
+
+    let profile_configuration_path = get_profile_configuration_path(&profile, None);
+    let guest_xml_path = get_profile_configuration_path(&profile, Path::new("guest.xml"));
+
+    let base_images_path = Path::new("/var/lib/libvirt/images/base");
+    info!(?base_images_path, "Creating libvirt images subdirectory");
+    create_dir_all(base_images_path)?;
+
+    let config_iso_path = base_images_path.join(format!("{base_vm_name}.config.iso"));
+    info!(?config_iso_path, "Creating config image file");
+    run_cmd!(genisoimage -V CIDATA -R -f -o $config_iso_path $profile_configuration_path/user-data $profile_configuration_path/meta-data)?;
+
+    let base_image_path = base_images_path.join(format!("{base_vm_name}.img"));
+    info!(?base_image_path, "Creating base image file");
+    let mut base_image_file = File::create(&base_image_path)?;
+    let base_image_size = 8; // GiB
+    for i in 0..base_image_size {
+        info!("Writing base image file: {i}/{base_image_size} GiB");
+        for _ in 0..1024 {
+            base_image_file.write_all(&vec![0u8; 1048576])?;
+        }
+    }
+
+    let os_image_path = IMAGE_DEPS_DIR
+        .join("ubuntu2204")
+        .join("jammy-server-cloudimg-amd64.raw");
+    info!(?os_image_path, "Writing OS image");
+    let mut os_image_file = File::open(&os_image_path)?;
+    base_image_file.seek(SeekFrom::Start(0))?;
+    std::io::copy(&mut os_image_file, &mut base_image_file)?;
+
+    run_cmd!(virsh define -- $guest_xml_path)?;
+    run_cmd!(virt-clone --preserve-data --check path_in_use=off -o $base_vm_name.init -n $base_vm_name -f $base_image_path)?;
+    run_cmd!(virsh undefine -- $base_vm_name.init)?;
+
+    info!("Starting guest, to expand root filesystem");
+    run_cmd!(virsh start -- $base_vm_name)?;
+
+    info!("Waiting for guest to shut down (max 40 seconds)"); // normally ~19 seconds
+    if !run_cmd!(time virsh event --timeout 40 -- $base_vm_name lifecycle).is_ok() {
+        bail!("virsh event timed out!");
+    }
+
+    bail!("no")
 }

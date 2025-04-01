@@ -29,7 +29,13 @@ use crossbeam_channel::{Receiver, Sender};
 use dotenv::dotenv;
 use jane_eyre::eyre::{self, eyre, Context, OptionExt};
 use mktemp::Temp;
-use rocket::{fs::NamedFile, get, http::ContentType, post, response::content::RawJson};
+use rocket::{
+    fs::NamedFile,
+    get,
+    http::ContentType,
+    post,
+    response::content::{RawJson, RawText},
+};
 use serde::Deserialize;
 use serde_json::json;
 use tokio::try_join;
@@ -102,6 +108,12 @@ enum Request {
     /// - GET `/github-jitconfig` => application/json
     GithubJitconfig {
         response_tx: Sender<eyre::Result<Option<String>>>,
+        remote_addr: RemoteAddr,
+    },
+
+    /// - GET `/boot` => text/plain
+    BootScript {
+        response_tx: Sender<eyre::Result<String>>,
         remote_addr: RemoteAddr,
     },
 }
@@ -277,6 +289,23 @@ fn github_jitconfig_route(remote_addr: RemoteAddr) -> rocket_eyre::Result<RawJso
     Ok(RawJson(json!(result).to_string()))
 }
 
+#[get("/boot")]
+fn boot_script_route(remote_addr: RemoteAddr) -> rocket_eyre::Result<RawText<String>> {
+    let (response_tx, response_rx) = crossbeam_channel::bounded(0);
+    REQUEST.sender.send_timeout(
+        Request::BootScript {
+            response_tx,
+            remote_addr,
+        },
+        DOTENV.monitor_thread_send_timeout,
+    )?;
+    let result = response_rx
+        .recv_timeout(DOTENV.monitor_thread_recv_timeout)?
+        .map_err(EyreReport::ServiceUnavailable)?;
+
+    Ok(RawText(result))
+}
+
 #[rocket::main]
 async fn main() -> eyre::Result<()> {
     jane_eyre::install()?;
@@ -331,6 +360,7 @@ async fn main() -> eyre::Result<()> {
                 runner_screenshot_route,
                 runner_screenshot_now_route,
                 github_jitconfig_route,
+                boot_script_route,
             ],
         )
         .launch()
@@ -403,6 +433,7 @@ fn monitor_thread() -> eyre::Result<()> {
         }
 
         runners.update_screenshots();
+        profiles.update_ipv4_addresses();
         for (_key, profile) in profiles.iter() {
             profile.update_screenshot();
         }
@@ -564,6 +595,23 @@ fn monitor_thread() -> eyre::Result<()> {
                                 .github_jitconfig(remote_addr)
                                 .map(|result| result.map(|ip| ip.to_owned())),
                         )
+                        .expect("Failed to send Response to API thread");
+                }
+                Request::BootScript {
+                    response_tx,
+                    remote_addr,
+                } => {
+                    // The monitor runs a loop like (1) update our lists of resources, including guest IPv4 addresses,
+                    // (2) wait for up to 5 seconds for a message, (3) handle one message. If the DHCP lease and the
+                    // GET /github-jitconfig request both happen in step (2) without step (1) in between, we won’t know
+                    // the IPv4 address, so let’s update the IPv4 addresses before continuing.
+                    let mut runners = runners;
+                    runners.update_ipv4_addresses();
+                    profiles.update_ipv4_addresses();
+
+                    let result = profiles.boot_script(remote_addr);
+                    response_tx
+                        .send(result)
                         .expect("Failed to send Response to API thread");
                 }
             }
