@@ -49,7 +49,11 @@ pub fn update_screenshot(guest_name: &str, output_dir: &Path) -> Result<(), eyre
 }
 
 pub fn get_ipv4_address(guest_name: &str) -> Option<Ipv4Addr> {
-    let output = run_fun!(virsh domifaddr $guest_name);
+    virsh_domifaddr(guest_name, "lease").or_else(|| virsh_domifaddr(guest_name, "arp"))
+}
+
+fn virsh_domifaddr(guest_name: &str, source: &str) -> Option<Ipv4Addr> {
+    let output = run_fun!(virsh domifaddr --source $source $guest_name);
     match output {
         Ok(output) => parse_virsh_domifaddr_output(&output),
         Err(error) => {
