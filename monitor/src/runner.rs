@@ -192,7 +192,8 @@ impl Runners {
         };
         let result = Temp::new_file()?;
         let output_path = result.clone();
-        run_cmd!(virsh screenshot -- $guest_name $output_path)?;
+        // Squelch errors due to guests being shut off
+        run_cmd!(virsh screenshot -- $guest_name $output_path > /dev/null 2>&1)?;
 
         Ok(result)
     }
