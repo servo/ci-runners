@@ -101,7 +101,7 @@ enum Request {
 
     /// - GET `/github-jitconfig` => application/json
     GithubJitconfig {
-        response_tx: Sender<Option<String>>,
+        response_tx: Sender<eyre::Result<Option<String>>>,
         remote_addr: RemoteAddr,
     },
 }
@@ -270,9 +270,11 @@ fn github_jitconfig_route(remote_addr: RemoteAddr) -> rocket_eyre::Result<RawJso
         },
         DOTENV.monitor_thread_send_timeout,
     )?;
-    let result = json!(response_rx.recv_timeout(DOTENV.monitor_thread_recv_timeout)?);
+    let result = response_rx
+        .recv_timeout(DOTENV.monitor_thread_recv_timeout)?
+        .map_err(EyreReport::ServiceUnavailable)?;
 
-    Ok(RawJson(result.to_string()))
+    Ok(RawJson(json!(result).to_string()))
 }
 
 #[rocket::main]
@@ -557,7 +559,11 @@ fn monitor_thread() -> eyre::Result<()> {
                     runners.update_ipv4_addresses();
 
                     response_tx
-                        .send(runners.github_jitconfig(remote_addr).map(|x| x.to_owned()))
+                        .send(
+                            runners
+                                .github_jitconfig(remote_addr)
+                                .map(|result| result.map(|ip| ip.to_owned())),
+                        )
                         .expect("Failed to send Response to API thread");
                 }
             }

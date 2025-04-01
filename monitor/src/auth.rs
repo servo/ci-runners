@@ -1,4 +1,7 @@
-use std::net::{IpAddr, Ipv4Addr};
+use std::{
+    fmt::Display,
+    net::{IpAddr, Ipv4Addr},
+};
 
 use rocket::{
     http::Status,
@@ -56,5 +59,14 @@ impl PartialEq<Ipv4Addr> for RemoteAddr {
             Some(IpAddr::V6(ipv6)) => ipv6 == other.to_ipv6_mapped(),
             None => false,
         }
+    }
+}
+
+impl Display for RemoteAddr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(ip) = self.real_ip.or(self.client_ip) {
+            write!(f, "{}", ip);
+        }
+        Ok(())
     }
 }

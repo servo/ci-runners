@@ -228,16 +228,16 @@ impl Runners {
         Ok(())
     }
 
-    pub fn github_jitconfig(&self, remote_addr: RemoteAddr) -> Option<&str> {
+    pub fn github_jitconfig(&self, remote_addr: RemoteAddr) -> eyre::Result<Option<&str>> {
         for (_id, runner) in self.runners.iter() {
             if let Some(ipv4_address) = runner.ipv4_address {
                 if remote_addr == ipv4_address {
-                    return runner.github_jitconfig.as_deref();
+                    return Ok(runner.github_jitconfig.as_deref());
                 }
             }
         }
 
-        None
+        bail!("No runner found with IP address: {}", remote_addr)
     }
 
     pub fn update_ipv4_addresses(&mut self) {
