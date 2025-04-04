@@ -6,6 +6,7 @@ use std::{
     mem::take,
     path::{Path, PathBuf},
     thread::{self, JoinHandle},
+    time::Duration,
 };
 
 use bytesize::{ByteSize, MIB};
@@ -225,10 +226,7 @@ fn rebuild_with_rust(
     run_cmd!(virsh change-media -- $base_vm_name sda $config_iso_path)?;
     run_cmd!(virsh resume -- $base_vm_name)?;
 
-    info!("Waiting for guest to shut down (max 90 seconds)"); // normally ~37 seconds
-    if !run_cmd!(time virsh event --timeout 90 -- $base_vm_name lifecycle).is_ok() {
-        bail!("virsh event timed out!");
-    }
+    wait_for_guest(base_vm_name, Duration::from_secs(90))?;
 
     let base_image_filename = Path::new(
         base_image_path
@@ -289,4 +287,14 @@ pub(self) fn create_disk_image(
     }
 
     Ok(base_image_path)
+}
+
+pub(self) fn wait_for_guest(base_vm_name: &str, timeout: Duration) -> eyre::Result<()> {
+    let timeout = timeout.as_secs();
+    info!("Waiting for guest to shut down (max {timeout} seconds)"); // normally ~37 seconds
+    if !run_cmd!(time virsh event --timeout $timeout -- $base_vm_name lifecycle).is_ok() {
+        bail!("`virsh event` failed or timed out!");
+    }
+
+    Ok(())
 }
