@@ -43,9 +43,8 @@
       <boot order='1'/>
       <address type='pci' domain='0x0000' bus='0x04' slot='0x00' function='0x0'/>
     </disk>
-    <disk type='file' device='cdrom'>
+    <disk type='block' device='cdrom'>
       <driver name='qemu' type='raw'/>
-      <source file='/var/lib/libvirt/images/base/servo-ubuntu2204-rust.config.iso'/>
       <target dev='sda' bus='sata'/>
       <readonly/>
       <boot order='2'/>

@@ -1,8 +1,13 @@
 use std::{
+    fs::rename,
     io::{BufRead, BufReader, Read},
+    os::unix::fs::symlink,
+    path::Path,
     str,
 };
 
+use jane_eyre::eyre::{self, OptionExt};
+use mktemp::Temp;
 use tracing::{info, trace, warn};
 
 macro_rules! impl_log_output_as {
@@ -66,3 +71,12 @@ macro_rules! impl_log_output_as {
 
 impl_log_output_as!(log_output_as_trace, trace);
 impl_log_output_as!(log_output_as_info, info);
+
+pub fn atomic_symlink(original: impl AsRef<Path>, link: impl AsRef<Path>) -> eyre::Result<()> {
+    let link_path = link.as_ref();
+    let link_parent = link_path.parent().ok_or_eyre("Link path has no parent")?;
+    let link_temp = Temp::new_path_in(link_parent);
+    symlink(original, &link_temp)?;
+    rename(&link_temp, link_path)?;
+    Ok(())
+}
