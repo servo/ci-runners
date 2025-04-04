@@ -17,6 +17,7 @@ use tracing::{debug, info, warn};
 use crate::{
     auth::RemoteAddr,
     data::{get_profile_configuration_path, get_profile_data_path, get_runner_data_path},
+    github::register_runner,
     libvirt::{get_ipv4_address, update_screenshot},
     runner::{Runner, Runners, Status},
     zfs::snapshot_creation_time_unix,
@@ -119,13 +120,15 @@ impl Profiles {
             }
             ImageType::Rust => {
                 let base_vm_name = &profile.base_vm_name;
-                let libvirt_prefix = &DOTENV.libvirt_prefix;
                 create_dir(get_runner_data_path(id, None)?)?;
                 let mut runner_toml =
                     File::create_new(get_runner_data_path(id, Path::new("runner.toml"))?)?;
                 writeln!(runner_toml, r#"image_type = "Rust""#)?;
-                run_cmd!(virt-clone --auto-clone --reflink -o $base_vm_name -n $libvirt_prefix-$base_vm_name.$id)?;
-                run_cmd!(virsh start -- $libvirt_prefix-$base_vm_name.$id)?;
+                let vm_name = format!("{base_vm_name}.{id}");
+                let prefixed_vm_name = format!("{}-{vm_name}", DOTENV.libvirt_prefix);
+                register_runner(&vm_name, &profile.github_runner_label, "../a")?;
+                run_cmd!(virt-clone --auto-clone --reflink -o $base_vm_name -n $prefixed_vm_name)?;
+                run_cmd!(virsh start -- $prefixed_vm_name)?;
                 Ok(())
             }
         }
