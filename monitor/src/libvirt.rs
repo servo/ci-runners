@@ -7,7 +7,7 @@ use std::{
 
 use cmd_lib::{run_fun, spawn_with_output};
 use jane_eyre::eyre;
-use tracing::warn;
+use tracing::debug;
 
 use crate::{shell::log_output_as_trace, DOTENV};
 
@@ -50,11 +50,11 @@ pub fn get_ipv4_address(guest_name: &str) -> Option<Ipv4Addr> {
 }
 
 fn virsh_domifaddr(guest_name: &str, source: &str) -> Option<Ipv4Addr> {
-    let output = run_fun!(virsh domifaddr --source $source $guest_name);
+    let output = run_fun!(virsh domifaddr --source $source $guest_name 2> /dev/null);
     match output {
         Ok(output) => parse_virsh_domifaddr_output(&output),
         Err(error) => {
-            warn!(?error, "Failed to get IPv4 address of guest");
+            debug!(?error, "Failed to get IPv4 address of guest");
             None
         }
     }
