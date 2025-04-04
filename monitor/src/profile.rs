@@ -1,6 +1,6 @@
 use std::{
     collections::BTreeMap,
-    fs::File,
+    fs::{create_dir, File},
     io::{Read, Write},
     net::Ipv4Addr,
     path::{Path, PathBuf},
@@ -9,13 +9,14 @@ use std::{
 };
 
 use atomic_write_file::AtomicWriteFile;
+use cmd_lib::run_cmd;
 use jane_eyre::eyre::{self, bail, Context};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
 
 use crate::{
     auth::RemoteAddr,
-    data::{get_profile_configuration_path, get_profile_data_path},
+    data::{get_profile_configuration_path, get_profile_data_path, get_runner_data_path},
     libvirt::{get_ipv4_address, update_screenshot},
     runner::{Runner, Runners, Status},
     zfs::snapshot_creation_time_unix,
@@ -95,23 +96,36 @@ impl Profiles {
             );
         };
         info!(runner_id = id, profile.base_vm_name, "Creating runner");
-        let exit_status = Command::new("./create-runner.sh")
-            .current_dir(&*LIB_MONITOR_DIR)
-            .args([
-                &id.to_string(),
-                &profile.base_vm_name,
-                base_image_snapshot,
-                &profile.configuration_name,
-                &profile.github_runner_label,
-            ])
-            .spawn()
-            .unwrap()
-            .wait()
-            .unwrap();
-        if exit_status.success() {
-            return Ok(());
-        } else {
-            eyre::bail!("Command exited with status {}", exit_status);
+        match profile.image_type {
+            ImageType::BuildImageScript => {
+                let exit_status = Command::new("./create-runner.sh")
+                    .current_dir(&*LIB_MONITOR_DIR)
+                    .args([
+                        &id.to_string(),
+                        &profile.base_vm_name,
+                        base_image_snapshot,
+                        &profile.configuration_name,
+                        &profile.github_runner_label,
+                    ])
+                    .spawn()
+                    .unwrap()
+                    .wait()
+                    .unwrap();
+                if exit_status.success() {
+                    Ok(())
+                } else {
+                    eyre::bail!("Command exited with status {}", exit_status);
+                }
+            }
+            ImageType::Rust => {
+                let base_vm_name = &profile.base_vm_name;
+                let libvirt_prefix = &DOTENV.libvirt_prefix;
+                create_dir(get_runner_data_path(id, None)?)?;
+                File::create_new(get_runner_data_path(id, Path::new("created-time"))?)?;
+                run_cmd!(virt-clone --auto-clone --reflink -o $base_vm_name -n $libvirt_prefix-$base_vm_name.$id)?;
+                run_cmd!(virsh start -- $libvirt_prefix-$base_vm_name.$id)?;
+                Ok(())
+            }
         }
     }
 
