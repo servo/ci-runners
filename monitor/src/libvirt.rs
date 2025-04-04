@@ -30,11 +30,16 @@ pub fn libvirt_prefix() -> String {
 pub fn update_screenshot(guest_name: &str, output_dir: &Path) -> Result<(), eyre::Error> {
     create_dir_all(output_dir)?;
     let new_path = output_dir.join("screenshot.png.new");
-    // Squelch errors due to guests being shut off
-    run_cmd!(virsh screenshot -- $guest_name $new_path > /dev/null 2>&1)?;
+    take_screenshot(guest_name, &new_path)?;
     let path = output_dir.join("screenshot.png");
     rename(new_path, path)?;
 
+    Ok(())
+}
+
+pub fn take_screenshot(guest_name: &str, output_path: &Path) -> Result<(), eyre::Error> {
+    // Squelch errors due to guests being shut off
+    run_cmd!(virsh screenshot -- $guest_name $output_path > /dev/null 2>&1)?;
     Ok(())
 }
 

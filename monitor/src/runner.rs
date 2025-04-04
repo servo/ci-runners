@@ -8,7 +8,6 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use cmd_lib::run_cmd;
 use itertools::Itertools;
 use jane_eyre::eyre::{self, bail};
 use mktemp::Temp;
@@ -19,7 +18,7 @@ use crate::{
     auth::RemoteAddr,
     data::get_runner_data_path,
     github::{ApiGenerateJitconfigResponse, ApiRunner},
-    libvirt::{get_ipv4_address, libvirt_prefix, update_screenshot},
+    libvirt::{get_ipv4_address, libvirt_prefix, take_screenshot, update_screenshot},
     LIB_MONITOR_DIR,
 };
 
@@ -192,8 +191,7 @@ impl Runners {
         };
         let result = Temp::new_file()?;
         let output_path = result.clone();
-        // Squelch errors due to guests being shut off
-        run_cmd!(virsh screenshot -- $guest_name $output_path > /dev/null 2>&1)?;
+        take_screenshot(guest_name, &output_path)?;
 
         Ok(result)
     }
