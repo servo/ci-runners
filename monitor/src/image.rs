@@ -205,7 +205,8 @@ fn rebuild_with_rust(
     let config_iso_symlink_path = base_images_path.join(format!("config.iso"));
     let config_iso_filename = format!("config.iso@{snapshot_name}");
     let config_iso_path = base_images_path.join(&config_iso_filename);
-    info!(?config_iso_path, "Creating config image file");
+    let config_iso_path = config_iso_path.to_str().expect("Unsupported path");
+    info!(config_iso_path, "Creating config image file");
     run_cmd!(genisoimage -V CIDATA -R -f -o $config_iso_path $profile_configuration_path/user-data $profile_configuration_path/meta-data)?;
 
     let base_image_symlink_path = base_images_path.join(format!("base.img"));
@@ -218,13 +219,7 @@ fn rebuild_with_rust(
 
     let guest_xml_path = get_profile_configuration_path(&profile, Path::new("guest.xml"))?;
     define_libvirt_guest(base_vm_name, guest_xml_path, &[&"-f", &base_image_path])?;
-
-    info!("Starting guest, to expand root filesystem");
-    // FIXME: This dance is only needed because `virt-clone -f` ignores cdrom drives.
-    run_cmd!(virsh start --paused -- $base_vm_name)?;
-    run_cmd!(virsh change-media -- $base_vm_name sda $config_iso_path)?;
-    run_cmd!(virsh resume -- $base_vm_name)?;
-
+    start_libvirt_guest(base_vm_name, &[CdromImage::new("sda", config_iso_path)])?;
     wait_for_guest(base_vm_name, Duration::from_secs(90))?;
 
     let base_image_filename = Path::new(
@@ -299,6 +294,30 @@ pub(self) fn define_libvirt_guest(
     run_cmd!(virsh define -- $guest_xml_path)?;
     run_cmd!(virt-clone --preserve-data --check path_in_use=off -o $base_vm_name.init -n $base_vm_name $[args])?;
     run_cmd!(virsh undefine -- $base_vm_name.init)?;
+
+    Ok(())
+}
+
+pub(self) struct CdromImage<'path> {
+    pub target_dev: &'static str,
+    pub path: &'path str,
+}
+impl<'path> CdromImage<'path> {
+    fn new(target_dev: &'static str, path: &'path str) -> Self {
+        Self { target_dev, path }
+    }
+}
+pub(self) fn start_libvirt_guest(
+    base_vm_name: &str,
+    cdrom_images: &[CdromImage],
+) -> eyre::Result<()> {
+    info!("Starting guest");
+    // FIXME: This dance is only needed because `virt-clone -f` ignores cdrom drives.
+    run_cmd!(virsh start --paused -- $base_vm_name)?;
+    for CdromImage { target_dev, path } in cdrom_images {
+        run_cmd!(virsh change-media -- $base_vm_name $target_dev $path)?;
+    }
+    run_cmd!(virsh resume -- $base_vm_name)?;
 
     Ok(())
 }
