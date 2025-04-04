@@ -5,11 +5,11 @@ use std::{
     path::Path,
 };
 
-use cmd_lib::{run_cmd, run_fun};
+use cmd_lib::{run_fun, spawn_with_output};
 use jane_eyre::eyre;
 use tracing::warn;
 
-use crate::DOTENV;
+use crate::{shell::log_output_as_trace, DOTENV};
 
 pub fn list_runner_guests() -> eyre::Result<Vec<String>> {
     // Output is not filtered by prefix, so we must filter it ourselves.
@@ -39,7 +39,9 @@ pub fn update_screenshot(guest_name: &str, output_dir: &Path) -> Result<(), eyre
 
 pub fn take_screenshot(guest_name: &str, output_path: &Path) -> Result<(), eyre::Error> {
     // Squelch errors due to guests being shut off
-    run_cmd!(virsh screenshot -- $guest_name $output_path > /dev/null 2>&1)?;
+    let pipe = || |reader| log_output_as_trace(reader);
+    spawn_with_output!(virsh screenshot -- $guest_name $output_path 2>&1)?
+        .wait_with_pipe(&mut pipe())?;
     Ok(())
 }
 
