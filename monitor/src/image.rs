@@ -211,7 +211,7 @@ fn rebuild_with_rust(
     let base_image_path = base_images_path.join(&base_image_filename);
     info!(?base_image_path, "Creating base image file");
     let mut base_image_file = File::create_new(&base_image_path)?;
-    let base_image_size = 8; // GiB
+    let base_image_size = 20; // GiB
     for i in 0..base_image_size {
         info!("Writing base image file: {i}/{base_image_size} GiB");
         for _ in 0..1024 {
@@ -237,8 +237,8 @@ fn rebuild_with_rust(
     run_cmd!(virsh change-media -- $base_vm_name sda $config_iso_path)?;
     run_cmd!(virsh resume -- $base_vm_name)?;
 
-    info!("Waiting for guest to shut down (max 40 seconds)"); // normally ~19 seconds
-    if !run_cmd!(time virsh event --timeout 40 -- $base_vm_name lifecycle).is_ok() {
+    info!("Waiting for guest to shut down (max 90 seconds)"); // normally ~37 seconds
+    if !run_cmd!(time virsh event --timeout 90 -- $base_vm_name lifecycle).is_ok() {
         bail!("virsh event timed out!");
     }
 
