@@ -9,7 +9,7 @@ use std::{
 };
 
 use atomic_write_file::AtomicWriteFile;
-use cmd_lib::run_cmd;
+use cmd_lib::spawn_with_output;
 use jane_eyre::eyre::{self, bail, Context};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
@@ -20,6 +20,7 @@ use crate::{
     github::register_runner,
     libvirt::{get_ipv4_address, update_screenshot},
     runner::{Runner, Runners, Status},
+    shell::log_output_as_info,
     zfs::snapshot_creation_time_unix,
     DOTENV, LIB_MONITOR_DIR, TOML,
 };
@@ -127,8 +128,10 @@ impl Profiles {
                 let vm_name = format!("{base_vm_name}.{id}");
                 let prefixed_vm_name = format!("{}-{vm_name}", DOTENV.libvirt_prefix);
                 register_runner(&vm_name, &profile.github_runner_label, "../a")?;
-                run_cmd!(virt-clone --auto-clone --reflink -o $base_vm_name -n $prefixed_vm_name)?;
-                run_cmd!(virsh start -- $prefixed_vm_name)?;
+                let pipe = || |reader| log_output_as_info(reader);
+                spawn_with_output!(virt-clone --auto-clone --reflink -o $base_vm_name -n $prefixed_vm_name 2>&1)?.wait_with_pipe(&mut pipe())?;
+                spawn_with_output!(virsh start -- $prefixed_vm_name 2>&1)?
+                    .wait_with_pipe(&mut pipe())?;
                 Ok(())
             }
         }
