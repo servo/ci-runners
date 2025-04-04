@@ -139,17 +139,30 @@ impl Profiles {
 
     pub fn destroy_runner(&self, profile: &Profile, id: usize) -> eyre::Result<()> {
         info!(runner_id = id, profile.base_vm_name, "Destroying runner");
-        let exit_status = Command::new("./destroy-runner.sh")
-            .current_dir(&*LIB_MONITOR_DIR)
-            .args([&profile.base_vm_name, &id.to_string()])
-            .spawn()
-            .unwrap()
-            .wait()
-            .unwrap();
-        if exit_status.success() {
-            return Ok(());
-        } else {
-            eyre::bail!("Command exited with status {}", exit_status);
+        match profile.image_type {
+            ImageType::BuildImageScript => {
+                let exit_status = Command::new("./destroy-runner.sh")
+                    .current_dir(&*LIB_MONITOR_DIR)
+                    .args([&profile.base_vm_name, &id.to_string()])
+                    .spawn()
+                    .unwrap()
+                    .wait()
+                    .unwrap();
+                if exit_status.success() {
+                    Ok(())
+                } else {
+                    eyre::bail!("Command exited with status {}", exit_status);
+                }
+            }
+            ImageType::Rust => {
+                let vm_name = format!("{}.{id}", profile.base_vm_name);
+                let prefixed_vm_name = format!("{}-{vm_name}", DOTENV.libvirt_prefix);
+                let pipe = || |reader| log_output_as_info(reader);
+                let _ = spawn_with_output!(virsh destroy -- $prefixed_vm_name 2>&1)?
+                    .wait_with_pipe(&mut pipe());
+                let _ = spawn_with_output!(virsh undefine --nvram --remove-all-storage -- $prefixed_vm_name 2>&1)?.wait_with_pipe(&mut pipe());
+                Ok(())
+            }
         }
     }
 }
