@@ -420,12 +420,21 @@ fn monitor_thread() -> eyre::Result<()> {
         ) in profile_runner_counts.iter()
         {
             let profile = profiles.get(key).ok_or_eyre("Failed to get profile")?;
-            let image = profiles.base_image_snapshot(key).map(|snapshot| {
-                format!(
-                    "{}/{}@{snapshot}",
-                    DOTENV.zfs_clone_prefix, profile.base_vm_name
-                )
-            });
+            let image =
+                profiles
+                    .base_image_snapshot(key)
+                    .map(|snapshot| match profile.image_type {
+                        profile::ImageType::BuildImageScript => format!(
+                            "{}/{}@{snapshot}",
+                            DOTENV.zfs_clone_prefix, profile.base_vm_name
+                        ),
+                        profile::ImageType::Rust => profile
+                            .base_image_path(&**snapshot)
+                            .as_os_str()
+                            .to_str()
+                            .expect("Guaranteed by base_image_path()")
+                            .to_owned(),
+                    });
             info!("profile {key}: {healthy}/{target} healthy runners ({idle} idle, {reserved} reserved, {busy} busy, {started_or_crashed} started or crashed, {excess_idle} excess idle, {wanted} wanted), image {:?} age {image_age:?}", image);
         }
         for (_id, runner) in runners.iter() {
