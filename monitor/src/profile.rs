@@ -3,6 +3,7 @@ use std::{
     fs::{create_dir, File},
     io::{Read, Write},
     net::Ipv4Addr,
+    os::unix::fs::symlink,
     path::{Path, PathBuf},
     process::Command,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -125,12 +126,21 @@ impl Profiles {
                 let mut runner_toml =
                     File::create_new(get_runner_data_path(id, Path::new("runner.toml"))?)?;
                 writeln!(runner_toml, r#"image_type = "Rust""#)?;
+                symlink(
+                    get_profile_configuration_path(profile, Path::new("boot-script.sh"))?,
+                    get_runner_data_path(id, Path::new("boot-script.sh"))?,
+                )?;
                 let vm_name = format!("{base_vm_name}.{id}");
                 let prefixed_vm_name = format!("{}-{vm_name}", DOTENV.libvirt_prefix);
                 register_runner(&vm_name, &profile.github_runner_label, "../a")?;
                 let pipe = || |reader| log_output_as_info(reader);
                 spawn_with_output!(virt-clone --auto-clone --reflink -o $base_vm_name -n $prefixed_vm_name 2>&1)?.wait_with_pipe(&mut pipe())?;
-                spawn_with_output!(virsh start -- $prefixed_vm_name 2>&1)?
+                // FIXME: This dance is only needed because `virt-clone -f` ignores cdrom drives.
+                let config_iso_path = profile.base_images_path().join("config.iso");
+                spawn_with_output!(virsh start --paused -- $prefixed_vm_name 2>&1)?
+                    .wait_with_pipe(&mut pipe())?;
+                spawn_with_output!(virsh change-media -- $prefixed_vm_name sda $config_iso_path 2>&1)?.wait_with_pipe(&mut pipe())?;
+                spawn_with_output!(virsh resume -- $prefixed_vm_name 2>&1)?
                     .wait_with_pipe(&mut pipe())?;
                 Ok(())
             }
@@ -425,19 +435,20 @@ impl Profiles {
         }
     }
 
-    pub fn boot_script(&self, remote_addr: RemoteAddr) -> eyre::Result<String> {
+    pub fn boot_script(&self, remote_addr: RemoteAddr) -> eyre::Result<Option<String>> {
         for (key, ipv4_address) in self.ipv4_addresses.iter() {
             if let Some(ipv4_address) = ipv4_address {
                 if remote_addr == *ipv4_address {
                     let profile = self.profiles.get(key).expect("Guaranteed by Profiles impl");
-                    let path = get_profile_configuration_path(profile, Path::new("boot-script.sh"));
+                    let path =
+                        get_profile_configuration_path(profile, Path::new("boot-script.sh"))?;
                     let mut result = String::default();
                     File::open(path)?.read_to_string(&mut result)?;
-                    return Ok(result);
+                    return Ok(Some(result));
                 }
             }
         }
 
-        bail!("No profile guest found with IP address: {}", remote_addr)
+        Ok(None)
     }
 }

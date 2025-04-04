@@ -50,13 +50,16 @@ pub fn get_profile_data_path<'p>(
 pub fn get_profile_configuration_path<'p>(
     profile: &Profile,
     path: impl Into<Option<&'p Path>>,
-) -> PathBuf {
-    let profile_data = Path::new(&*LIB_MONITOR_DIR).join(&profile.configuration_name);
-
-    match path.into() {
+) -> eyre::Result<PathBuf> {
+    let profile_data = Path::new(&*LIB_MONITOR_DIR)
+        .join(&profile.configuration_name)
+        .canonicalize()?;
+    let result = match path.into() {
         Some(path) => profile_data.join(path),
         None => profile_data,
-    }
+    };
+
+    Ok(result)
 }
 
 #[tracing::instrument]

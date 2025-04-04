@@ -618,7 +618,12 @@ fn monitor_thread() -> eyre::Result<()> {
                     runners.update_ipv4_addresses();
                     profiles.update_ipv4_addresses();
 
-                    let result = profiles.boot_script(remote_addr);
+                    let result = runners
+                        .boot_script(remote_addr.clone())
+                        .transpose()
+                        .or_else(|| profiles.boot_script(remote_addr).transpose())
+                        .transpose()
+                        .and_then(|result| result.ok_or_eyre("No guest found with IP address"));
                     response_tx
                         .send(result)
                         .expect("Failed to send Response to API thread");

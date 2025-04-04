@@ -34,7 +34,7 @@ impl<'req> FromRequest<'req> for ApiKeyGuard<'req> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct RemoteAddr {
     client_ip: Option<IpAddr>,
     real_ip: Option<IpAddr>,
