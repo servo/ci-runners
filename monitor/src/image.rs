@@ -197,10 +197,7 @@ fn rebuild_with_rust(
     }
 
     let profile_configuration_path = get_profile_configuration_path(&profile, None)?;
-
-    let base_images_path = profile.base_images_path();
-    info!(?base_images_path, "Creating libvirt images subdirectory");
-    create_dir_all(&base_images_path)?;
+    let base_images_path = create_base_images_dir(&profile)?;
 
     let config_iso_symlink_path = base_images_path.join(format!("config.iso"));
     let config_iso_filename = format!("config.iso@{snapshot_name}");
@@ -230,6 +227,14 @@ fn rebuild_with_rust(
     atomic_symlink(config_iso_filename, config_iso_symlink_path)?;
     atomic_symlink(base_image_filename, base_image_symlink_path)?;
     Ok(())
+}
+
+pub(self) fn create_base_images_dir(profile: &Profile) -> eyre::Result<PathBuf> {
+    let base_images_path = profile.base_images_path();
+    info!(?base_images_path, "Creating libvirt images subdirectory");
+    create_dir_all(&base_images_path)?;
+
+    Ok(base_images_path)
 }
 
 pub(self) fn create_disk_image(
