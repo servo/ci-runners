@@ -1,21 +1,27 @@
 use std::{
     collections::BTreeMap,
-    fs::File,
+    fs::{create_dir, File},
     io::{Read, Write},
-    path::Path,
+    net::Ipv4Addr,
+    os::unix::fs::symlink,
+    path::{Path, PathBuf},
     process::Command,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use atomic_write_file::AtomicWriteFile;
+use cmd_lib::spawn_with_output;
 use jane_eyre::eyre::{self, bail, Context};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
 
 use crate::{
-    data::get_profile_data_path,
-    libvirt::update_screenshot,
+    auth::RemoteAddr,
+    data::{get_profile_configuration_path, get_profile_data_path, get_runner_data_path},
+    github::register_runner,
+    libvirt::{get_ipv4_address, update_screenshot},
     runner::{Runner, Runners, Status},
+    shell::log_output_as_info,
     zfs::snapshot_creation_time_unix,
     DOTENV, LIB_MONITOR_DIR, TOML,
 };
@@ -24,6 +30,7 @@ use crate::{
 pub struct Profiles {
     profiles: BTreeMap<String, Profile>,
     base_image_snapshots: BTreeMap<String, String>,
+    ipv4_addresses: BTreeMap<String, Option<Ipv4Addr>>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -32,6 +39,15 @@ pub struct Profile {
     pub base_vm_name: String,
     pub github_runner_label: String,
     pub target_count: usize,
+    #[serde(default)]
+    pub image_type: ImageType,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub enum ImageType {
+    #[default]
+    BuildImageScript,
+    Rust,
 }
 
 #[derive(Debug, Serialize)]
@@ -59,6 +75,7 @@ impl Profiles {
         Ok(Self {
             profiles,
             base_image_snapshots,
+            ipv4_addresses: BTreeMap::default(),
         })
     }
 
@@ -82,39 +99,88 @@ impl Profiles {
             );
         };
         info!(runner_id = id, profile.base_vm_name, "Creating runner");
-        let exit_status = Command::new("./create-runner.sh")
-            .current_dir(&*LIB_MONITOR_DIR)
-            .args([
-                &id.to_string(),
-                &profile.base_vm_name,
-                base_image_snapshot,
-                &profile.configuration_name,
-                &profile.github_runner_label,
-            ])
-            .spawn()
-            .unwrap()
-            .wait()
-            .unwrap();
-        if exit_status.success() {
-            return Ok(());
-        } else {
-            eyre::bail!("Command exited with status {}", exit_status);
+        match profile.image_type {
+            ImageType::BuildImageScript => {
+                let exit_status = Command::new("./create-runner.sh")
+                    .current_dir(&*LIB_MONITOR_DIR)
+                    .args([
+                        &id.to_string(),
+                        &profile.base_vm_name,
+                        base_image_snapshot,
+                        &profile.configuration_name,
+                        &profile.github_runner_label,
+                    ])
+                    .spawn()
+                    .unwrap()
+                    .wait()
+                    .unwrap();
+                if exit_status.success() {
+                    Ok(())
+                } else {
+                    eyre::bail!("Command exited with status {}", exit_status);
+                }
+            }
+            ImageType::Rust => {
+                let base_vm_name = &profile.base_vm_name;
+                create_dir(get_runner_data_path(id, None)?)?;
+                let mut runner_toml =
+                    File::create_new(get_runner_data_path(id, Path::new("runner.toml"))?)?;
+                writeln!(runner_toml, r#"image_type = "Rust""#)?;
+                symlink(
+                    get_profile_configuration_path(profile, Path::new("boot-script.sh"))?,
+                    get_runner_data_path(id, Path::new("boot-script.sh"))?,
+                )?;
+                let vm_name = format!("{base_vm_name}.{id}");
+                let prefixed_vm_name = format!("{}-{vm_name}", DOTENV.libvirt_prefix);
+                if !DOTENV.dont_register_runners {
+                    let mut github_api_registration = File::create_new(get_runner_data_path(
+                        id,
+                        Path::new("github-api-registration"),
+                    )?)?;
+                    github_api_registration.write_all(
+                        register_runner(&vm_name, &profile.github_runner_label, "../a")?.as_bytes(),
+                    )?;
+                }
+                let pipe = || |reader| log_output_as_info(reader);
+                spawn_with_output!(virt-clone --auto-clone --reflink -o $base_vm_name -n $prefixed_vm_name 2>&1)?.wait_with_pipe(&mut pipe())?;
+                // FIXME: This dance is only needed because `virt-clone -f` ignores cdrom drives.
+                let config_iso_path = profile.base_images_path().join("config.iso");
+                spawn_with_output!(virsh start --paused -- $prefixed_vm_name 2>&1)?
+                    .wait_with_pipe(&mut pipe())?;
+                spawn_with_output!(virsh change-media -- $prefixed_vm_name sda $config_iso_path 2>&1)?.wait_with_pipe(&mut pipe())?;
+                spawn_with_output!(virsh resume -- $prefixed_vm_name 2>&1)?
+                    .wait_with_pipe(&mut pipe())?;
+                Ok(())
+            }
         }
     }
 
     pub fn destroy_runner(&self, profile: &Profile, id: usize) -> eyre::Result<()> {
         info!(runner_id = id, profile.base_vm_name, "Destroying runner");
-        let exit_status = Command::new("./destroy-runner.sh")
-            .current_dir(&*LIB_MONITOR_DIR)
-            .args([&profile.base_vm_name, &id.to_string()])
-            .spawn()
-            .unwrap()
-            .wait()
-            .unwrap();
-        if exit_status.success() {
-            return Ok(());
-        } else {
-            eyre::bail!("Command exited with status {}", exit_status);
+        match profile.image_type {
+            ImageType::BuildImageScript => {
+                let exit_status = Command::new("./destroy-runner.sh")
+                    .current_dir(&*LIB_MONITOR_DIR)
+                    .args([&profile.base_vm_name, &id.to_string()])
+                    .spawn()
+                    .unwrap()
+                    .wait()
+                    .unwrap();
+                if exit_status.success() {
+                    Ok(())
+                } else {
+                    eyre::bail!("Command exited with status {}", exit_status);
+                }
+            }
+            ImageType::Rust => {
+                let vm_name = format!("{}.{id}", profile.base_vm_name);
+                let prefixed_vm_name = format!("{}-{vm_name}", DOTENV.libvirt_prefix);
+                let pipe = || |reader| log_output_as_info(reader);
+                let _ = spawn_with_output!(virsh destroy -- $prefixed_vm_name 2>&1)?
+                    .wait_with_pipe(&mut pipe());
+                let _ = spawn_with_output!(virsh undefine --nvram --remove-all-storage -- $prefixed_vm_name 2>&1)?.wait_with_pipe(&mut pipe());
+                Ok(())
+            }
         }
     }
 }
@@ -255,18 +321,49 @@ impl Profiles {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .wrap_err("Failed to get current time")?;
-        let creation_time =
-            match snapshot_creation_time_unix(&profile.base_vm_name, base_image_snapshot) {
-                Ok(result) => result,
-                Err(error) => {
-                    debug!(
-                        profile.base_vm_name,
-                        ?error,
-                        "Failed to get snapshot creation time"
-                    );
-                    return Ok(None);
+        let creation_time = match profile.image_type {
+            ImageType::BuildImageScript => {
+                match snapshot_creation_time_unix(&profile.base_vm_name, base_image_snapshot) {
+                    Ok(result) => result,
+                    Err(error) => {
+                        debug!(
+                            profile.base_vm_name,
+                            ?error,
+                            "Failed to get snapshot creation time"
+                        );
+                        return Ok(None);
+                    }
                 }
-            };
+            }
+            ImageType::Rust => {
+                let base_image_path = profile.base_image_path(&**base_image_snapshot);
+                let metadata = match std::fs::metadata(&base_image_path) {
+                    Ok(result) => result,
+                    Err(error) => {
+                        debug!(
+                            profile.base_vm_name,
+                            ?base_image_path,
+                            ?error,
+                            "Failed to get file metadata"
+                        );
+                        return Ok(None);
+                    }
+                };
+                let mtime = metadata.modified().expect("Guaranteed by platform");
+                match mtime.duration_since(UNIX_EPOCH) {
+                    Ok(result) => result,
+                    Err(error) => {
+                        debug!(
+                            profile.base_vm_name,
+                            ?base_image_path,
+                            ?error,
+                            "Failed to calculate image age"
+                        );
+                        return Ok(None);
+                    }
+                }
+            }
+        };
 
         Ok(Some(now - creation_time))
     }
@@ -288,6 +385,19 @@ impl Profile {
         update_screenshot(&self.base_vm_name, &output_dir)?;
 
         Ok(())
+    }
+
+    pub fn base_images_path(&self) -> PathBuf {
+        Path::new("/var/lib/libvirt/images/base").join(&self.base_vm_name)
+    }
+
+    pub fn base_image_path<'snap>(&self, snapshot_name: impl Into<Option<&'snap str>>) -> PathBuf {
+        if let Some(snapshot_name) = snapshot_name.into() {
+            self.base_images_path()
+                .join(format!("base.img@{snapshot_name}"))
+        } else {
+            self.base_images_path().join("base.img")
+        }
     }
 }
 
@@ -314,6 +424,37 @@ impl Profiles {
             let mut base_image_snapshot = String::default();
             file.read_to_string(&mut base_image_snapshot)?;
             return Ok(Some(base_image_snapshot));
+        }
+
+        Ok(None)
+    }
+
+    pub fn update_ipv4_addresses(&mut self) {
+        for (key, profile) in self.profiles.iter() {
+            let ipv4_address = get_ipv4_address(&profile.base_vm_name);
+            let entry = self.ipv4_addresses.entry(key.clone()).or_default();
+            if ipv4_address != *entry {
+                info!(
+                    "IPv4 address changed for profile guest {key}: {:?} -> {:?}",
+                    *entry, ipv4_address
+                );
+            }
+            *entry = ipv4_address;
+        }
+    }
+
+    pub fn boot_script(&self, remote_addr: RemoteAddr) -> eyre::Result<Option<String>> {
+        for (key, ipv4_address) in self.ipv4_addresses.iter() {
+            if let Some(ipv4_address) = ipv4_address {
+                if remote_addr == *ipv4_address {
+                    let profile = self.profiles.get(key).expect("Guaranteed by Profiles impl");
+                    let path =
+                        get_profile_configuration_path(profile, Path::new("boot-script.sh"))?;
+                    let mut result = String::default();
+                    File::open(path)?.read_to_string(&mut result)?;
+                    return Ok(Some(result));
+                }
+            }
         }
 
         Ok(None)
