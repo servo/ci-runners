@@ -17,11 +17,10 @@ use jane_eyre::eyre::{self, bail, OptionExt};
 use tracing::{error, info, warn};
 
 use crate::{
-    data::get_profile_configuration_path,
     profile::{Profile, Profiles},
     runner::Runners,
-    shell::{atomic_symlink, log_output_as_info},
-    DOTENV, IMAGE_DEPS_DIR, LIB_MONITOR_DIR,
+    shell::log_output_as_info,
+    DOTENV, LIB_MONITOR_DIR,
 };
 
 #[derive(Debug, Default)]
@@ -189,45 +188,18 @@ fn rebuild_with_rust(
 ) -> Result<(), eyre::Error> {
     info!(?snapshot_name, "Starting image rebuild");
 
+    let base_images_path = create_base_images_dir(&profile)?;
     let base_vm_name = &profile.base_vm_name;
     if run_cmd!(virsh domstate -- $base_vm_name).is_ok() {
         // FIXME make this idempotent in a less noisy way?
         let _ = run_cmd!(virsh destroy -- $base_vm_name);
-        run_cmd!(virsh undefine -- $base_vm_name)?;
+        run_cmd!(virsh undefine --nvram -- $base_vm_name)?;
     }
 
-    let profile_configuration_path = get_profile_configuration_path(&profile, None)?;
-    let base_images_path = create_base_images_dir(&profile)?;
-
-    let config_iso_symlink_path = base_images_path.join(format!("config.iso"));
-    let config_iso_filename = format!("config.iso@{snapshot_name}");
-    let config_iso_path = base_images_path.join(&config_iso_filename);
-    let config_iso_path = config_iso_path.to_str().expect("Unsupported path");
-    info!(config_iso_path, "Creating config image file");
-    run_cmd!(genisoimage -V CIDATA -R -f -o $config_iso_path $profile_configuration_path/user-data $profile_configuration_path/meta-data)?;
-
-    let base_image_symlink_path = base_images_path.join(format!("base.img"));
-    let os_image_path = IMAGE_DEPS_DIR
-        .join("ubuntu2204")
-        .join("jammy-server-cloudimg-amd64.raw");
-    let os_image = File::open(os_image_path)?;
-    let base_image_path =
-        create_disk_image(base_images_path, snapshot_name, ByteSize::gib(20), os_image)?;
-
-    let guest_xml_path = get_profile_configuration_path(&profile, Path::new("guest.xml"))?;
-    define_libvirt_guest(base_vm_name, guest_xml_path, &[&"-f", &base_image_path])?;
-    start_libvirt_guest(base_vm_name, &[CdromImage::new("sda", config_iso_path)])?;
-    wait_for_guest(base_vm_name, Duration::from_secs(90))?;
-
-    let base_image_filename = Path::new(
-        base_image_path
-            .file_name()
-            .expect("Guaranteed by make_disk_image"),
-    );
-    atomic_symlink(config_iso_filename, config_iso_symlink_path)?;
-    atomic_symlink(base_image_filename, base_image_symlink_path)?;
-    Ok(())
+    ubuntu2204_rust::rebuild(base_images_path, &profile, snapshot_name)
 }
+
+mod ubuntu2204_rust;
 
 pub(self) fn create_base_images_dir(profile: &Profile) -> eyre::Result<PathBuf> {
     let base_images_path = profile.base_images_path();
