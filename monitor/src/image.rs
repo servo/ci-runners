@@ -193,8 +193,8 @@ fn rebuild_with_rust(
         run_cmd!(virsh undefine -- $base_vm_name)?;
     }
 
-    let profile_configuration_path = get_profile_configuration_path(&profile, None);
-    let guest_xml_path = get_profile_configuration_path(&profile, Path::new("guest.xml"));
+    let profile_configuration_path = get_profile_configuration_path(&profile, None)?;
+    let guest_xml_path = get_profile_configuration_path(&profile, Path::new("guest.xml"))?;
 
     let base_images_path = profile.base_images_path();
     info!(?base_images_path, "Creating libvirt images subdirectory");

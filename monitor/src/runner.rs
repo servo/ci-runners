@@ -251,6 +251,21 @@ impl Runners {
             }
         }
     }
+
+    pub fn boot_script(&self, remote_addr: RemoteAddr) -> eyre::Result<Option<String>> {
+        for (&id, runner) in self.runners.iter() {
+            if let Some(ipv4_address) = runner.ipv4_address {
+                if remote_addr == ipv4_address {
+                    let path = get_runner_data_path(id, Path::new("boot-script.sh"))?;
+                    let mut result = String::default();
+                    File::open(path)?.read_to_string(&mut result)?;
+                    return Ok(Some(result));
+                }
+            }
+        }
+
+        Ok(None)
+    }
 }
 
 impl Runner {
