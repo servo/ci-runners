@@ -1,6 +1,7 @@
 use core::str;
 use std::{
     collections::BTreeMap,
+    ffi::OsStr,
     fs::{create_dir_all, File},
     io::{Read, Seek, Write},
     mem::take,
@@ -196,7 +197,6 @@ fn rebuild_with_rust(
     }
 
     let profile_configuration_path = get_profile_configuration_path(&profile, None)?;
-    let guest_xml_path = get_profile_configuration_path(&profile, Path::new("guest.xml"))?;
 
     let base_images_path = profile.base_images_path();
     info!(?base_images_path, "Creating libvirt images subdirectory");
@@ -216,9 +216,8 @@ fn rebuild_with_rust(
     let base_image_path =
         create_disk_image(base_images_path, snapshot_name, ByteSize::gib(20), os_image)?;
 
-    run_cmd!(virsh define -- $guest_xml_path)?;
-    run_cmd!(virt-clone --preserve-data --check path_in_use=off -o $base_vm_name.init -n $base_vm_name -f $base_image_path)?;
-    run_cmd!(virsh undefine -- $base_vm_name.init)?;
+    let guest_xml_path = get_profile_configuration_path(&profile, Path::new("guest.xml"))?;
+    define_libvirt_guest(base_vm_name, guest_xml_path, &[&"-f", &base_image_path])?;
 
     info!("Starting guest, to expand root filesystem");
     // FIXME: This dance is only needed because `virt-clone -f` ignores cdrom drives.
@@ -287,6 +286,21 @@ pub(self) fn create_disk_image(
     }
 
     Ok(base_image_path)
+}
+
+pub(self) fn define_libvirt_guest(
+    base_vm_name: &str,
+    guest_xml_path: impl AsRef<Path>,
+    args: &[&dyn AsRef<OsStr>],
+) -> eyre::Result<()> {
+    // This dance is needed to randomise the MAC address of the guest.
+    let guest_xml_path = guest_xml_path.as_ref();
+    let args = args.iter().map(|x| x.as_ref()).collect::<Vec<_>>();
+    run_cmd!(virsh define -- $guest_xml_path)?;
+    run_cmd!(virt-clone --preserve-data --check path_in_use=off -o $base_vm_name.init -n $base_vm_name $[args])?;
+    run_cmd!(virsh undefine -- $base_vm_name.init)?;
+
+    Ok(())
 }
 
 pub(self) fn wait_for_guest(base_vm_name: &str, timeout: Duration) -> eyre::Result<()> {
