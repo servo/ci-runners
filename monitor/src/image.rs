@@ -196,7 +196,7 @@ fn rebuild_with_rust(
     let profile_configuration_path = get_profile_configuration_path(&profile, None);
     let guest_xml_path = get_profile_configuration_path(&profile, Path::new("guest.xml"));
 
-    let base_images_path = Path::new("/var/lib/libvirt/images/base").join(base_vm_name);
+    let base_images_path = profile.base_images_path();
     info!(?base_images_path, "Creating libvirt images subdirectory");
     create_dir_all(&base_images_path)?;
 
@@ -206,8 +206,8 @@ fn rebuild_with_rust(
     info!(?config_iso_path, "Creating config image file");
     run_cmd!(genisoimage -V CIDATA -R -f -o $config_iso_path $profile_configuration_path/user-data $profile_configuration_path/meta-data)?;
 
-    let base_image_symlink_path = base_images_path.join(format!("root.img"));
-    let base_image_filename = format!("root.img@{snapshot_name}");
+    let base_image_symlink_path = base_images_path.join(format!("base.img"));
+    let base_image_filename = format!("base.img@{snapshot_name}");
     let base_image_path = base_images_path.join(&base_image_filename);
     info!(?base_image_path, "Creating base image file");
     let mut base_image_file = File::create_new(&base_image_path)?;
