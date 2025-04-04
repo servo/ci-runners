@@ -26,6 +26,7 @@ MIME-Version: 1.0
 Content-Transfer-Encoding: binary
 
 #!/bin/sh
+set -eux
 # This script runs on every boot, near the start of cloud-init.
 # https://docs.cloud-init.io/en/24.1/reference/datasources/nocloud.html#file-formats
 # https://docs.cloud-init.io/en/latest/explanation/format.html#cloud-boothook
@@ -67,7 +68,7 @@ cloud-init-per instance netplan-generate  netplan generate
 cloud-init-per instance netplan-apply  netplan apply
 
 # Run the boot script
-systemd-cat  curl -fsSo /usr/local/bin/servo-ci-boot http://192.168.100.1:8000/boot
+systemd-cat  curl -fsSo /usr/local/bin/servo-ci-boot --max-time 5 --retry 99 --retry-all-errors http://192.168.100.1:8000/boot
 systemd-cat  chmod +x /usr/local/bin/servo-ci-boot
 systemd-cat  /usr/local/bin/servo-ci-boot
 

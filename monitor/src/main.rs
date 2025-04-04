@@ -30,7 +30,7 @@ use dotenv::dotenv;
 use jane_eyre::eyre::{self, eyre, Context, OptionExt};
 use mktemp::Temp;
 use rocket::{
-    fs::NamedFile,
+    fs::{FileServer, NamedFile},
     get,
     http::ContentType,
     post,
@@ -362,6 +362,10 @@ async fn main() -> eyre::Result<()> {
                 github_jitconfig_route,
                 boot_script_route,
             ],
+        )
+        .mount(
+            "/image-deps/",
+            FileServer::new(&*IMAGE_DEPS_DIR, rocket::fs::Options::NormalizeDirs),
         )
         .launch()
     };
