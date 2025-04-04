@@ -3,7 +3,7 @@ use std::{
     fs::File,
     io::{Read, Write},
     net::Ipv4Addr,
-    path::Path,
+    path::{Path, PathBuf},
     process::Command,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -268,18 +268,49 @@ impl Profiles {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .wrap_err("Failed to get current time")?;
-        let creation_time =
-            match snapshot_creation_time_unix(&profile.base_vm_name, base_image_snapshot) {
-                Ok(result) => result,
-                Err(error) => {
-                    debug!(
-                        profile.base_vm_name,
-                        ?error,
-                        "Failed to get snapshot creation time"
-                    );
-                    return Ok(None);
+        let creation_time = match profile.image_type {
+            ImageType::BuildImageScript => {
+                match snapshot_creation_time_unix(&profile.base_vm_name, base_image_snapshot) {
+                    Ok(result) => result,
+                    Err(error) => {
+                        debug!(
+                            profile.base_vm_name,
+                            ?error,
+                            "Failed to get snapshot creation time"
+                        );
+                        return Ok(None);
+                    }
                 }
-            };
+            }
+            ImageType::Rust => {
+                let base_image_path = profile.base_image_path(&**base_image_snapshot);
+                let metadata = match std::fs::metadata(&base_image_path) {
+                    Ok(result) => result,
+                    Err(error) => {
+                        debug!(
+                            profile.base_vm_name,
+                            ?base_image_path,
+                            ?error,
+                            "Failed to get file metadata"
+                        );
+                        return Ok(None);
+                    }
+                };
+                let mtime = metadata.modified().expect("Guaranteed by platform");
+                match mtime.duration_since(UNIX_EPOCH) {
+                    Ok(result) => result,
+                    Err(error) => {
+                        debug!(
+                            profile.base_vm_name,
+                            ?base_image_path,
+                            ?error,
+                            "Failed to calculate image age"
+                        );
+                        return Ok(None);
+                    }
+                }
+            }
+        };
 
         Ok(Some(now - creation_time))
     }
@@ -301,6 +332,19 @@ impl Profile {
         update_screenshot(&self.base_vm_name, &output_dir)?;
 
         Ok(())
+    }
+
+    pub fn base_images_path(&self) -> PathBuf {
+        Path::new("/var/lib/libvirt/images/base").join(&self.base_vm_name)
+    }
+
+    pub fn base_image_path<'snap>(&self, snapshot_name: impl Into<Option<&'snap str>>) -> PathBuf {
+        if let Some(snapshot_name) = snapshot_name.into() {
+            self.base_images_path()
+                .join(format!("base.img@{snapshot_name}"))
+        } else {
+            self.base_images_path().join("base.img")
+        }
     }
 }
 
