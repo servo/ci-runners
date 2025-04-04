@@ -15,6 +15,7 @@ use mktemp::Temp;
 use tracing::{debug, info, trace, warn};
 
 /// Global instance of [Shell] for single-threaded situations.
+#[allow(unused)]
 pub static SHELL: LazyLock<Mutex<Shell>> =
     LazyLock::new(|| Mutex::new(Shell::new().expect("Failed to create Shell")));
 
@@ -24,6 +25,7 @@ pub static SHELL: LazyLock<Mutex<Shell>> =
 /// - The program can be run from any working directory without breaking the shell scripts
 /// - You can edit shell scripts while they are running without interfering with their execution
 ///   (usually the shell will read the next command from the same offset in the new file)
+#[allow(unused)]
 #[derive(Debug)]
 pub struct Shell(Temp);
 impl Shell {
