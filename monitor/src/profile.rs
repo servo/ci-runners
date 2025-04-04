@@ -40,7 +40,7 @@ pub struct Profile {
     pub image_type: ImageType,
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub enum ImageType {
     #[default]
     BuildImageScript,
@@ -121,7 +121,9 @@ impl Profiles {
                 let base_vm_name = &profile.base_vm_name;
                 let libvirt_prefix = &DOTENV.libvirt_prefix;
                 create_dir(get_runner_data_path(id, None)?)?;
-                File::create_new(get_runner_data_path(id, Path::new("created-time"))?)?;
+                let mut runner_toml =
+                    File::create_new(get_runner_data_path(id, Path::new("runner.toml"))?)?;
+                writeln!(runner_toml, r#"image_type = "Rust""#)?;
                 run_cmd!(virt-clone --auto-clone --reflink -o $base_vm_name -n $libvirt_prefix-$base_vm_name.$id)?;
                 run_cmd!(virsh start -- $libvirt_prefix-$base_vm_name.$id)?;
                 Ok(())
