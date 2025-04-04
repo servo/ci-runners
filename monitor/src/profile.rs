@@ -132,7 +132,15 @@ impl Profiles {
                 )?;
                 let vm_name = format!("{base_vm_name}.{id}");
                 let prefixed_vm_name = format!("{}-{vm_name}", DOTENV.libvirt_prefix);
-                register_runner(&vm_name, &profile.github_runner_label, "../a")?;
+                if !DOTENV.dont_register_runners {
+                    let mut github_api_registration = File::create_new(get_runner_data_path(
+                        id,
+                        Path::new("github-api-registration"),
+                    )?)?;
+                    github_api_registration.write_all(
+                        register_runner(&vm_name, &profile.github_runner_label, "../a")?.as_bytes(),
+                    )?;
+                }
                 let pipe = || |reader| log_output_as_info(reader);
                 spawn_with_output!(virt-clone --auto-clone --reflink -o $base_vm_name -n $prefixed_vm_name 2>&1)?.wait_with_pipe(&mut pipe())?;
                 // FIXME: This dance is only needed because `virt-clone -f` ignores cdrom drives.
