@@ -2,15 +2,16 @@ use core::str;
 use std::{
     collections::BTreeMap,
     fs::{create_dir_all, File},
-    io::{Seek, SeekFrom, Write},
+    io::{Read, Seek, Write},
     mem::take,
-    path::Path,
+    path::{Path, PathBuf},
     thread::{self, JoinHandle},
 };
 
+use bytesize::{ByteSize, MIB};
 use chrono::{SecondsFormat, Utc};
 use cmd_lib::{run_cmd, spawn_with_output};
-use jane_eyre::eyre::{self, bail};
+use jane_eyre::eyre::{self, bail, OptionExt};
 use tracing::{error, info, warn};
 
 use crate::{
@@ -207,25 +208,12 @@ fn rebuild_with_rust(
     run_cmd!(genisoimage -V CIDATA -R -f -o $config_iso_path $profile_configuration_path/user-data $profile_configuration_path/meta-data)?;
 
     let base_image_symlink_path = base_images_path.join(format!("base.img"));
-    let base_image_filename = format!("base.img@{snapshot_name}");
-    let base_image_path = base_images_path.join(&base_image_filename);
-    info!(?base_image_path, "Creating base image file");
-    let mut base_image_file = File::create_new(&base_image_path)?;
-    let base_image_size = 20; // GiB
-    for i in 0..base_image_size {
-        info!("Writing base image file: {i}/{base_image_size} GiB");
-        for _ in 0..1024 {
-            base_image_file.write_all(&vec![0u8; 1048576])?;
-        }
-    }
-
     let os_image_path = IMAGE_DEPS_DIR
         .join("ubuntu2204")
         .join("jammy-server-cloudimg-amd64.raw");
-    info!(?os_image_path, "Writing OS image");
-    let mut os_image_file = File::open(&os_image_path)?;
-    base_image_file.seek(SeekFrom::Start(0))?;
-    std::io::copy(&mut os_image_file, &mut base_image_file)?;
+    let os_image = File::open(os_image_path)?;
+    let base_image_path =
+        create_disk_image(base_images_path, snapshot_name, ByteSize::gib(20), os_image)?;
 
     run_cmd!(virsh define -- $guest_xml_path)?;
     run_cmd!(virt-clone --preserve-data --check path_in_use=off -o $base_vm_name.init -n $base_vm_name -f $base_image_path)?;
@@ -242,7 +230,63 @@ fn rebuild_with_rust(
         bail!("virsh event timed out!");
     }
 
+    let base_image_filename = Path::new(
+        base_image_path
+            .file_name()
+            .expect("Guaranteed by make_disk_image"),
+    );
     atomic_symlink(config_iso_filename, config_iso_symlink_path)?;
     atomic_symlink(base_image_filename, base_image_symlink_path)?;
     Ok(())
+}
+
+pub(self) fn create_disk_image(
+    base_images_path: impl AsRef<Path>,
+    snapshot_name: &str,
+    size: ByteSize,
+    mut initial_contents: impl Read,
+) -> eyre::Result<PathBuf> {
+    let base_images_path = base_images_path.as_ref();
+    let base_image_filename = format!("base.img@{snapshot_name}");
+    let base_image_path = base_images_path.join(&base_image_filename);
+    info!(?base_image_path, "Creating base image file");
+    let mut base_image_file = File::create_new(&base_image_path)?;
+    info!("Writing base image file: {size} left");
+    std::io::copy(&mut initial_contents, &mut base_image_file)?;
+
+    let size = size
+        .0
+        .checked_sub(base_image_file.stream_position()?)
+        .ok_or_eyre("`size` is smaller than `initial_contents`")?;
+    let mut size = ByteSize(size);
+
+    // If needed, do one write of less than 1 MiB, to align the image to 1 MiB.
+    if size.0 % MIB > 0 {
+        info!("Writing base image file: {size} left");
+        let len = size.0 / MIB * MIB + MIB - size.0;
+        let len_usize = len.try_into().expect("Guaranteed by platform");
+        base_image_file.write_all(&vec![0u8; len_usize])?;
+        size.0 -= len;
+    }
+    // Continue writing 1 MiB at a time, logging progress every 1 GiB.
+    while size.0 >= MIB {
+        info!("Writing base image file: {size} left");
+        let mut limit = ByteSize::gib(1);
+        while size.0 >= MIB && limit.0 > 0 {
+            let len_usize = MIB.try_into().expect("Guaranteed by platform");
+            base_image_file.write_all(&vec![0u8; len_usize])?;
+            size.0 -= MIB;
+            limit.0 -= MIB;
+        }
+    }
+    // If needed, do one write of less than 1 MiB, to finish the image.
+    if size.0 > 0 {
+        info!("Writing base image file: {size} left");
+        let len = size.0 / MIB * MIB + MIB - size.0;
+        let len_usize = len.try_into().expect("Guaranteed by platform");
+        base_image_file.write_all(&vec![0u8; len_usize])?;
+        size.0 -= len;
+    }
+
+    Ok(base_image_path)
 }
