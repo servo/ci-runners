@@ -1,17 +1,18 @@
 use std::{
     ffi::OsStr,
     fs::File,
-    io::Write,
+    io::{BufRead, BufReader, Read, Write},
     marker::PhantomData,
     ops::{Deref, DerefMut},
     os::unix::fs::PermissionsExt,
     process::Command,
+    str,
     sync::{LazyLock, Mutex},
 };
 
 use jane_eyre::eyre::{self, Context};
 use mktemp::Temp;
-use tracing::debug;
+use tracing::{debug, info, warn};
 
 /// Global instance of [Shell] for single-threaded situations.
 pub static SHELL: LazyLock<Mutex<Shell>> =
@@ -77,5 +78,60 @@ impl Deref for ShellHandle<'_> {
 impl DerefMut for ShellHandle<'_> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
+    }
+}
+
+/// Log the given output to tracing.
+///
+/// Unlike cmd_lib’s built-in logging:
+/// - it handles CR-based progress output correctly, such as in `curl`, `dd`, and `rsync`
+/// - it uses `tracing` instead of `log`, so the logs show the correct target and any span context
+///   given via `#[tracing::instrument]`
+///
+/// This only works with `spawn_with_output!()`, and `wait_with_pipe()` only works with stdout, so
+/// if you want to log both stdout and stderr, use `spawn_with_output!(... 2>&1)`.
+pub fn log_output_as_info(reader: Box<dyn Read>) {
+    let mut reader = BufReader::new(reader);
+    let mut buffer = vec![];
+    loop {
+        // Unconditionally try to read more data, since the BufReader buffer is empty
+        let result = match reader.fill_buf() {
+            Ok(buffer) => buffer,
+            Err(error) => {
+                warn!(?error, "Error reading from child process");
+                break;
+            }
+        };
+        // Add the result onto our own buffer
+        buffer.extend(result);
+        // Empty the BufReader
+        let read_len = result.len();
+        reader.consume(read_len);
+
+        // Log output to tracing. Take whole “lines” at every LF or CR (for progress bars etc),
+        // but leave any incomplete lines in our buffer so we can try to complete them.
+        while let Some(offset) = buffer.iter().position(|&b| b == b'\n' || b == b'\r') {
+            let line = &buffer[..offset];
+            let line = str::from_utf8(line).map_err(|_| line);
+            match line {
+                Ok(string) => info!(line = %string),
+                Err(bytes) => info!(?bytes),
+            }
+            buffer = buffer.split_off(offset + 1);
+        }
+
+        if read_len == 0 {
+            break;
+        }
+    }
+
+    // Log any remaining incomplete line to tracing.
+    if !buffer.is_empty() {
+        let line = &buffer;
+        let line = str::from_utf8(line).map_err(|_| line);
+        match line {
+            Ok(string) => info!(line = %string),
+            Err(bytes) => info!(?bytes),
+        }
     }
 }
