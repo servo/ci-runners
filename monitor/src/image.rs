@@ -17,7 +17,7 @@ use crate::{
     data::get_profile_configuration_path,
     profile::{Profile, Profiles},
     runner::Runners,
-    shell::log_output_as_info,
+    shell::{atomic_symlink, log_output_as_info},
     DOTENV, IMAGE_DEPS_DIR, LIB_MONITOR_DIR,
 };
 
@@ -196,17 +196,21 @@ fn rebuild_with_rust(
     let profile_configuration_path = get_profile_configuration_path(&profile, None);
     let guest_xml_path = get_profile_configuration_path(&profile, Path::new("guest.xml"));
 
-    let base_images_path = Path::new("/var/lib/libvirt/images/base");
+    let base_images_path = Path::new("/var/lib/libvirt/images/base").join(base_vm_name);
     info!(?base_images_path, "Creating libvirt images subdirectory");
-    create_dir_all(base_images_path)?;
+    create_dir_all(&base_images_path)?;
 
-    let config_iso_path = base_images_path.join(format!("{base_vm_name}.config.iso"));
+    let config_iso_symlink_path = base_images_path.join(format!("config.iso"));
+    let config_iso_filename = format!("config.iso@{snapshot_name}");
+    let config_iso_path = base_images_path.join(&config_iso_filename);
     info!(?config_iso_path, "Creating config image file");
     run_cmd!(genisoimage -V CIDATA -R -f -o $config_iso_path $profile_configuration_path/user-data $profile_configuration_path/meta-data)?;
 
-    let base_image_path = base_images_path.join(format!("{base_vm_name}.img"));
+    let base_image_symlink_path = base_images_path.join(format!("root.img"));
+    let base_image_filename = format!("root.img@{snapshot_name}");
+    let base_image_path = base_images_path.join(&base_image_filename);
     info!(?base_image_path, "Creating base image file");
-    let mut base_image_file = File::create(&base_image_path)?;
+    let mut base_image_file = File::create_new(&base_image_path)?;
     let base_image_size = 8; // GiB
     for i in 0..base_image_size {
         info!("Writing base image file: {i}/{base_image_size} GiB");
@@ -228,12 +232,17 @@ fn rebuild_with_rust(
     run_cmd!(virsh undefine -- $base_vm_name.init)?;
 
     info!("Starting guest, to expand root filesystem");
-    run_cmd!(virsh start -- $base_vm_name)?;
+    // FIXME: This dance is only needed because `virt-clone -f` ignores cdrom drives.
+    run_cmd!(virsh start --paused -- $base_vm_name)?;
+    run_cmd!(virsh change-media -- $base_vm_name sda $config_iso_path)?;
+    run_cmd!(virsh resume -- $base_vm_name)?;
 
     info!("Waiting for guest to shut down (max 40 seconds)"); // normally ~19 seconds
     if !run_cmd!(time virsh event --timeout 40 -- $base_vm_name lifecycle).is_ok() {
         bail!("virsh event timed out!");
     }
 
-    bail!("no")
+    atomic_symlink(config_iso_filename, config_iso_symlink_path)?;
+    atomic_symlink(base_image_filename, base_image_symlink_path)?;
+    Ok(())
 }
