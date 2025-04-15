@@ -23,7 +23,7 @@ COPY --from=commandline_tools /data/command-line-tools/sdk/default/openharmony/t
 # Note: We could solve this via Github secrets, but that would require first auditing all
 # servo workflows. I suspect that it is currently possible to extract secrets from the servo repo
 # via pull requests with malicous build scripts.
-ADD ohos-config.tar /home/${USERNAME}/
+ADD --chown=${USERNAME}:${USERNAME} ohos-config.tar /home/${USERNAME}/
 # Used to authorize with the hdc device and avoid the confirmation dialog.
 COPY --chown=${USERNAME}:${USERNAME} hdckey hdckey.pub /home/${USERNAME}/.harmony/
 ADD hdc.tar /usr/bin/
