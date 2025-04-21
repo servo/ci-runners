@@ -16,7 +16,7 @@ pub struct Dotenv {
     // GITHUB_TOKEN not used
     // LIBVIRT_DEFAULT_URI not used
     pub monitor_api_token_authorization_value: String,
-    // SERVO_CI_GITHUB_API_SCOPE not used
+    pub github_api_scope: String,
     pub github_api_suffix: String,
     pub libvirt_prefix: String,
     pub zfs_prefix: String,
@@ -52,6 +52,7 @@ impl Dotenv {
 
         Self {
             monitor_api_token_authorization_value: format!("Bearer {monitor_api_token}"),
+            github_api_scope: env_string("SERVO_CI_GITHUB_API_SCOPE"),
             github_api_suffix: env_string("SERVO_CI_GITHUB_API_SUFFIX"),
             libvirt_prefix: env_string("SERVO_CI_LIBVIRT_PREFIX"),
             zfs_prefix: env_string("SERVO_CI_ZFS_PREFIX"),
