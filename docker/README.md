@@ -42,7 +42,7 @@ The Host system should be configured in the following way:
   and allow the user running the monitor to access hdc devices.
 
 Use the servo_ci.service file and put it into `~/.config/systemd/user`.
-Edit the `GITHUB_TOKEN` and `SERVO_CI_GITHUB_SCOPE` variables.
+Edit the `GITHUB_TOKEN` and `SERVO_CI_GITHUB_SCOPE` variables and edit the DOCKER_HOST variable to have the correct User ID.
 Run `systemctl --user daemon-reload`
 Enable linger by `loginctl enable-linger <USER>` for your user.
 Start the service with `systemctl --user start servo_ci`. You will find logs in `journalctl`.
