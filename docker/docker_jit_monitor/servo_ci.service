@@ -2,7 +2,7 @@
 Description=Run the servo_ci runner
 
 [Service]
-# Change this to have the numerical id of your user, e.g., DOCKER_HOST=unix:///run/user/1000/docker.sock
+# Change this to have the numerical id of the ci user, e.g., DOCKER_HOST=unix:///run/user/1000/docker.sock
 Environment="DOCKER_HOST=unix:///run/user/<USERID>/docker.sock"
 Environment="GITHUB_TOKEN=<INSERT YOUR TOKEN>"
 Environment="SERVO_CI_GITHUB_API_SCOPE=<YOUR API SCOPE, /repos/servo/servo>"
