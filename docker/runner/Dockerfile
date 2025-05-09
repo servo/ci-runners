@@ -1,6 +1,13 @@
 ARG GITHUB_ACTIONS_RUNNER_VERSION
 ARG HOS_COMMANDLINE_TOOLS_VERSION
 
+FROM ubuntu:20.04 AS rust
+RUN apt update && apt install -y curl build-essential
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+        | sh -s -- -y --default-toolchain stable \
+        --profile=minimal
+RUN /root/.cargo/bin/cargo install hitrace-bench --version 0.2.2
+
 FROM hos_commandline_tools:${HOS_COMMANDLINE_TOOLS_VERSION} AS commandline_tools
 
 FROM servo_gha_runner:${GITHUB_ACTIONS_RUNNER_VERSION}
@@ -9,7 +16,7 @@ USER root
 # Java is required for signing the hap, libatomic1 for hdc
 RUN apt-get update && \
     apt-get -y install --no-install-recommends \
-        openjdk-11-jre-headless libatomic1 \
+        openjdk-21-jre-headless libatomic1 libc6 \
     && rm -rf /var/cache/apt/lists
 
 ARG USERNAME
@@ -30,5 +37,6 @@ ADD hdc.tar /usr/bin/
 
 COPY sign.sh /usr/bin/sign-hos.sh
 
-ENV PATH="/home/${USERNAME}/.local/bin:${PATH}"
+COPY --from=rust /root/.cargo/bin/hitrace-bench /data/hitrace-bench
+ENV PATH="/home/${USERNAME}/.local/bin:/data:/data/commandline-tools/sdk/default/openharmony/toolchains/:${PATH}"
 

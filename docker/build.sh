@@ -27,13 +27,13 @@ docker build hos_commandline_tools -f hos_commandline_tools/Dockerfile -t "hos_c
 
 docker build hos_builder -f hos_builder/Dockerfile -t servo_gha_hos_builder:latest \
      --build-arg SERVO_GIT_HASH=${SERVO_GIT_HASH} \
-     --build-arg HOS_COMMANDLINE_TOOLS_VERSION=${HOS_COMMANDLINE_TOOLS_VERSION} \
+     --build-arg HOS_COMMANDLINE_TOOLS_VERSION=latest \
      --build-arg GITHUB_ACTIONS_RUNNER_VERSION=${GITHUB_ACTIONS_RUNNER_VERSION} \
      --build-arg RUST_VERSION=${RUST_VERSION} \
      --build-arg UV_VERSION=${UV_VERSION} \
      --build-arg USERNAME=${IMAGE_USERNAME}
 
 docker build runner -f runner/Dockerfile -t servo_gha_hos_runner:latest \
-    --build-arg HOS_COMMANDLINE_TOOLS_VERSION=${HOS_COMMANDLINE_TOOLS_VERSION} \
+    --build-arg HOS_COMMANDLINE_TOOLS_VERSION=latest \
     --build-arg GITHUB_ACTIONS_RUNNER_VERSION=${GITHUB_ACTIONS_RUNNER_VERSION} \
     --build-arg USERNAME=${IMAGE_USERNAME}

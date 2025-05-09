@@ -31,7 +31,7 @@ RUN apt-get update && \
         libharfbuzz-dev liblzma-dev libudev-dev libunwind-dev \
         libvulkan1 libx11-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxmu-dev \
         libxmu6 libegl1-mesa-dev llvm-dev m4 xorg-dev libxkbcommon0 libxkbcommon-x11-0 \
-        xvfb gh sudo openjdk-11-jre-headless \
+        xvfb gh sudo openjdk-21-jre-headless \
     && rm -rf /var/cache/apt/lists
 
 RUN mkdir -p /data/servo/servo && chown -R "${USERNAME}:${USERNAME}" /data/
