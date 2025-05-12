@@ -1,6 +1,6 @@
 use std::{
     collections::BTreeMap,
-    fs::{create_dir, File},
+    fs::{create_dir, read_link, File},
     io::{Read, Write},
     net::Ipv4Addr,
     os::unix::fs::symlink,
@@ -11,7 +11,7 @@ use std::{
 
 use atomic_write_file::AtomicWriteFile;
 use cmd_lib::spawn_with_output;
-use jane_eyre::eyre::{self, bail, Context};
+use jane_eyre::eyre::{self, bail, Context, OptionExt};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
 
@@ -66,8 +66,8 @@ pub struct RunnerCounts {
 impl Profiles {
     pub fn new(profiles: BTreeMap<String, Profile>) -> eyre::Result<Self> {
         let mut base_image_snapshots = BTreeMap::default();
-        for profile_key in profiles.keys() {
-            if let Some(base_image_snapshot) = Self::read_base_image_snapshot(&profile_key)? {
+        for (profile_key, profile) in profiles.iter() {
+            if let Some(base_image_snapshot) = profile.read_base_image_snapshot()? {
                 base_image_snapshots.insert(profile_key.clone(), base_image_snapshot);
             }
         }
@@ -410,6 +410,13 @@ impl Profiles {
         self.base_image_snapshots
             .insert(profile_key.to_owned(), base_image_snapshot.to_owned());
 
+        Ok(())
+    }
+
+    pub fn write_base_image_snapshot(
+        profile_key: &str,
+        base_image_snapshot: &str,
+    ) -> eyre::Result<()> {
         let path = get_profile_data_path(profile_key, Path::new("base-image-snapshot"))?;
         let mut file = AtomicWriteFile::open(&path)?;
         write!(file, "{base_image_snapshot}")?;
@@ -417,18 +424,31 @@ impl Profiles {
 
         Ok(())
     }
+}
 
-    fn read_base_image_snapshot(profile_key: &str) -> eyre::Result<Option<String>> {
-        let path = get_profile_data_path(profile_key, Path::new("base-image-snapshot"))?;
+impl Profile {
+    fn read_base_image_snapshot(&self) -> eyre::Result<Option<String>> {
+        let path = get_profile_data_path(&self.base_vm_name, Path::new("base-image-snapshot"))?;
         if let Ok(mut file) = File::open(&path) {
             let mut base_image_snapshot = String::default();
             file.read_to_string(&mut base_image_snapshot)?;
             return Ok(Some(base_image_snapshot));
         }
 
+        let path = self.base_image_path(None);
+        if let Ok(path) = read_link(path) {
+            let path = path.to_str().ok_or_eyre("Symlink target is unsupported")?;
+            let (_, snapshot_name) = path
+                .split_once("@")
+                .ok_or_eyre("Symlink target has no snapshot name")?;
+            return Ok(Some(snapshot_name.to_owned()));
+        }
+
         Ok(None)
     }
+}
 
+impl Profiles {
     pub fn update_ipv4_addresses(&mut self) {
         for (key, profile) in self.profiles.iter() {
             let ipv4_address = get_ipv4_address(&profile.base_vm_name);

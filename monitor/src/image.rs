@@ -176,6 +176,7 @@ fn rebuild_with_build_image_script(
     info!(build_script_path = ?build_script_path, ?snapshot_name, "Starting image rebuild");
     let pipe = || |reader| log_output_as_info(reader);
     spawn_with_output!($build_script_path $snapshot_name 2>&1)?.wait_with_pipe(&mut pipe())?;
+    Profiles::write_base_image_snapshot(profile_key, snapshot_name)?;
 
     Ok(())
 }
