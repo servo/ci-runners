@@ -11,6 +11,7 @@
   gnused,
   libvirt,
   openssh,
+  zfs,
   zsh,
 }: let
   fs = lib.fileset;
@@ -60,6 +61,7 @@ in stdenv.mkDerivation rec {
     gnused
     libvirt
     openssh
+    zfs
     zsh
     # TODO: list other commands needed by scripts here
   ];
