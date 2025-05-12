@@ -1,0 +1,95 @@
+Content-Type: multipart/mixed; boundary="==part=="
+MIME-Version: 1.0
+Number-Attachments: 3
+
+--==part==
+Content-Type: text/cloud-config; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: binary
+
+# https://docs.cloud-init.io/en/24.1/reference/datasources/nocloud.html#file-formats
+# https://docs.cloud-init.io/en/24.1/explanation/format.html#cloud-config-data
+
+password: "servo2024!"
+chpasswd:
+  expire: False
+ssh_authorized_keys:
+  # Keep this in sync with server/nixos/configuration.nix
+  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGEpS5yFUgXwOf9rkw/TdZgoWkfAgLYwABGiK7qAWsHR root@ci0
+  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICBvkS7z2RAWzqRByRsHHB8PoCjXrnyHtjpdTxmOdcom delan@azabani.com/2016-07-18/Ed25519
+  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPag2UMaWyIEIsL0EbdvChBCcARVxNeJAplUZe70kXlr mrobinson@igalia.com
+  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIPiTpwVkwvE8npI7Z944tmrFlPKDjDVbm1rI7m4lng7 me@mukilan
+
+# Avoid depending on external pollinate servers
+random_seed:
+  command: ['sh', '-c', 'dd if=/dev/urandom of=$RANDOM_SEED_FILE count=2048']
+  command_required: true
+  data: my random string
+  encoding: raw
+  file: /dev/urandom
+
+--==part==
+Content-Type: text/cloud-boothook; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: binary
+
+#!/bin/sh
+set -eux
+# This script runs on every boot, near the start of cloud-init.
+# https://docs.cloud-init.io/en/24.1/reference/datasources/nocloud.html#file-formats
+# https://docs.cloud-init.io/en/latest/explanation/format.html#cloud-boothook
+
+# On first boot, configure journald.conf(5) to print logs to tty7 and restart journald.
+# This means we print logs to tty7 on every boot, including the first boot. We use a
+# boothook here, instead of write_files + cc_scripts_user, because boothooks run much
+# earlier, so more logs will be readable.
+# https://manpages.ubuntu.com/manpages/jammy/en/man1/cloud-init-per.1.html
+cloud-init-per instance configure-journald  tee -a /etc/systemd/journald.conf <<'EOF'
+ForwardToConsole=yes
+MaxLevelConsole=debug
+TTYPath=/dev/tty7
+EOF
+cloud-init-per instance restart-journald  systemctl restart systemd-journald
+
+# On every boot, switch to tty7, which displays logs only and has no getty.
+chvt 7
+
+# The fallback network config is inappropriate for our needs, because it bakes
+# the MAC address into the netplan config, which breaks virt-clone(1).
+# https://docs.cloud-init.io/en/24.1/reference/network-config.html#fallback-network-configuration
+
+# This network config will survive cloning, but for some reason, maybe a bug,
+# we have to write the file and bring the network up ourselves. If we use a
+# network-config file, cloud-init will write the file and `netplan generate`,
+# but never seems to actually apply it. When this happens, the guest will hang
+# for a while, blocking cloud-init and leaving us with an unreachable guest.
+cloud-init-per instance no-cloud-init-networking  rm /etc/netplan/50-cloud-init.yaml
+cloud-init-per instance configure-netplan  tee /etc/netplan/99-local.yaml <<'EOF'
+network:
+  version: 2
+  ethernets:
+    enp1s0:
+      dhcp4: true
+      dhcp6: true
+EOF
+cloud-init-per instance netplan-generate  netplan generate
+cloud-init-per instance netplan-apply  netplan apply
+
+--==part==
+Content-Type: text/x-shellscript-per-boot; charset="utf-8"
+MIME-Version: 1.0
+Content-Transfer-Encoding: binary
+
+#!/bin/sh
+set -eux
+# This script runs on every boot, near the end of cloud-init.
+# https://docs.cloud-init.io/en/24.1/reference/datasources/nocloud.html#file-formats
+# https://docs.cloud-init.io/en/24.1/explanation/format.html#user-data-script
+# https://docs.cloud-init.io/en/24.1/explanation/format.html#mime-multi-part-archive
+
+# Run the boot script
+systemd-cat -t ci  curl -fsSo /usr/local/bin/servo-ci-boot --max-time 5 --retry 99 --retry-all-errors http://192.168.100.1:8000/boot
+systemd-cat -t ci  chmod +x /usr/local/bin/servo-ci-boot
+systemd-cat -t ci  /usr/local/bin/servo-ci-boot
+
+--==part==--

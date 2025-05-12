@@ -1,18 +1,26 @@
 use core::str;
 use std::{
     collections::BTreeMap,
+    ffi::OsStr,
+    fs::{create_dir_all, File},
+    io::{Read, Seek, Write},
     mem::take,
-    path::Path,
+    path::{Path, PathBuf},
     thread::{self, JoinHandle},
+    time::Duration,
 };
 
+use bytesize::{ByteSize, MIB};
 use chrono::{SecondsFormat, Utc};
-use cmd_lib::spawn_with_output;
-use jane_eyre::eyre;
+use cmd_lib::{run_cmd, spawn_with_output};
+use jane_eyre::eyre::{self, bail, OptionExt};
 use tracing::{error, info, warn};
 
 use crate::{
-    profile::Profiles, runner::Runners, shell::log_output_as_info, DOTENV, LIB_MONITOR_DIR,
+    profile::{Profile, Profiles},
+    runner::Runners,
+    shell::log_output_as_info,
+    DOTENV, LIB_MONITOR_DIR,
 };
 
 #[derive(Debug, Default)]
@@ -87,20 +95,30 @@ impl Rebuilds {
 
         // Kick off image rebuild threads for profiles needing it.
         for (key, profile) in profiles_needing_rebuild {
-            let build_script_path = Path::new(&*LIB_MONITOR_DIR)
-                .join(&profile.configuration_name)
-                .join("build-image.sh");
             let snapshot_name = Utc::now().to_rfc3339_opts(SecondsFormat::Nanos, true);
 
             let key_for_thread = key.clone();
             let snapshot_name_for_thread = snapshot_name.clone();
-            let thread = thread::spawn(move || {
-                rebuild_thread(
-                    &key_for_thread,
-                    build_script_path,
-                    &snapshot_name_for_thread,
-                )
-            });
+            let thread = match profile.image_type {
+                crate::profile::ImageType::BuildImageScript => {
+                    let build_script_path = Path::new(&*LIB_MONITOR_DIR)
+                        .join(&profile.configuration_name)
+                        .join("build-image.sh");
+                    thread::spawn(move || {
+                        rebuild_with_build_image_script(
+                            &key_for_thread,
+                            build_script_path,
+                            &snapshot_name_for_thread,
+                        )
+                    })
+                }
+                crate::profile::ImageType::Rust => {
+                    let profile = profile.clone();
+                    thread::spawn(move || {
+                        rebuild_with_rust(&key_for_thread, profile, &snapshot_name_for_thread)
+                    })
+                }
+            };
 
             self.rebuilds.insert(
                 key.to_owned(),
@@ -149,7 +167,7 @@ fn servo_update_thread() -> eyre::Result<()> {
 }
 
 #[tracing::instrument(skip(build_script_path, snapshot_name))]
-fn rebuild_thread(
+fn rebuild_with_build_image_script(
     profile_key: &str,
     build_script_path: impl AsRef<Path>,
     snapshot_name: &str,
@@ -158,6 +176,136 @@ fn rebuild_thread(
     info!(build_script_path = ?build_script_path, ?snapshot_name, "Starting image rebuild");
     let pipe = || |reader| log_output_as_info(reader);
     spawn_with_output!($build_script_path $snapshot_name 2>&1)?.wait_with_pipe(&mut pipe())?;
+    Profiles::write_base_image_snapshot(profile_key, snapshot_name)?;
+
+    Ok(())
+}
+
+#[tracing::instrument(skip(profile, snapshot_name))]
+fn rebuild_with_rust(
+    profile_key: &str,
+    profile: Profile,
+    snapshot_name: &str,
+) -> Result<(), eyre::Error> {
+    info!(?snapshot_name, "Starting image rebuild");
+
+    let base_images_path = create_base_images_dir(&profile)?;
+    let base_vm_name = &profile.base_vm_name;
+    if run_cmd!(virsh domstate -- $base_vm_name).is_ok() {
+        // FIXME make this idempotent in a less noisy way?
+        let _ = run_cmd!(virsh destroy -- $base_vm_name);
+        run_cmd!(virsh undefine --nvram -- $base_vm_name)?;
+    }
+
+    ubuntu2204_rust::rebuild(base_images_path, &profile, snapshot_name)
+}
+
+mod ubuntu2204_rust;
+
+pub(self) fn create_base_images_dir(profile: &Profile) -> eyre::Result<PathBuf> {
+    let base_images_path = profile.base_images_path();
+    info!(?base_images_path, "Creating libvirt images subdirectory");
+    create_dir_all(&base_images_path)?;
+
+    Ok(base_images_path)
+}
+
+pub(self) fn create_disk_image(
+    base_images_path: impl AsRef<Path>,
+    snapshot_name: &str,
+    size: ByteSize,
+    mut initial_contents: impl Read,
+) -> eyre::Result<PathBuf> {
+    let base_images_path = base_images_path.as_ref();
+    let base_image_filename = format!("base.img@{snapshot_name}");
+    let base_image_path = base_images_path.join(&base_image_filename);
+    info!(?base_image_path, "Creating base image file");
+    let mut base_image_file = File::create_new(&base_image_path)?;
+    info!("Writing base image file: {size} left");
+    std::io::copy(&mut initial_contents, &mut base_image_file)?;
+
+    let size = size
+        .0
+        .checked_sub(base_image_file.stream_position()?)
+        .ok_or_eyre("`size` is smaller than `initial_contents`")?;
+    let mut size = ByteSize(size);
+
+    // If needed, do one write of less than 1 MiB, to align the image to 1 MiB.
+    if size.0 % MIB > 0 {
+        info!("Writing base image file: {size} left");
+        let len = size.0 / MIB * MIB + MIB - size.0;
+        let len_usize = len.try_into().expect("Guaranteed by platform");
+        base_image_file.write_all(&vec![0u8; len_usize])?;
+        size.0 -= len;
+    }
+    // Continue writing 1 MiB at a time, logging progress every 1 GiB.
+    while size.0 >= MIB {
+        info!("Writing base image file: {size} left");
+        let mut limit = ByteSize::gib(1);
+        while size.0 >= MIB && limit.0 > 0 {
+            let len_usize = MIB.try_into().expect("Guaranteed by platform");
+            base_image_file.write_all(&vec![0u8; len_usize])?;
+            size.0 -= MIB;
+            limit.0 -= MIB;
+        }
+    }
+    // If needed, do one write of less than 1 MiB, to finish the image.
+    if size.0 > 0 {
+        info!("Writing base image file: {size} left");
+        let len = size.0 / MIB * MIB + MIB - size.0;
+        let len_usize = len.try_into().expect("Guaranteed by platform");
+        base_image_file.write_all(&vec![0u8; len_usize])?;
+        size.0 -= len;
+    }
+
+    Ok(base_image_path)
+}
+
+pub(self) fn define_libvirt_guest(
+    base_vm_name: &str,
+    guest_xml_path: impl AsRef<Path>,
+    args: &[&dyn AsRef<OsStr>],
+) -> eyre::Result<()> {
+    // This dance is needed to randomise the MAC address of the guest.
+    let guest_xml_path = guest_xml_path.as_ref();
+    let args = args.iter().map(|x| x.as_ref()).collect::<Vec<_>>();
+    run_cmd!(virsh define -- $guest_xml_path)?;
+    run_cmd!(virt-clone --preserve-data --check path_in_use=off -o $base_vm_name.init -n $base_vm_name $[args])?;
+    run_cmd!(virsh undefine -- $base_vm_name.init)?;
+
+    Ok(())
+}
+
+pub(self) struct CdromImage<'path> {
+    pub target_dev: &'static str,
+    pub path: &'path str,
+}
+impl<'path> CdromImage<'path> {
+    fn new(target_dev: &'static str, path: &'path str) -> Self {
+        Self { target_dev, path }
+    }
+}
+pub(self) fn start_libvirt_guest(
+    base_vm_name: &str,
+    cdrom_images: &[CdromImage],
+) -> eyre::Result<()> {
+    info!("Starting guest");
+    // FIXME: This dance is only needed because `virt-clone -f` ignores cdrom drives.
+    run_cmd!(virsh start --paused -- $base_vm_name)?;
+    for CdromImage { target_dev, path } in cdrom_images {
+        run_cmd!(virsh change-media -- $base_vm_name $target_dev $path)?;
+    }
+    run_cmd!(virsh resume -- $base_vm_name)?;
+
+    Ok(())
+}
+
+pub(self) fn wait_for_guest(base_vm_name: &str, timeout: Duration) -> eyre::Result<()> {
+    let timeout = timeout.as_secs();
+    info!("Waiting for guest to shut down (max {timeout} seconds)"); // normally ~37 seconds
+    if !run_cmd!(time virsh event --timeout $timeout -- $base_vm_name lifecycle).is_ok() {
+        bail!("`virsh event` failed or timed out!");
+    }
 
     Ok(())
 }

@@ -6,11 +6,16 @@
   lib,
   stdenv,
   makeWrapper,
+
+  cdrkit,
   gawk,
+  gh,
   git,
   gnused,
   libvirt,
   openssh,
+  time,
+  virt-manager,
   zfs,
   zsh,
 }: let
@@ -22,6 +27,7 @@
       ../../shared
       ../../macos13
       ../../ubuntu2204
+      ../../ubuntu2204-rust
       ../../ubuntu2204-wpt
       ../../windows10
       ../../common.sh
@@ -56,11 +62,15 @@ in stdenv.mkDerivation rec {
 
   buildInputs = [
     monitorCrate
-    gawk
+    cdrkit  # for genisoimage(1)
+    gawk  # for awk(1)
+    gh
     git
-    gnused
-    libvirt
-    openssh
+    gnused  # for sed(1)
+    libvirt  # for virsh(1)
+    openssh  # for ssh(1)
+    time  # for time(1)
+    virt-manager  # for virt-clone(1)
     zfs
     zsh
     # TODO: list other commands needed by scripts here
@@ -78,6 +88,7 @@ in stdenv.mkDerivation rec {
     cp -R shared $out/lib/monitor
     cp -R macos13 $out/lib/monitor
     cp -R ubuntu2204 $out/lib/monitor
+    cp -R ubuntu2204-rust $out/lib/monitor
     cp -R ubuntu2204-wpt $out/lib/monitor
     cp -R windows10 $out/lib/monitor
     cp -R common.sh $out/lib/monitor

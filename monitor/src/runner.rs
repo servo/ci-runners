@@ -2,6 +2,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{Debug, Display},
     fs::{self, File},
+    io::Read,
     net::Ipv4Addr,
     path::Path,
     process::Command,
@@ -11,7 +12,7 @@ use std::{
 use itertools::Itertools;
 use jane_eyre::eyre::{self, bail};
 use mktemp::Temp;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tracing::{error, info, trace, warn};
 
 use crate::{
@@ -19,6 +20,7 @@ use crate::{
     data::get_runner_data_path,
     github::{ApiGenerateJitconfigResponse, ApiRunner},
     libvirt::{get_ipv4_address, libvirt_prefix, take_screenshot, update_screenshot},
+    profile::ImageType,
     LIB_MONITOR_DIR,
 };
 
@@ -37,6 +39,12 @@ pub struct Runner {
     volume_name: Option<String>,
     ipv4_address: Option<Ipv4Addr>,
     github_jitconfig: Option<String>,
+    details: RunnerDetails,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct RunnerDetails {
+    image_type: ImageType,
 }
 
 #[derive(Debug, PartialEq)]
@@ -243,6 +251,21 @@ impl Runners {
             }
         }
     }
+
+    pub fn boot_script(&self, remote_addr: RemoteAddr) -> eyre::Result<Option<String>> {
+        for (&id, runner) in self.runners.iter() {
+            if let Some(ipv4_address) = runner.ipv4_address {
+                if remote_addr == ipv4_address {
+                    let path = get_runner_data_path(id, Path::new("boot-script.sh"))?;
+                    let mut result = String::default();
+                    File::open(path)?.read_to_string(&mut result)?;
+                    return Ok(Some(result));
+                }
+            }
+        }
+
+        Ok(None)
+    }
 }
 
 impl Runner {
@@ -250,8 +273,11 @@ impl Runner {
     ///
     /// For use by [`Runners::new`] only. Does not create a runner.
     fn new(id: usize) -> eyre::Result<Self> {
-        let created_time = get_runner_data_path(id, Path::new("created-time"))?;
-        let created_time = fs::metadata(created_time)?.modified()?;
+        let created_time_path = get_runner_data_path(id, Path::new("created-time"))?;
+        let runner_toml_path = get_runner_data_path(id, Path::new("runner.toml"))?;
+        let created_time = fs::metadata(created_time_path)
+            .or_else(|_| fs::metadata(&runner_toml_path))?
+            .modified()?;
         trace!(?created_time, "[{id}]");
 
         let github_jitconfig = || -> eyre::Result<String> {
@@ -268,6 +294,14 @@ impl Runner {
             }
         };
 
+        let details = if let Ok(mut runner_toml) = File::open(&runner_toml_path) {
+            let mut contents = String::default();
+            runner_toml.read_to_string(&mut contents)?;
+            toml::from_str(&contents)?
+        } else {
+            RunnerDetails::default()
+        };
+
         Ok(Self {
             id,
             created_time,
@@ -276,6 +310,7 @@ impl Runner {
             volume_name: None,
             ipv4_address: None,
             github_jitconfig: github_jitconfig,
+            details,
         })
     }
 
@@ -334,7 +369,7 @@ impl Runner {
     }
 
     pub fn status(&self) -> Status {
-        if self.guest_name.is_none() || self.volume_name.is_none() {
+        if self.guest_name.is_none() || (self.needs_zfs_volume() && self.volume_name.is_none()) {
             return Status::Invalid;
         };
         let Some(registration) = &self.registration else {
@@ -350,6 +385,13 @@ impl Runner {
             return Status::Idle;
         }
         return Status::StartedOrCrashed;
+    }
+
+    fn needs_zfs_volume(&self) -> bool {
+        match self.details.image_type {
+            ImageType::BuildImageScript => true,
+            ImageType::Rust => false,
+        }
     }
 
     pub fn base_vm_name(&self) -> &str {
