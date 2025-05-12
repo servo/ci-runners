@@ -1,0 +1,20 @@
+[Unit]
+Description=Run the servo_ci runner
+
+[Service]
+# Change this to have the numerical id of the ci user, e.g., DOCKER_HOST=unix:///run/user/1000/docker.sock
+Environment="DOCKER_HOST=unix:///run/user/<USERID>/docker.sock"
+Environment="GITHUB_TOKEN=<INSERT YOUR TOKEN>"
+Environment="SERVO_CI_GITHUB_API_SCOPE=<YOUR API SCOPE, /repos/servo/servo>"
+ExecStart=/home/servo_ci/ci-runners/docker/docker_jit_monitor/target/release/docker_jit_monitor
+ProtectKernelModules=no
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+MemoryDenyWriteExecute=yes
+LockPersonality=yes
+DevicePolicy=closed
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=default.target
