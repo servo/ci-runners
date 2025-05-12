@@ -20,6 +20,14 @@ ssh_authorized_keys:
   - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPag2UMaWyIEIsL0EbdvChBCcARVxNeJAplUZe70kXlr mrobinson@igalia.com
   - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIPiTpwVkwvE8npI7Z944tmrFlPKDjDVbm1rI7m4lng7 me@mukilan
 
+# Avoid depending on external pollinate servers
+random_seed:
+  command: ['sh', '-c', 'dd if=/dev/urandom of=$RANDOM_SEED_FILE count=2048']
+  command_required: true
+  data: my random string
+  encoding: raw
+  file: /dev/urandom
+
 --==part==
 Content-Type: text/cloud-boothook; charset="utf-8"
 MIME-Version: 1.0
