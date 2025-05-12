@@ -68,9 +68,9 @@ cloud-init-per instance netplan-generate  netplan generate
 cloud-init-per instance netplan-apply  netplan apply
 
 # Run the boot script
-systemd-cat  curl -fsSo /usr/local/bin/servo-ci-boot --max-time 5 --retry 99 --retry-all-errors http://192.168.100.1:8000/boot
-systemd-cat  chmod +x /usr/local/bin/servo-ci-boot
-systemd-cat  /usr/local/bin/servo-ci-boot
+systemd-cat -t ci  curl -fsSo /usr/local/bin/servo-ci-boot --max-time 5 --retry 99 --retry-all-errors http://192.168.100.1:8000/boot
+systemd-cat -t ci  chmod +x /usr/local/bin/servo-ci-boot
+systemd-cat -t ci  /usr/local/bin/servo-ci-boot
 
 --==part==
 Content-Type: text/x-shellscript; charset="utf-8"
