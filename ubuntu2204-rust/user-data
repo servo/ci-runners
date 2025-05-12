@@ -75,20 +75,21 @@ EOF
 cloud-init-per instance netplan-generate  netplan generate
 cloud-init-per instance netplan-apply  netplan apply
 
-# Run the boot script
-systemd-cat -t ci  curl -fsSo /usr/local/bin/servo-ci-boot --max-time 5 --retry 99 --retry-all-errors http://192.168.100.1:8000/boot
-systemd-cat -t ci  chmod +x /usr/local/bin/servo-ci-boot
-systemd-cat -t ci  /usr/local/bin/servo-ci-boot
-
 --==part==
-Content-Type: text/x-shellscript; charset="utf-8"
+Content-Type: text/x-shellscript-per-boot; charset="utf-8"
 MIME-Version: 1.0
 Content-Transfer-Encoding: binary
 
 #!/bin/sh
 set -eux
-# This script runs once, near the end of cloud-init.
+# This script runs on every boot, near the end of cloud-init.
 # https://docs.cloud-init.io/en/24.1/reference/datasources/nocloud.html#file-formats
 # https://docs.cloud-init.io/en/24.1/explanation/format.html#user-data-script
+# https://docs.cloud-init.io/en/24.1/explanation/format.html#mime-multi-part-archive
+
+# Run the boot script
+systemd-cat -t ci  curl -fsSo /usr/local/bin/servo-ci-boot --max-time 5 --retry 99 --retry-all-errors http://192.168.100.1:8000/boot
+systemd-cat -t ci  chmod +x /usr/local/bin/servo-ci-boot
+systemd-cat -t ci  /usr/local/bin/servo-ci-boot
 
 --==part==--
