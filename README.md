@@ -176,11 +176,12 @@ To prepare a server for macOS 13 guests, build a clean image:
     - `virsh start servo-macos13.clean`
 - Install macOS
     - At the boot menu, choose **macOS Base System**
-    - **Utilities** > **Terminal**
-        - `diskutil list | grep GB` and find the `diskN` line that is around 96.6 GB
-        - `diskutil partitionDisk diskN 2 GPT  ExFAT a 60G  APFS macOS 0G`
-    - Quit Terminal
-    - **Reinstall macOS Ventura**
+    - Choose **Disk Utility**
+    - Choose the **QEMU HARDDISK Media** listed as **Uninitialized**
+    - Click **Erase**, click **Erase**, then click **Done**
+    - Press **Cmd**+**Q** to quit Disk Utility
+    - Choose **Reinstall macOS Ventura**
+    - When asked to select a disk, choose **Untitled**
     - Shut down the guest when you see **Select Your Country or Region**: `virsh shutdown servo-macos13.clean`
 - Take a snapshot: `zfs snapshot tank/base/servo-macos13.clean@fresh-install`
 - Boot base vm guest: `virsh start servo-macos13.clean`
@@ -188,10 +189,10 @@ To prepare a server for macOS 13 guests, build a clean image:
         - Press **Command**+**Option**+**F5**, then click **Full Keyboard Access**, then press **Enter**
         - You can now press **Shift**+**Tab** to get to the buttons at the bottom of the wizard
     - **Select Your Country or Region** = United States
-    - **Migration Assistant** = Not Now
     - If latency is high, **Accessibility** > **Vision** then:
         - \> **Reduce Transparency** = Reduce Transparency
         - \> **Reduce Motion** = Reduce Motion
+    - **Migration Assistant** = Not Now
     - **Sign In with Your Apple ID** = Set Up Later
     - **Full name** = `servo`
     - **Account name** = `servo`

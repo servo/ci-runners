@@ -10,7 +10,6 @@ use std::{
 };
 
 use atomic_write_file::AtomicWriteFile;
-use cmd_lib::spawn_with_output;
 use jane_eyre::eyre::{self, bail, Context, OptionExt};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
@@ -18,10 +17,9 @@ use tracing::{debug, info, warn};
 use crate::{
     auth::RemoteAddr,
     data::{get_profile_configuration_path, get_profile_data_path, get_runner_data_path},
-    github::register_runner,
+    image::{create_runner, destroy_runner, register_runner},
     libvirt::{get_ipv4_address, update_screenshot},
     runner::{Runner, Runners, Status},
-    shell::log_output_as_info,
     zfs::snapshot_creation_time_unix,
     DOTENV, LIB_MONITOR_DIR, TOML,
 };
@@ -131,25 +129,16 @@ impl Profiles {
                     get_runner_data_path(id, Path::new("boot-script.sh"))?,
                 )?;
                 let vm_name = format!("{base_vm_name}.{id}");
-                let prefixed_vm_name = format!("{}-{vm_name}", DOTENV.libvirt_prefix);
                 if !DOTENV.dont_register_runners {
                     let mut github_api_registration = File::create_new(get_runner_data_path(
                         id,
                         Path::new("github-api-registration"),
                     )?)?;
-                    github_api_registration.write_all(
-                        register_runner(&vm_name, &profile.github_runner_label, "../a")?.as_bytes(),
-                    )?;
+                    github_api_registration
+                        .write_all(register_runner(profile, &vm_name)?.as_bytes())?;
                 }
-                let pipe = || |reader| log_output_as_info(reader);
-                spawn_with_output!(virt-clone --auto-clone --reflink -o $base_vm_name -n $prefixed_vm_name 2>&1)?.wait_with_pipe(&mut pipe())?;
-                // FIXME: This dance is only needed because `virt-clone -f` ignores cdrom drives.
-                let config_iso_path = profile.base_images_path().join("config.iso");
-                spawn_with_output!(virsh start --paused -- $prefixed_vm_name 2>&1)?
-                    .wait_with_pipe(&mut pipe())?;
-                spawn_with_output!(virsh change-media -- $prefixed_vm_name sda $config_iso_path 2>&1)?.wait_with_pipe(&mut pipe())?;
-                spawn_with_output!(virsh resume -- $prefixed_vm_name 2>&1)?
-                    .wait_with_pipe(&mut pipe())?;
+                create_runner(profile, &vm_name)?;
+
                 Ok(())
             }
         }
@@ -174,11 +163,7 @@ impl Profiles {
             }
             ImageType::Rust => {
                 let vm_name = format!("{}.{id}", profile.base_vm_name);
-                let prefixed_vm_name = format!("{}-{vm_name}", DOTENV.libvirt_prefix);
-                let pipe = || |reader| log_output_as_info(reader);
-                let _ = spawn_with_output!(virsh destroy -- $prefixed_vm_name 2>&1)?
-                    .wait_with_pipe(&mut pipe());
-                let _ = spawn_with_output!(virsh undefine --nvram --remove-all-storage -- $prefixed_vm_name 2>&1)?.wait_with_pipe(&mut pipe());
+                destroy_runner(profile, &vm_name)?;
                 Ok(())
             }
         }

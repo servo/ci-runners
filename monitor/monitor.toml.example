@@ -8,7 +8,14 @@ base_image_max_age = 86400
 configuration_name = "windows10"
 base_vm_name = "servo-windows10"
 github_runner_label = "self-hosted-image:windows10"
-target_count = 2
+target_count = 1
+
+[profiles.servo-macos13]
+configuration_name = "macos13"
+base_vm_name = "servo-macos13"
+github_runner_label = "self-hosted-image:macos13"
+target_count = 1
+image_type = "Rust"
 
 [profiles.servo-ubuntu2204]
 configuration_name = "ubuntu2204"

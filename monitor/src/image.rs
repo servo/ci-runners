@@ -1,3 +1,6 @@
+pub mod macos13;
+pub mod ubuntu2204;
+
 use core::str;
 use std::{
     collections::BTreeMap,
@@ -201,6 +204,13 @@ fn rebuild_with_rust(
     }
 
     match &*profile.configuration_name {
+        "macos13" => macos13::rebuild(
+            base_images_path,
+            &profile,
+            snapshot_name,
+            ByteSize::gib(90),
+            Duration::from_secs(2000),
+        ),
         "ubuntu2204" => ubuntu2204::rebuild(
             base_images_path,
             &profile,
@@ -226,7 +236,35 @@ fn rebuild_with_rust(
     }
 }
 
-mod ubuntu2204;
+pub fn register_runner(profile: &Profile, vm_name: &str) -> eyre::Result<String> {
+    match &*profile.configuration_name {
+        "macos13" => macos13::register_runner(profile, vm_name),
+        "ubuntu2204" => ubuntu2204::register_runner(profile, vm_name),
+        "ubuntu2204-rust" => ubuntu2204::register_runner(profile, vm_name),
+        "ubuntu2204-wpt" => ubuntu2204::register_runner(profile, vm_name),
+        other => todo!("Runner registration not yet implemented: {other}"),
+    }
+}
+
+pub fn create_runner(profile: &Profile, vm_name: &str) -> eyre::Result<()> {
+    match &*profile.configuration_name {
+        "macos13" => macos13::create_runner(profile, vm_name),
+        "ubuntu2204" => ubuntu2204::create_runner(profile, vm_name),
+        "ubuntu2204-rust" => ubuntu2204::create_runner(profile, vm_name),
+        "ubuntu2204-wpt" => ubuntu2204::create_runner(profile, vm_name),
+        other => todo!("Runner creation not yet implemented: {other}"),
+    }
+}
+
+pub fn destroy_runner(profile: &Profile, vm_name: &str) -> eyre::Result<()> {
+    match &*profile.configuration_name {
+        "macos13" => macos13::destroy_runner(vm_name),
+        "ubuntu2204" => ubuntu2204::destroy_runner(vm_name),
+        "ubuntu2204-rust" => ubuntu2204::destroy_runner(vm_name),
+        "ubuntu2204-wpt" => ubuntu2204::destroy_runner(vm_name),
+        other => todo!("Runner destruction not yet implemented: {other}"),
+    }
+}
 
 pub(self) fn create_base_images_dir(profile: &Profile) -> eyre::Result<PathBuf> {
     let base_images_path = profile.base_images_path();
@@ -302,26 +340,23 @@ pub(self) fn define_libvirt_guest(
     Ok(())
 }
 
-pub(self) struct CdromImage<'path> {
+pub struct CdromImage<'path> {
     pub target_dev: &'static str,
     pub path: &'path str,
 }
 impl<'path> CdromImage<'path> {
-    fn new(target_dev: &'static str, path: &'path str) -> Self {
+    pub fn new(target_dev: &'static str, path: &'path str) -> Self {
         Self { target_dev, path }
     }
 }
-pub(self) fn start_libvirt_guest(
-    base_vm_name: &str,
-    cdrom_images: &[CdromImage],
-) -> eyre::Result<()> {
+pub fn start_libvirt_guest(guest_name: &str, cdrom_images: &[CdromImage]) -> eyre::Result<()> {
     info!("Starting guest");
     // FIXME: This dance is only needed because `virt-clone -f` ignores cdrom drives.
-    run_cmd!(virsh start --paused -- $base_vm_name)?;
+    run_cmd!(virsh start --paused -- $guest_name)?;
     for CdromImage { target_dev, path } in cdrom_images {
-        run_cmd!(virsh change-media -- $base_vm_name $target_dev $path)?;
+        run_cmd!(virsh change-media -- $guest_name $target_dev $path)?;
     }
-    run_cmd!(virsh resume -- $base_vm_name)?;
+    run_cmd!(virsh resume -- $guest_name)?;
 
     Ok(())
 }

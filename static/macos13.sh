@@ -1,6 +1,5 @@
 #!/usr/bin/env zsh
-set -eu
-macos_version=13
+set -eux
 mkdir -p /var/root/ci
 cd /var/root/ci
 
@@ -22,6 +21,12 @@ echo 'servo  ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/servo
 # Install a LaunchAgent to run our code on boot
 # <https://superuser.com/a/229792>
 (
+    > /Users/servo/init.sh echo '#!/bin/sh'
+    >> /Users/servo/init.sh echo 'curl -fsSo /Users/servo/servo-ci-boot --max-time 5 --retry 99 --retry-all-errors http://192.168.100.1:8000/boot'
+    >> /Users/servo/init.sh echo 'chmod +x /Users/servo/servo-ci-boot'
+    >> /Users/servo/init.sh echo '/Users/servo/servo-ci-boot'
+    chmod +x /Users/servo/init.sh
+
     mkdir -p launchd
     cd launchd
     curl -fsSO https://ci0.servo.org/static/macos13/org.servo.ci.plist
