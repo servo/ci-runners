@@ -39,12 +39,6 @@ start_github_actions_runner() {
 mkdir -p /ci
 cd /ci
 
-if ! [ -e image-expanded ]; then
-    touch image-expanded
-    reboot
-    exit  # `reboot` does not exit
-fi
-
 if ! [ -e image-built ]; then
     install_github_actions_runner
     touch image-built
