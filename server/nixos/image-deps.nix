@@ -1,5 +1,6 @@
 {
   fetchurl,
+  lib,
   linkFarm,
   qemu,
   runCommand,
@@ -92,4 +93,7 @@ in linkFarm "image-deps" {
     url = "https://github.com/git-for-windows/git/releases/download/v2.45.1.windows.1/Git-2.45.1-64-bit.exe";
     hash = "sha256-GytY+1Fklf63A1OqkdojC+CitKoBrMO8BH7h/khGvE4=";
   };
+  "windows10/software.reg" = writeText "software.reg" (lib.readFile ../../windows10/software.reg);
+  "windows10/system.reg" = writeText "system.reg" (lib.readFile ../../windows10/system.reg);
+  "windows10/refreshenv.ps1" = writeText "refreshenv.ps1" (lib.readFile ../../windows10/refreshenv.ps1);
 }

@@ -1,0 +1,158 @@
+# Out-Default makes the script wait for programs in the Windows subsystem to exit
+# https://stackoverflow.com/a/7272390
+
+# Trace script execution
+Set-PSDebug -Trace 2
+
+# curl.exe uses the actual curl shipped in Windows 1804+, not the alias for Invoke-WebRequest
+
+$actions_runner_version = '2.323.0'
+
+# Pause on cmdlet errors (does not affect external processes)
+# <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_preference_variables?view=powershell-7.5#erroractionpreference>
+$ErrorActionPreference = 'Inquire'
+
+# Stop on external process failures
+function Check {
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
+
+cd C:\ci
+
+if (!(Test-Path .\image-built)) {
+    # Install Git
+    # Note: installer automatically uninstalls first if needed, so the check is just there to save time
+    if (!(Test-Path 'C:\Program Files\Git\cmd\git.exe')) {
+        curl.exe -fsSLO 'http://192.168.100.1:8000/image-deps/windows10/Git-2.45.1-64-bit.exe'; Check
+        .\Git-2.45.1-64-bit.exe /silent | Out-Default; Check
+    }
+
+    # Install Python, for checkouts without servo#34504
+    # Note: installer is idempotent, so the check is just there to save time
+    if (!(Test-Path $env:LOCALAPPDATA\Programs\Python\Python310\python.exe)) {
+        curl.exe -fsSLO 'http://192.168.100.1:8000/image-deps/windows10/python-3.10.11-amd64.exe'; Check
+        .\python-3.10.11-amd64.exe /passive | Out-Default; Check
+    }
+
+    # Install uv. Note that actually running uv relies on $env:USERPROFILE\.local\bin being on PATH,
+    # and that directory gets added to PATH by Chocolatey and refreshenv (see refreshenv.ps1).
+    if (!(Test-Path C:\Users\Administrator\.local\bin\uv.exe)) {
+        curl.exe -fsSLO 'http://192.168.100.1:8000/image-deps/windows10/uv-installer.ps1'; Check
+        .\uv-installer.ps1; Check
+    }
+
+    # Install rustup and the latest Rust
+    if (!(Test-Path C:\Users\Administrator\.rustup)) {
+        curl.exe -fsSLO 'http://192.168.100.1:8000/image-deps/windows10/rustup-init.exe'; Check
+        .\rustup-init.exe -y --quiet; Check
+    }
+
+    # Install .NET 4.8 for Chocolatey
+    # Note: installer is idempotent, so the check is just there to save time
+    # Note: explicit install avoids failure in Chocolatey installer due to the required reboot
+    # See also: <https://learn.microsoft.com/en-us/dotnet/framework/migration-guide/how-to-determine-which-versions-are-installed#query-the-registry-using-powershell>
+    # See also: <https://learn.microsoft.com/en-us/dotnet/core/install/windows?tabs=net80>
+    # See also: the installer’s /?
+    if (!((Get-ItemPropertyValue -LiteralPath 'HKLM:SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full' -Name Release) -ge 528040)) {
+        curl.exe -fsSLO 'http://192.168.100.1:8000/image-deps/windows10/ndp48-x86-x64-allos-enu.exe'; Check
+        # /passive works on Windows Server with desktop, but not on core
+        # <https://serverfault.com/a/914454>
+        .\ndp48-x86-x64-allos-enu.exe /norestart /q | Out-Default; Check
+        # Reboot to avoid running Chocolatey installer
+        shutdown /r /t 0
+        exit  # `shutdown` does not exit
+    }
+
+    # Install Chocolatey
+    if (!(Test-Path C:\ProgramData\chocolatey\bin\choco.exe)) {
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+    }
+
+    # Install Visual Studio 2022 (17.0), with the components from the Servo book
+    # <https://book.servo.org/hacking/setting-up-your-environment.html#tools-for-windows>
+    # See also: <https://github.com/rust-lang/rustup/blob/2a5a69e0914ff419554d684ca71eb1d72c72bcb3/src/cli/self_update/windows.rs#L174>
+    # See also: <https://learn.microsoft.com/en-us/visualstudio/install/use-command-line-parameters-to-install-visual-studio?view=vs-2022>
+    # See also: the installer’s --help
+    if (!(Test-Path .\vswhere.exe)) {
+        curl.exe -fsSLO 'http://192.168.100.1:8000/image-deps/windows10/vswhere.exe'; Check
+    }
+    if ($(.\vswhere.exe -format value -property isComplete) -ne '1') {
+        Check
+        curl.exe -fsSLO 'http://192.168.100.1:8000/image-deps/windows10/vs_community.exe'; Check
+        .\vs_community.exe --wait --focusedUi --addProductLang en-us `
+            --add Microsoft.VisualStudio.Component.Windows10SDK.19041 `
+            --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            --add Microsoft.VisualStudio.Component.VC.ATL `
+            --add Microsoft.VisualStudio.Component.VC.ATLMFC `
+            --passive | Out-Default; Check
+        # FIXME: rebooting here as a speculative fix for choco hanging during warm.ps1
+        shutdown /r /t 0
+        exit  # `shutdown` does not exit
+    }
+
+    if (!(Test-Path .\refreshenv.ps1)) {
+        curl.exe -fsSLO 'http://192.168.100.1:8000/image-deps/windows10/refreshenv.ps1'; Check
+    }
+
+    # Clone and enter the Servo repo
+    if (!(Test-Path C:\a\servo\servo)) {
+        mkdir -p C:\a\servo
+        git clone http://192.168.100.1:8000/cache/servo/.git C:\a\servo\servo; Check
+    }
+    cd C:\a\servo\servo
+
+    .\mach fetch; Check
+    .\mach bootstrap-gstreamer; Check
+
+    # Like `mach bootstrap`, but doesn’t require closing choco’s conhost window manually (servo#32342)
+    choco install -y support\windows\chocolatey.config; Check
+    . C:\ci\refreshenv.ps1
+
+    # Install the Rust toolchain, for checkouts without servo#35795
+    rustup show active-toolchain
+    if ($LASTEXITCODE -ne 0) {
+        rustup toolchain install; Check
+    }
+
+    .\mach bootstrap --skip-platform; Check
+
+    # Save a copy of the environment variables that can break incremental builds, for debugging.
+    echo "`$env:LIBCLANG_PATH in runner image = $env:LIBCLANG_PATH" > C:\ci\incremental_build_debug.txt
+    echo "`$env:PATH in runner image = $env:PATH" >> C:\ci\incremental_build_debug.txt
+
+    $env:RUSTUP_WINDOWS_PATH_ADD_BIN = 1
+    # Build the same way as a typical Windows libservo job, to allow for incremental builds.
+    cargo build -p libservo --all-targets --release --target-dir target\libservo; Check
+    # Build the same way as a typical Windows build job, to allow for incremental builds.
+    .\mach build --use-crown --locked --release; Check
+
+    # Leave the Servo repo
+    cd C:\ci
+
+    # Install the GitHub Actions runner
+    if (Test-Path .\actions-runner) {
+        rm -Recurse -Force actions-runner
+    }
+    if (!(Test-Path .\actions-runner-win-x64-$actions_runner_version.zip)) {
+        curl.exe -fsSLO "http://192.168.100.1:8000/image-deps/windows10/actions-runner-win-x64-$actions_runner_version.zip"; Check
+    }
+    mkdir -p actions-runner
+    cd actions-runner
+    Expand-Archive -Path ..\actions-runner-win-x64-$actions_runner_version.zip
+    cd ..
+
+    if (Test-Path C:\a\servo\servo\target\release\servo.exe) {
+        New-Item C:\ci\image-built
+        shutdown /s /t 0
+        exit  # `shutdown` does not exit
+    }
+} else {
+    # Use the actual curl shipped in Windows 1804+, not the alias for Invoke-WebRequest
+    $jitconfig = curl.exe -fsS --max-time 5 --retry 99 --retry-all-errors http://192.168.100.1:8000/github-jitconfig | ConvertFrom-Json
+    if ($jitconfig -ne $null) {
+        . C:\ci\refreshenv.ps1
+        & C:\ci\actions-runner\actions-runner-win-x64-$actions_runner_version\run.cmd --jitconfig $jitconfig
+    }
+}

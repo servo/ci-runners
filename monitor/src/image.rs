@@ -1,5 +1,6 @@
 pub mod macos13;
 pub mod ubuntu2204;
+pub mod windows10;
 
 use core::str;
 use std::{
@@ -232,6 +233,13 @@ fn rebuild_with_rust(
             ByteSize::gib(90),
             Duration::from_secs(2000),
         ),
+        "windows10" => windows10::rebuild(
+            base_images_path,
+            &profile,
+            snapshot_name,
+            ByteSize::gib(90),
+            Duration::from_secs(3000),
+        ),
         other => todo!("Rebuild not yet implemented: {other}"),
     }
 }
@@ -242,6 +250,7 @@ pub fn register_runner(profile: &Profile, vm_name: &str) -> eyre::Result<String>
         "ubuntu2204" => ubuntu2204::register_runner(profile, vm_name),
         "ubuntu2204-rust" => ubuntu2204::register_runner(profile, vm_name),
         "ubuntu2204-wpt" => ubuntu2204::register_runner(profile, vm_name),
+        "windows10" => windows10::register_runner(profile, vm_name),
         other => todo!("Runner registration not yet implemented: {other}"),
     }
 }
@@ -252,6 +261,7 @@ pub fn create_runner(profile: &Profile, vm_name: &str) -> eyre::Result<()> {
         "ubuntu2204" => ubuntu2204::create_runner(profile, vm_name),
         "ubuntu2204-rust" => ubuntu2204::create_runner(profile, vm_name),
         "ubuntu2204-wpt" => ubuntu2204::create_runner(profile, vm_name),
+        "windows10" => windows10::create_runner(profile, vm_name),
         other => todo!("Runner creation not yet implemented: {other}"),
     }
 }
@@ -262,6 +272,7 @@ pub fn destroy_runner(profile: &Profile, vm_name: &str) -> eyre::Result<()> {
         "ubuntu2204" => ubuntu2204::destroy_runner(vm_name),
         "ubuntu2204-rust" => ubuntu2204::destroy_runner(vm_name),
         "ubuntu2204-wpt" => ubuntu2204::destroy_runner(vm_name),
+        "windows10" => windows10::destroy_runner(vm_name),
         other => todo!("Runner destruction not yet implemented: {other}"),
     }
 }

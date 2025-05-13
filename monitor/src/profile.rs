@@ -125,8 +125,8 @@ impl Profiles {
                     File::create_new(get_runner_data_path(id, Path::new("runner.toml"))?)?;
                 writeln!(runner_toml, r#"image_type = "Rust""#)?;
                 symlink(
-                    get_profile_configuration_path(profile, Path::new("boot-script.sh"))?,
-                    get_runner_data_path(id, Path::new("boot-script.sh"))?,
+                    get_profile_configuration_path(profile, Path::new("boot-script"))?,
+                    get_runner_data_path(id, Path::new("boot-script"))?,
                 )?;
                 let vm_name = format!("{base_vm_name}.{id}");
                 if !DOTENV.dont_register_runners {
@@ -453,8 +453,7 @@ impl Profiles {
             if let Some(ipv4_address) = ipv4_address {
                 if remote_addr == *ipv4_address {
                     let profile = self.profiles.get(key).expect("Guaranteed by Profiles impl");
-                    let path =
-                        get_profile_configuration_path(profile, Path::new("boot-script.sh"))?;
+                    let path = get_profile_configuration_path(profile, Path::new("boot-script"))?;
                     let mut result = String::default();
                     File::open(path)?.read_to_string(&mut result)?;
                     return Ok(Some(result));

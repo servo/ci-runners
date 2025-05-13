@@ -211,8 +211,35 @@ foreach( $file in $Document.unattend.Extensions.File ) {
 }
 		</ExtractScript>
 		<File path="C:\Windows\Setup\Scripts\unattend-01.ps1" transformation="Text">
-schtasks /Create /F /TN "servo ci init" /SC ONLOGON /RL HIGHEST /TR "powershell -NoExit C:\init\init.ps1"
-shutdown /s /t 0
+mkdir C:\ci
+cd C:\ci
+
+# We need to run this on boot as Administrator, but the current user will only be Administrator on Windows Server,
+# and HKLM Run can’t run elevated commands. Instead register an elevated scheduled task. This is tricky to do with
+# a registry patch or `Register-ScheduledTask -xml`, because we would need to know the user’s SID and hostname.
+# Note: `schtasks /Create /F` is idempotent, keyed on task name (/TN)
+schtasks /Create /F /TN "servo ci init" /SC ONLOGON /RL HIGHEST /TR "powershell -NoExit C:\ci\init.ps1"
+
+# Disable Windows Defender, for better disk performance
+Set-MpPreference -DisableRealtimeMonitoring $True
+
+# Install VirtIO NIC driver (NetKVM)
+# Note: installer fails without negative side effects when rerun, so the check is just there to save time
+# https://stackoverflow.com/q/22496847
+if (!(Test-Path C:\Windows\System32\drivers\netkvm.sys)) {
+    pnputil -i -a E:\NetKVM\2k19\amd64\netkvm.inf
+}
+
+# Use the actual curl shipped in Windows 1804+, not the alias for Invoke-WebRequest
+curl.exe -fsSo software.reg --max-time 5 --retry 99 --retry-all-errors http://192.168.100.1:8000/image-deps/windows10/software.reg
+curl.exe -fsSo system.reg --max-time 5 --retry 99 --retry-all-errors http://192.168.100.1:8000/image-deps/windows10/system.reg
+reg import software.reg
+reg import system.reg
+
+echo "curl.exe -fsSo C:\ci\servo-ci-boot.ps1 --max-time 5 --retry 99 --retry-all-errors http://192.168.100.1:8000/boot" > init.ps1
+echo "C:\ci\servo-ci-boot.ps1" >> init.ps1
+
+.\init.ps1
 		</File>
 		<File path="C:\Windows\Setup\Scripts\Specialize.ps1" transformation="Text">
 $scripts = @(
