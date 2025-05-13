@@ -162,6 +162,9 @@ fn servo_update_thread() -> eyre::Result<()> {
         .wait_with_pipe(&mut pipe())?;
     spawn_with_output!(git -C $main_repo_path switch --detach FETCH_HEAD 2>&1)?
         .wait_with_pipe(&mut pipe())?;
+    // Allow git-clone(1) <https://stackoverflow.com/a/19707416>
+    spawn_with_output!(git -C $main_repo_path update-server-info 2>&1)?
+        .wait_with_pipe(&mut pipe())?;
 
     Ok(())
 }
@@ -197,10 +200,33 @@ fn rebuild_with_rust(
         run_cmd!(virsh undefine --nvram -- $base_vm_name)?;
     }
 
-    ubuntu2204_rust::rebuild(base_images_path, &profile, snapshot_name)
+    match &*profile.configuration_name {
+        "ubuntu2204" => ubuntu2204::rebuild(
+            base_images_path,
+            &profile,
+            snapshot_name,
+            ByteSize::gib(90),
+            Duration::from_secs(2000),
+        ),
+        "ubuntu2204-rust" => ubuntu2204::rebuild(
+            base_images_path,
+            &profile,
+            snapshot_name,
+            ByteSize::gib(20),
+            Duration::from_secs(90),
+        ),
+        "ubuntu2204-wpt" => ubuntu2204::rebuild(
+            base_images_path,
+            &profile,
+            snapshot_name,
+            ByteSize::gib(90),
+            Duration::from_secs(2000),
+        ),
+        other => todo!("Rebuild not yet implemented: {other}"),
+    }
 }
 
-mod ubuntu2204_rust;
+mod ubuntu2204;
 
 pub(self) fn create_base_images_dir(profile: &Profile) -> eyre::Result<PathBuf> {
     let base_images_path = profile.base_images_path();

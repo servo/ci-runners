@@ -1,6 +1,6 @@
 <domain type='kvm'>
   <name>servo-ubuntu2204.init</name>
-  <uuid>ec747b67-ffb4-47cc-a27b-43156ca1724f</uuid>
+  <uuid>ac6d9c63-492b-4f0c-b2fe-5d20cf32caab</uuid>
   <metadata>
     <libosinfo:libosinfo xmlns:libosinfo="http://libosinfo.org/xmlns/libvirt/domain/1.0">
       <libosinfo:os id="http://ubuntu.com/ubuntu/22.04"/>
@@ -43,9 +43,8 @@
       <boot order='1'/>
       <address type='pci' domain='0x0000' bus='0x04' slot='0x00' function='0x0'/>
     </disk>
-    <disk type='file' device='cdrom'>
+    <disk type='block' device='cdrom'>
       <driver name='qemu' type='raw'/>
-      <source file='/var/lib/libvirt/images/servo-ubuntu2204.config.iso'/>
       <target dev='sda' bus='sata'/>
       <readonly/>
       <boot order='2'/>

@@ -367,6 +367,13 @@ async fn main() -> eyre::Result<()> {
             "/image-deps/",
             FileServer::new(&*IMAGE_DEPS_DIR, rocket::fs::Options::NormalizeDirs),
         )
+        .mount(
+            "/cache/servo/",
+            FileServer::new(
+                &DOTENV.main_repo_path,
+                rocket::fs::Options::NormalizeDirs | rocket::fs::Options::DotFiles,
+            ),
+        )
         .launch()
     };
 

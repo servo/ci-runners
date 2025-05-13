@@ -1,1 +1,0 @@
-../ubuntu2204/configure-runner.sh

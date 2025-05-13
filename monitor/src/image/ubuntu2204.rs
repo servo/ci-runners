@@ -22,6 +22,8 @@ pub(super) fn rebuild(
     base_images_path: impl AsRef<Path>,
     profile: &Profile,
     snapshot_name: &str,
+    base_image_size: ByteSize,
+    wait_duration: Duration,
 ) -> eyre::Result<()> {
     let base_images_path = base_images_path.as_ref();
     let base_vm_name = &profile.base_vm_name;
@@ -39,12 +41,12 @@ pub(super) fn rebuild(
         .join("jammy-server-cloudimg-amd64.raw");
     let os_image = File::open(os_image_path)?;
     let base_image_path =
-        create_disk_image(base_images_path, snapshot_name, ByteSize::gib(20), os_image)?;
+        create_disk_image(base_images_path, snapshot_name, base_image_size, os_image)?;
 
     let guest_xml_path = get_profile_configuration_path(&profile, Path::new("guest.xml"))?;
     define_libvirt_guest(base_vm_name, guest_xml_path, &[&"-f", &base_image_path])?;
     start_libvirt_guest(base_vm_name, &[CdromImage::new("sda", config_iso_path)])?;
-    wait_for_guest(base_vm_name, Duration::from_secs(90))?;
+    wait_for_guest(base_vm_name, wait_duration)?;
 
     let base_image_filename = Path::new(
         base_image_path

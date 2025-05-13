@@ -3,12 +3,18 @@
   linkFarm,
   qemu,
   runCommand,
+  writeText,
 }: let
   jammy-server-cloudimg-amd64_img = fetchurl {
     url = "https://cloud-images.ubuntu.com/jammy/20250318/jammy-server-cloudimg-amd64.img";
     hash = "sha256-wZl8Ehv0n0iWtO3pSEPhY9LoIzkPh4ju2m9+nkvqQLg=";
   };
 in linkFarm "image-deps" {
+  "cargo-config.toml" = writeText "cargo-config.toml" ''
+    [build]
+    incremental = true
+  '';
+
   "macos13/rustup-init" = fetchurl {
     url = "https://static.rust-lang.org/rustup/archive/1.28.1/x86_64-apple-darwin/rustup-init";
     hash = "sha256-5LH57GE4YSMiR+DLY2HJuxqGUl1ijs1Ln+rcnvngwig=";

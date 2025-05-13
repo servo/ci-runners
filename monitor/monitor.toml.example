@@ -14,4 +14,12 @@ target_count = 2
 configuration_name = "ubuntu2204"
 base_vm_name = "servo-ubuntu2204"
 github_runner_label = "self-hosted-image:ubuntu2204"
-target_count = 2
+target_count = 1
+image_type = "Rust"
+
+[profiles.servo-ubuntu2204-wpt]
+configuration_name = "ubuntu2204-wpt"
+base_vm_name = "servo-ubuntu2204-wpt"
+github_runner_label = "self-hosted-image:ubuntu2204-wpt"
+target_count = 1
+image_type = "Rust"
