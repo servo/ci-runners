@@ -10,7 +10,6 @@ mod rocket_eyre;
 mod runner;
 mod settings;
 mod shell;
-mod zfs;
 
 use core::str;
 use std::{
@@ -54,7 +53,6 @@ use crate::{
     rocket_eyre::EyreReport,
     runner::{Runner, Runners, Status},
     settings::{Dotenv, Toml},
-    zfs::list_runner_volumes,
 };
 
 static LIB_MONITOR_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
@@ -399,16 +397,14 @@ fn monitor_thread() -> eyre::Result<()> {
     loop {
         let registrations = registrations_cache.get(|| list_registered_runners_for_host())?;
         let guests = list_runner_guests()?;
-        let volumes = list_runner_volumes()?;
-        trace!(?registrations, ?guests, ?volumes);
+        trace!(?registrations, ?guests);
         info!(
-            "{} registrations, {} guests, {} volumes",
+            "{} registrations, {} guests",
             registrations.len(),
             guests.len(),
-            volumes.len()
         );
 
-        let runners = Runners::new(registrations, guests, volumes);
+        let runners = Runners::new(registrations, guests);
         image_rebuilds.run(&mut profiles, &runners)?;
 
         let profile_runner_counts: BTreeMap<_, _> = profiles
@@ -435,10 +431,6 @@ fn monitor_thread() -> eyre::Result<()> {
                 profiles
                     .base_image_snapshot(key)
                     .map(|snapshot| match profile.image_type {
-                        profile::ImageType::BuildImageScript => format!(
-                            "{}/{}@{snapshot}",
-                            DOTENV.zfs_clone_prefix, profile.base_vm_name
-                        ),
                         profile::ImageType::Rust => profile
                             .base_image_path(&**snapshot)
                             .as_os_str()

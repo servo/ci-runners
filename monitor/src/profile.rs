@@ -5,11 +5,9 @@ use std::{
     net::Ipv4Addr,
     os::unix::fs::symlink,
     path::{Path, PathBuf},
-    process::Command,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use atomic_write_file::AtomicWriteFile;
 use jane_eyre::eyre::{self, bail, Context, OptionExt};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
@@ -20,8 +18,7 @@ use crate::{
     image::{create_runner, destroy_runner, register_runner},
     libvirt::{get_ipv4_address, update_screenshot},
     runner::{Runner, Runners, Status},
-    zfs::snapshot_creation_time_unix,
-    DOTENV, LIB_MONITOR_DIR, TOML,
+    DOTENV, TOML,
 };
 
 #[derive(Debug)]
@@ -44,7 +41,6 @@ pub struct Profile {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub enum ImageType {
     #[default]
-    BuildImageScript,
     Rust,
 }
 
@@ -98,26 +94,6 @@ impl Profiles {
         };
         info!(runner_id = id, profile.base_vm_name, "Creating runner");
         match profile.image_type {
-            ImageType::BuildImageScript => {
-                let exit_status = Command::new("./create-runner.sh")
-                    .current_dir(&*LIB_MONITOR_DIR)
-                    .args([
-                        &id.to_string(),
-                        &profile.base_vm_name,
-                        base_image_snapshot,
-                        &profile.configuration_name,
-                        &profile.github_runner_label,
-                    ])
-                    .spawn()
-                    .unwrap()
-                    .wait()
-                    .unwrap();
-                if exit_status.success() {
-                    Ok(())
-                } else {
-                    eyre::bail!("Command exited with status {}", exit_status);
-                }
-            }
             ImageType::Rust => {
                 let base_vm_name = &profile.base_vm_name;
                 create_dir(get_runner_data_path(id, None)?)?;
@@ -147,20 +123,6 @@ impl Profiles {
     pub fn destroy_runner(&self, profile: &Profile, id: usize) -> eyre::Result<()> {
         info!(runner_id = id, profile.base_vm_name, "Destroying runner");
         match profile.image_type {
-            ImageType::BuildImageScript => {
-                let exit_status = Command::new("./destroy-runner.sh")
-                    .current_dir(&*LIB_MONITOR_DIR)
-                    .args([&profile.base_vm_name, &id.to_string()])
-                    .spawn()
-                    .unwrap()
-                    .wait()
-                    .unwrap();
-                if exit_status.success() {
-                    Ok(())
-                } else {
-                    eyre::bail!("Command exited with status {}", exit_status);
-                }
-            }
             ImageType::Rust => {
                 let vm_name = format!("{}.{id}", profile.base_vm_name);
                 destroy_runner(profile, &vm_name)?;
@@ -307,19 +269,6 @@ impl Profiles {
             .duration_since(UNIX_EPOCH)
             .wrap_err("Failed to get current time")?;
         let creation_time = match profile.image_type {
-            ImageType::BuildImageScript => {
-                match snapshot_creation_time_unix(&profile.base_vm_name, base_image_snapshot) {
-                    Ok(result) => result,
-                    Err(error) => {
-                        debug!(
-                            profile.base_vm_name,
-                            ?error,
-                            "Failed to get snapshot creation time"
-                        );
-                        return Ok(None);
-                    }
-                }
-            }
             ImageType::Rust => {
                 let base_image_path = profile.base_image_path(&**base_image_snapshot);
                 let metadata = match std::fs::metadata(&base_image_path) {
@@ -397,29 +346,10 @@ impl Profiles {
 
         Ok(())
     }
-
-    pub fn write_base_image_snapshot(
-        profile_key: &str,
-        base_image_snapshot: &str,
-    ) -> eyre::Result<()> {
-        let path = get_profile_data_path(profile_key, Path::new("base-image-snapshot"))?;
-        let mut file = AtomicWriteFile::open(&path)?;
-        write!(file, "{base_image_snapshot}")?;
-        file.commit()?;
-
-        Ok(())
-    }
 }
 
 impl Profile {
     fn read_base_image_snapshot(&self) -> eyre::Result<Option<String>> {
-        let path = get_profile_data_path(&self.base_vm_name, Path::new("base-image-snapshot"))?;
-        if let Ok(mut file) = File::open(&path) {
-            let mut base_image_snapshot = String::default();
-            file.read_to_string(&mut base_image_snapshot)?;
-            return Ok(Some(base_image_snapshot));
-        }
-
         let path = self.base_image_path(None);
         if let Ok(path) = read_link(path) {
             let path = path.to_str().ok_or_eyre("Symlink target is unsupported")?;

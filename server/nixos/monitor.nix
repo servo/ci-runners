@@ -31,13 +31,7 @@
       ../../ubuntu2204-wpt
       ../../windows10
       ../../common.sh
-      ../../create-runner.sh
-      ../../destroy-runner.sh
-      ../../download.sh
-      ../../inject.sh
       ../../list-registered-runners.sh
-      ../../list-runner-volumes.sh
-      ../../mount-runner.sh
       ../../register-runner.sh
       ../../reserve-runner.sh
       ../../unregister-runner.sh
@@ -92,13 +86,7 @@ in stdenv.mkDerivation rec {
     cp -R ubuntu2204-wpt $out/lib/monitor
     cp -R windows10 $out/lib/monitor
     cp -R common.sh $out/lib/monitor
-    cp -R create-runner.sh $out/lib/monitor
-    cp -R destroy-runner.sh $out/lib/monitor
-    cp -R download.sh $out/lib/monitor
-    cp -R inject.sh $out/lib/monitor
     cp -R list-registered-runners.sh $out/lib/monitor
-    cp -R list-runner-volumes.sh $out/lib/monitor
-    cp -R mount-runner.sh $out/lib/monitor
     cp -R register-runner.sh $out/lib/monitor
     cp -R reserve-runner.sh $out/lib/monitor
     cp -R unregister-runner.sh $out/lib/monitor

@@ -24,7 +24,7 @@ use crate::{
     profile::{Profile, Profiles},
     runner::Runners,
     shell::log_output_as_info,
-    DOTENV, LIB_MONITOR_DIR,
+    DOTENV,
 };
 
 #[derive(Debug, Default)]
@@ -104,18 +104,6 @@ impl Rebuilds {
             let key_for_thread = key.clone();
             let snapshot_name_for_thread = snapshot_name.clone();
             let thread = match profile.image_type {
-                crate::profile::ImageType::BuildImageScript => {
-                    let build_script_path = Path::new(&*LIB_MONITOR_DIR)
-                        .join(&profile.configuration_name)
-                        .join("build-image.sh");
-                    thread::spawn(move || {
-                        rebuild_with_build_image_script(
-                            &key_for_thread,
-                            build_script_path,
-                            &snapshot_name_for_thread,
-                        )
-                    })
-                }
                 crate::profile::ImageType::Rust => {
                     let profile = profile.clone();
                     thread::spawn(move || {
@@ -169,21 +157,6 @@ fn servo_update_thread() -> eyre::Result<()> {
     // Allow git-clone(1) <https://stackoverflow.com/a/19707416>
     spawn_with_output!(git -C $main_repo_path update-server-info 2>&1)?
         .wait_with_pipe(&mut pipe())?;
-
-    Ok(())
-}
-
-#[tracing::instrument(skip(build_script_path, snapshot_name))]
-fn rebuild_with_build_image_script(
-    profile_key: &str,
-    build_script_path: impl AsRef<Path>,
-    snapshot_name: &str,
-) -> eyre::Result<()> {
-    let build_script_path = build_script_path.as_ref();
-    info!(build_script_path = ?build_script_path, ?snapshot_name, "Starting image rebuild");
-    let pipe = || |reader| log_output_as_info(reader);
-    spawn_with_output!($build_script_path $snapshot_name 2>&1)?.wait_with_pipe(&mut pipe())?;
-    Profiles::write_base_image_snapshot(profile_key, snapshot_name)?;
 
     Ok(())
 }

@@ -8,15 +8,7 @@ This repo contains:
 - Templates for CI runner images
     - `windows10/*` is for **Windows 10** runners
     - `ubuntu2204/*` is for **Ubuntu 22.04** runners
-- Scripts for building CI runner images
-    - `*/configure-base.sh`
-    - `*/configure-runner.sh`
-- Scripts for creating and managing runners
-    - `create-runner.sh` creates and registers a new runner
-    - `destroy-runner.sh` destroys the libvirt guest and ZFS volume for a runner
-    - `register-runner.sh` registers a runner with the GitHub API
-    - `unregister-runner.sh` unregisters a runner with the GitHub API
-    - `mount-runner.sh` mounts the main filesystem of a runner on the host
+    - `macos13/*` is for **macOS 13** runners
 - A service that automates runner management
     - `monitor` is the service
     - `.env.example` contains the settings
@@ -143,17 +135,19 @@ To prepare a server for Windows 10 guests:
     - Windows 10 (multi-edition ISO), English (United States): [Win10_22H2_English_x64v1.iso](https://www.microsoft.com/en-us/software-download/windows10ISO) (sha256 = a6f470ca6d331eb353b815c043e327a347f594f37ff525f17764738fe812852e)
     - Hint: grab the link, then `curl -Lo Win10_22H2_English_x64v1.iso '<link>'`
 
-Building the base vm image is handled automatically by the monitor, with the help of `ubuntu2204/build-image.sh`.
+Building the base vm image is handled automatically by the monitor.
 
 Ubuntu runner
 -------------
 
 Runners created from this image preinstall all dependencies (including those specified in the main repo, like mach bootstrap deps), preload the main repo, and prebuild Servo in the release profile.
 
-Building the base vm image is handled automatically by the monitor, with the help of `ubuntu2204/build-image.sh`.
+Building the base vm image is handled automatically by the monitor.
 
 macOS 13 runner
 ---------------
+
+Runners created from this image preinstall all dependencies (including those specified in the main repo, like mach bootstrap deps), preload the main repo, and prebuild Servo in the release profile.
 
 To prepare a server for macOS 13 guests, build a clean image:
 
@@ -215,4 +209,4 @@ To prepare a server for macOS 13 guests, build a clean image:
 - When the guest shuts down, take another snapshot: `zfs snapshot tank/base/servo-macos13.clean@automated`
 - Enable per-snapshot block devices for the zvol: `zfs set snapdev=visible tank/base/servo-macos13.clean`
 
-Building the base vm image is handled automatically by the monitor, with the help of `macos13/build-image.sh`.
+Building the base vm image is handled automatically by the monitor.

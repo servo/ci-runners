@@ -36,7 +36,6 @@ pub struct Runner {
     created_time: SystemTime,
     registration: Option<ApiRunner>,
     guest_name: Option<String>,
-    volume_name: Option<String>,
     ipv4_address: Option<Ipv4Addr>,
     github_jitconfig: Option<String>,
     details: RunnerDetails,
@@ -58,11 +57,7 @@ pub enum Status {
 }
 
 impl Runners {
-    pub fn new(
-        registrations: Vec<ApiRunner>,
-        guest_names: Vec<String>,
-        volume_names: Vec<String>,
-    ) -> Self {
+    pub fn new(registrations: Vec<ApiRunner>, guest_names: Vec<String>) -> Self {
         // Gather all known runner ids with live resources.
         let registration_ids = registrations
             .iter()
@@ -75,18 +70,12 @@ impl Runners {
             .flat_map(|guest| guest.rsplit_once('.'))
             .flat_map(|(_, id)| id.parse())
             .collect::<Vec<usize>>();
-        let volume_ids = volume_names
-            .iter()
-            .flat_map(|volume| volume.rsplit_once('.'))
-            .flat_map(|(_, id)| id.parse())
-            .collect::<Vec<usize>>();
         let ids: BTreeSet<usize> = registration_ids
             .iter()
             .copied()
             .chain(guest_ids.iter().copied())
-            .chain(volume_ids.iter().copied())
             .collect();
-        trace!(?ids, ?registration_ids, ?guest_ids, ?volume_ids);
+        trace!(?ids, ?registration_ids, ?guest_ids);
 
         // Create a tracking object for each runner id.
         let mut runners = BTreeMap::default();
@@ -116,11 +105,6 @@ impl Runners {
                 let ipv4_address = get_ipv4_address(&guest_name);
                 runner.guest_name = Some(guest_name);
                 runner.ipv4_address = ipv4_address;
-            }
-        }
-        for (id, volume_name) in volume_ids.iter().zip(volume_names) {
-            if let Some(runner) = runners.get_mut(id) {
-                runner.volume_name = Some(volume_name);
             }
         }
 
@@ -307,7 +291,6 @@ impl Runner {
             created_time,
             registration: None,
             guest_name: None,
-            volume_name: None,
             ipv4_address: None,
             github_jitconfig: github_jitconfig,
             details,
@@ -369,7 +352,7 @@ impl Runner {
     }
 
     pub fn status(&self) -> Status {
-        if self.guest_name.is_none() || (self.needs_zfs_volume() && self.volume_name.is_none()) {
+        if self.guest_name.is_none() {
             return Status::Invalid;
         };
         let Some(registration) = &self.registration else {
@@ -387,17 +370,9 @@ impl Runner {
         return Status::StartedOrCrashed;
     }
 
-    fn needs_zfs_volume(&self) -> bool {
-        match self.details.image_type {
-            ImageType::BuildImageScript => true,
-            ImageType::Rust => false,
-        }
-    }
-
     pub fn base_vm_name(&self) -> &str {
         self.base_vm_name_from_registration()
             .or_else(|| self.base_vm_name_from_guest_name())
-            .or_else(|| self.base_vm_name_from_volume_name())
             .expect("Guaranteed by Runners::new")
     }
 
@@ -417,15 +392,6 @@ impl Runner {
             .flat_map(|name| name.strip_prefix(&prefix))
             .flat_map(|name| name.rsplit_once('.'))
             .map(|(base, _id)| base)
-            .next()
-    }
-
-    fn base_vm_name_from_volume_name(&self) -> Option<&str> {
-        self.volume_name
-            .iter()
-            .flat_map(|path| path.rsplit_once('.'))
-            .flat_map(|(rest, _id)| rest.rsplit_once('/'))
-            .map(|(_rest, base)| base)
             .next()
     }
 }
