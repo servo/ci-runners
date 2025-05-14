@@ -239,7 +239,11 @@ reg import system.reg
 echo "curl.exe -fsSo C:\ci\servo-ci-boot.ps1 --max-time 5 --retry 99 --retry-all-errors http://192.168.100.1:8000/boot" > init.ps1
 echo "C:\ci\servo-ci-boot.ps1" >> init.ps1
 
-.\init.ps1
+# We could run init.ps1 here, but this PowerShell window is weird, causing our script to hang with:
+# > Confirm
+# > warn: installing msvc toolchain without its prerequisites
+# > [Y] Yes  [A] Yes to All  [H] Halt Command  [S] Suspend  [?] Help (default is "Y"):
+shutdown /r /t 0
 		</File>
 		<File path="C:\Windows\Setup\Scripts\Specialize.ps1" transformation="Text">
 $scripts = @(
