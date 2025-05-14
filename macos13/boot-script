@@ -20,6 +20,9 @@ bake_servo_repo() (
     # Note the parentheses around this block, so we only cd for this function
     cd ~/a/servo/servo
 
+    # Fix the remote url, since it’s still set to our cache
+    git remote set-url origin https://github.com/servo/servo.git
+
     # Install the Rust toolchain, for checkouts without servo#35795
     rustup show active-toolchain || rustup toolchain install
 
