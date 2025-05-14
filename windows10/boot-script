@@ -122,8 +122,9 @@ if (!(Test-Path .\image-built)) {
     .\mach bootstrap --skip-platform; Check
 
     # Save a copy of the environment variables that can break incremental builds, for debugging.
-    echo "`$env:LIBCLANG_PATH in runner image = $env:LIBCLANG_PATH" > C:\ci\incremental_build_debug.txt
-    echo "`$env:PATH in runner image = $env:PATH" >> C:\ci\incremental_build_debug.txt
+    mkdir -p C:\init
+    echo "`$env:LIBCLANG_PATH in runner image = $env:LIBCLANG_PATH" > C:\init\incremental_build_debug.txt
+    echo "`$env:PATH in runner image = $env:PATH" >> C:\init\incremental_build_debug.txt
 
     $env:RUSTUP_WINDOWS_PATH_ADD_BIN = 1
     # Build the same way as a typical Windows libservo job, to allow for incremental builds.
