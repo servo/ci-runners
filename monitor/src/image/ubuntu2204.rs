@@ -87,6 +87,8 @@ pub fn create_runner(profile: &Profile, vm_name: &str) -> eyre::Result<()> {
 pub fn destroy_runner(vm_name: &str) -> eyre::Result<()> {
     let prefixed_vm_name = format!("{}-{vm_name}", DOTENV.libvirt_prefix);
     let pipe = || |reader| log_output_as_info(reader);
+    let _ =
+        spawn_with_output!(virsh destroy -- $prefixed_vm_name 2>&1)?.wait_with_pipe(&mut pipe());
     let _ = spawn_with_output!(virsh undefine --nvram --storage vda -- $prefixed_vm_name 2>&1)?
         .wait_with_pipe(&mut pipe());
 
