@@ -12,6 +12,7 @@
   gh,
   git,
   gnused,
+  jq,
   libvirt,
   openssh,
   time,
@@ -31,7 +32,6 @@
       ../../ubuntu2204-wpt
       ../../windows10
       ../../common.sh
-      ../../list-registered-runners.sh
       ../../register-runner.sh
       ../../reserve-runner.sh
       ../../unregister-runner.sh
@@ -61,6 +61,7 @@ in stdenv.mkDerivation rec {
     gh
     git
     gnused  # for sed(1)
+    jq
     libvirt  # for virsh(1)
     openssh  # for ssh(1)
     time  # for time(1)
@@ -86,7 +87,6 @@ in stdenv.mkDerivation rec {
     cp -R ubuntu2204-wpt $out/lib/monitor
     cp -R windows10 $out/lib/monitor
     cp -R common.sh $out/lib/monitor
-    cp -R list-registered-runners.sh $out/lib/monitor
     cp -R register-runner.sh $out/lib/monitor
     cp -R reserve-runner.sh $out/lib/monitor
     cp -R unregister-runner.sh $out/lib/monitor

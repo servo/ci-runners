@@ -83,18 +83,12 @@ impl<Response: Clone + Debug> Cache<Response> {
 }
 
 fn list_registered_runners() -> eyre::Result<Vec<ApiRunner>> {
-    let output = Command::new("./list-registered-runners.sh")
-        .current_dir(&*LIB_MONITOR_DIR)
-        .stdout(Stdio::piped())
-        .spawn()
-        .unwrap()
-        .wait_with_output()
-        .unwrap();
-    if output.status.success() {
-        return serde_json::from_slice(&output.stdout).wrap_err("Failed to parse JSON");
-    } else {
-        eyre::bail!("Command exited with status {}", output.status);
-    }
+    let github_api_scope = &DOTENV.github_api_scope;
+    let result = run_fun!(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
+    "$github_api_scope/actions/runners" --paginate -q ".runners[]"
+    | jq -s .)?;
+
+    Ok(serde_json::from_str(&result).wrap_err("Failed to parse JSON")?)
 }
 
 pub fn list_registered_runners_for_host() -> eyre::Result<Vec<ApiRunner>> {
