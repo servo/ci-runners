@@ -18,7 +18,7 @@ use tracing::{error, info, trace, warn};
 use crate::{
     auth::RemoteAddr,
     data::get_runner_data_path,
-    github::{ApiGenerateJitconfigResponse, ApiRunner},
+    github::{unregister_runner, ApiGenerateJitconfigResponse, ApiRunner},
     libvirt::{get_ipv4_address, libvirt_prefix, take_screenshot, update_screenshot},
     profile::ImageType,
     LIB_MONITOR_DIR,
@@ -130,18 +130,9 @@ impl Runners {
             bail!("Tried to unregister an unregistered runner");
         };
         info!(runner_id = id, registration.id, "Unregistering runner");
-        let exit_status = Command::new("./unregister-runner.sh")
-            .current_dir(&*LIB_MONITOR_DIR)
-            .arg(&registration.id.to_string())
-            .spawn()
-            .unwrap()
-            .wait()
-            .unwrap();
-        if exit_status.success() {
-            return Ok(());
-        } else {
-            eyre::bail!("Command exited with status {}", exit_status);
-        }
+        unregister_runner(registration.id)?;
+
+        Ok(())
     }
 
     pub fn reserve_runner(

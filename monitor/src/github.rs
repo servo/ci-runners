@@ -1,15 +1,11 @@
-use std::{
-    fmt::Debug,
-    process::{Command, Stdio},
-    time::Instant,
-};
+use std::{fmt::Debug, time::Instant};
 
-use cmd_lib::run_fun;
+use cmd_lib::{run_cmd, run_fun};
 use jane_eyre::eyre::{self, Context};
 use serde::{Deserialize, Serialize};
 use tracing::trace;
 
-use crate::{DOTENV, LIB_MONITOR_DIR};
+use crate::DOTENV;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ApiRunner {
@@ -109,4 +105,12 @@ pub fn register_runner(name: &str, label: &str, work_folder: &str) -> eyre::Resu
     -f "labels[]=self-hosted" -f "labels[]=X64" -f "labels[]=$label")?;
 
     Ok(result)
+}
+
+pub fn unregister_runner(id: usize) -> eyre::Result<()> {
+    let github_api_scope = &DOTENV.github_api_scope;
+    run_cmd!(gh api --method DELETE -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
+        "$github_api_scope/actions/runners/$id")?;
+
+    Ok(())
 }

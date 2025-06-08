@@ -34,7 +34,6 @@
       ../../common.sh
       ../../register-runner.sh
       ../../reserve-runner.sh
-      ../../unregister-runner.sh
     ]
   );
 in stdenv.mkDerivation rec {
@@ -89,7 +88,6 @@ in stdenv.mkDerivation rec {
     cp -R common.sh $out/lib/monitor
     cp -R register-runner.sh $out/lib/monitor
     cp -R reserve-runner.sh $out/lib/monitor
-    cp -R unregister-runner.sh $out/lib/monitor
   '';
 
   postFixup = ''
