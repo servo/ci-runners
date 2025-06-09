@@ -6,8 +6,8 @@ use core::str;
 use std::{
     collections::BTreeMap,
     ffi::OsStr,
-    fs::{create_dir_all, File},
-    io::{Read, Seek, Write},
+    fs::{create_dir_all, read_dir, read_link, remove_file, File},
+    io::{ErrorKind, Read, Seek, Write},
     mem::take,
     path::{Path, PathBuf},
     thread::{self, JoinHandle},
@@ -18,7 +18,7 @@ use bytesize::{ByteSize, MIB};
 use chrono::{SecondsFormat, Utc};
 use cmd_lib::{run_cmd, spawn_with_output};
 use jane_eyre::eyre::{self, bail, OptionExt};
-use tracing::{error, info, warn};
+use tracing::{error, info, trace, warn};
 
 use crate::{
     profile::{Profile, Profiles},
@@ -177,7 +177,7 @@ fn rebuild_with_rust(
         run_cmd!(virsh undefine --nvram -- $base_vm_name)?;
     }
 
-    match &*profile.configuration_name {
+    match match &*profile.configuration_name {
         "macos13" => macos13::rebuild(
             base_images_path,
             &profile,
@@ -214,6 +214,38 @@ fn rebuild_with_rust(
             Duration::from_secs(3000),
         ),
         other => todo!("Rebuild not yet implemented: {other}"),
+    } {
+        Ok(()) => {
+            prune_images(&profile)?;
+        }
+        Err(error) => {
+            warn!(?error, "Image rebuild error");
+            delete_image(&profile, snapshot_name);
+        }
+    }
+
+    Ok(())
+}
+
+pub fn prune_images(profile: &Profile) -> eyre::Result<()> {
+    match &*profile.configuration_name {
+        "macos13" => macos13::prune_images(profile),
+        "ubuntu2204" => ubuntu2204::prune_images(profile),
+        "ubuntu2204-rust" => ubuntu2204::prune_images(profile),
+        "ubuntu2204-wpt" => ubuntu2204::prune_images(profile),
+        "windows10" => windows10::prune_images(profile),
+        other => todo!("Image pruning not yet implemented: {other}"),
+    }
+}
+
+pub fn delete_image(profile: &Profile, snapshot_name: &str) {
+    match &*profile.configuration_name {
+        "macos13" => macos13::delete_image(profile, snapshot_name),
+        "ubuntu2204" => ubuntu2204::delete_image(profile, snapshot_name),
+        "ubuntu2204-rust" => ubuntu2204::delete_image(profile, snapshot_name),
+        "ubuntu2204-wpt" => ubuntu2204::delete_image(profile, snapshot_name),
+        "windows10" => windows10::delete_image(profile, snapshot_name),
+        other => todo!("Image pruning not yet implemented: {other}"),
     }
 }
 
@@ -256,6 +288,74 @@ pub(self) fn create_base_images_dir(profile: &Profile) -> eyre::Result<PathBuf> 
     create_dir_all(&base_images_path)?;
 
     Ok(base_images_path)
+}
+
+pub(self) fn prune_base_image_files(profile: &Profile, prefix: &str) -> eyre::Result<()> {
+    let base_images_path = profile.base_images_path();
+    info!(?base_images_path, "Pruning base image files");
+    create_dir_all(&base_images_path)?;
+
+    let matches_prefix = |target: &str| {
+        target
+            .strip_prefix(prefix)
+            .and_then(move |f| f.strip_prefix("@"))
+            .is_some()
+    };
+
+    // Check the symlink target for the most recent successful build.
+    let mut symlink = match read_link(base_images_path.join(prefix)) {
+        Ok(result) => Some(result),
+        Err(error) if error.kind() == ErrorKind::NotFound => None,
+        Err(other) => Err(other)?,
+    };
+
+    // The symlink target should be of the form `{prefix}@{snapshot_name}`.
+    if let Some(target) = symlink.as_ref() {
+        let target = target.to_str().ok_or_eyre("Unsupported path")?;
+        if !matches_prefix(target) {
+            warn!(target, "Unexpected symlink target format");
+            symlink.take();
+        }
+    }
+
+    // Build a sorted list of filenames starting with `{prefix}@`.
+    let mut filenames = vec![];
+    for entry in read_dir(&base_images_path)? {
+        let filename = entry?.file_name();
+        let filename = filename.to_str().ok_or_eyre("Unsupported path")?;
+        if matches_prefix(filename) {
+            filenames.push(filename.to_owned());
+        }
+    }
+    filenames.sort();
+
+    // Delete all of those files, except the most recent successful build and up to three builds before that.
+    // Since the snapshot names are RFC 3339 timestamps, we can use the sorted order (until year 10000).
+    // FIXME: past images may be bad, if the monitor was restarted during an image build.
+    let mut filenames = filenames.iter().rev();
+    while let Some(filename) = filenames.next() {
+        if let Some(target) = symlink.as_ref() {
+            if Path::new(filename) == target {
+                trace!(filename, "Keeping");
+                filenames.next();
+                filenames.next();
+                filenames.next();
+                continue;
+            }
+        }
+        delete_base_image_file(profile, filename);
+    }
+
+    Ok(())
+}
+
+pub(self) fn delete_base_image_file(profile: &Profile, filename: &str) {
+    let base_images_path = profile.base_images_path();
+    let path = base_images_path.join(filename);
+    info!(?path, "Deleting");
+    if let Err(error) = remove_file(&path) {
+        warn!(?path, ?error, "Failed to delete");
+    }
 }
 
 pub(self) fn create_disk_image(

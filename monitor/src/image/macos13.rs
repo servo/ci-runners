@@ -8,6 +8,8 @@ use cmd_lib::run_cmd;
 use cmd_lib::spawn_with_output;
 use jane_eyre::eyre;
 
+use crate::image::delete_base_image_file;
+use crate::image::prune_base_image_files;
 use crate::profile::Profile;
 use crate::shell::atomic_symlink;
 use crate::shell::log_output_as_info;
@@ -52,6 +54,16 @@ pub(super) fn rebuild(
     atomic_symlink(base_image_filename, base_image_symlink_path)?;
 
     Ok(())
+}
+
+pub(super) fn prune_images(profile: &Profile) -> eyre::Result<()> {
+    prune_base_image_files(profile, "base.img")?;
+
+    Ok(())
+}
+
+pub(super) fn delete_image(profile: &Profile, snapshot_name: &str) {
+    delete_base_image_file(profile, &format!("base.img@{snapshot_name}"));
 }
 
 pub fn register_runner(profile: &Profile, vm_name: &str) -> eyre::Result<String> {
