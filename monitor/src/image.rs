@@ -171,43 +171,39 @@ fn rebuild_with_rust(
 
     let base_images_path = create_base_images_dir(&profile)?;
     let base_vm_name = &profile.base_vm_name;
-    if run_cmd!(virsh domstate -- $base_vm_name).is_ok() {
-        // FIXME make this idempotent in a less noisy way?
-        let _ = run_cmd!(virsh destroy -- $base_vm_name);
-        run_cmd!(virsh undefine --nvram -- $base_vm_name)?;
-    }
+    undefine_libvirt_guest(base_vm_name)?;
 
-    match match &*profile.configuration_name {
+    match match match &*profile.configuration_name {
         "macos13" => macos13::rebuild(
-            base_images_path,
+            &base_images_path,
             &profile,
             snapshot_name,
             ByteSize::gib(90),
             Duration::from_secs(2000),
         ),
         "ubuntu2204" => ubuntu2204::rebuild(
-            base_images_path,
+            &base_images_path,
             &profile,
             snapshot_name,
             ByteSize::gib(90),
             Duration::from_secs(2000),
         ),
         "ubuntu2204-rust" => ubuntu2204::rebuild(
-            base_images_path,
+            &base_images_path,
             &profile,
             snapshot_name,
             ByteSize::gib(20),
             Duration::from_secs(90),
         ),
         "ubuntu2204-wpt" => ubuntu2204::rebuild(
-            base_images_path,
+            &base_images_path,
             &profile,
             snapshot_name,
             ByteSize::gib(90),
             Duration::from_secs(2000),
         ),
         "windows10" => windows10::rebuild(
-            base_images_path,
+            &base_images_path,
             &profile,
             snapshot_name,
             ByteSize::gib(90),
@@ -215,17 +211,42 @@ fn rebuild_with_rust(
         ),
         other => todo!("Rebuild not yet implemented: {other}"),
     } {
-        Ok(()) => {
+        result @ Ok(()) => {
             prune_images(&profile)?;
+            result
         }
         Err(error) => {
             warn!(?error, "Image rebuild error");
             delete_image(&profile, snapshot_name);
-            return Err(error);
+            Err(error)
+        }
+    } {
+        result => {
+            // After a rebuild attempt, the base guest should always use the symlinks to the last known good image.
+            // On success, these will be the new image files. On failure, these will be the old image files.
+            match &*profile.configuration_name {
+                "macos13" => {
+                    macos13::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
+                }
+                "ubuntu2204" => {
+                    ubuntu2204::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
+                }
+                "ubuntu2204-rust" => {
+                    ubuntu2204::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
+                }
+                "ubuntu2204-wpt" => {
+                    ubuntu2204::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
+                }
+                "windows10" => {
+                    windows10::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
+                }
+                other => {
+                    todo!("Redefining base guest with symlinks not implemented: {other}")
+                }
+            }
+            result
         }
     }
-
-    Ok(())
 }
 
 pub fn prune_images(profile: &Profile) -> eyre::Result<()> {
@@ -414,13 +435,36 @@ pub(self) fn define_libvirt_guest(
     base_vm_name: &str,
     guest_xml_path: impl AsRef<Path>,
     args: &[&dyn AsRef<OsStr>],
+    cdrom_images: &[CdromImage],
 ) -> eyre::Result<()> {
     // This dance is needed to randomise the MAC address of the guest.
     let guest_xml_path = guest_xml_path.as_ref();
     let args = args.iter().map(|x| x.as_ref()).collect::<Vec<_>>();
     run_cmd!(virsh define -- $guest_xml_path)?;
     run_cmd!(virt-clone --preserve-data --check path_in_use=off -o $base_vm_name.init -n $base_vm_name $[args])?;
+    libvirt_change_media(base_vm_name, cdrom_images)?;
     run_cmd!(virsh undefine -- $base_vm_name.init)?;
+
+    Ok(())
+}
+
+pub(self) fn libvirt_change_media(
+    base_vm_name: &str,
+    cdrom_images: &[CdromImage],
+) -> eyre::Result<()> {
+    for CdromImage { target_dev, path } in cdrom_images {
+        run_cmd!(virsh change-media -- $base_vm_name $target_dev $path)?;
+    }
+
+    Ok(())
+}
+
+pub(self) fn undefine_libvirt_guest(base_vm_name: &str) -> eyre::Result<()> {
+    if run_cmd!(virsh domstate -- $base_vm_name).is_ok() {
+        // FIXME make this idempotent in a less noisy way?
+        let _ = run_cmd!(virsh destroy -- $base_vm_name);
+        run_cmd!(virsh undefine --nvram -- $base_vm_name)?;
+    }
 
     Ok(())
 }
@@ -434,14 +478,9 @@ impl<'path> CdromImage<'path> {
         Self { target_dev, path }
     }
 }
-pub fn start_libvirt_guest(guest_name: &str, cdrom_images: &[CdromImage]) -> eyre::Result<()> {
+pub fn start_libvirt_guest(guest_name: &str) -> eyre::Result<()> {
     info!("Starting guest");
-    // FIXME: This dance is only needed because `virt-clone -f` ignores cdrom drives.
-    run_cmd!(virsh start --paused -- $guest_name)?;
-    for CdromImage { target_dev, path } in cdrom_images {
-        run_cmd!(virsh change-media -- $guest_name $target_dev $path)?;
-    }
-    run_cmd!(virsh resume -- $guest_name)?;
+    run_cmd!(virsh start -- $guest_name)?;
 
     Ok(())
 }

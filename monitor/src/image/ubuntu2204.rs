@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::fs::File;
 use std::path::Path;
 use std::time::Duration;
@@ -12,6 +13,7 @@ use tracing::info;
 use crate::data::get_profile_configuration_path;
 use crate::image::delete_base_image_file;
 use crate::image::prune_base_image_files;
+use crate::image::undefine_libvirt_guest;
 use crate::profile::Profile;
 use crate::shell::atomic_symlink;
 use crate::shell::log_output_as_info;
@@ -49,9 +51,12 @@ pub(super) fn rebuild(
     let base_image_path =
         create_disk_image(base_images_path, snapshot_name, base_image_size, os_image)?;
 
-    let guest_xml_path = get_profile_configuration_path(&profile, Path::new("guest.xml"))?;
-    define_libvirt_guest(base_vm_name, guest_xml_path, &[&"-f", &base_image_path])?;
-    start_libvirt_guest(base_vm_name, &[CdromImage::new("sda", config_iso_path)])?;
+    define_base_guest(
+        profile,
+        &base_image_path,
+        &[CdromImage::new("sda", config_iso_path)],
+    )?;
+    start_libvirt_guest(base_vm_name)?;
     wait_for_guest(base_vm_name, wait_duration)?;
 
     let base_image_filename = Path::new(
@@ -61,6 +66,43 @@ pub(super) fn rebuild(
     );
     atomic_symlink(config_iso_filename, config_iso_symlink_path)?;
     atomic_symlink(base_image_filename, base_image_symlink_path)?;
+
+    Ok(())
+}
+
+pub(super) fn redefine_base_guest_with_symlinks(
+    base_images_path: impl AsRef<Path>,
+    profile: &Profile,
+) -> Result<(), eyre::Error> {
+    let base_images_path = base_images_path.as_ref();
+    let config_iso_symlink_path = base_images_path.join(format!("config.iso"));
+    let config_iso_symlink_path = config_iso_symlink_path
+        .to_str()
+        .ok_or_eyre("Unsupported path")?;
+    let base_image_symlink_path = base_images_path.join(format!("base.img"));
+    undefine_libvirt_guest(&profile.base_vm_name)?;
+    define_base_guest(
+        profile,
+        &base_image_symlink_path,
+        &[CdromImage::new("sda", &config_iso_symlink_path)],
+    )?;
+
+    Ok(())
+}
+
+fn define_base_guest(
+    profile: &Profile,
+    base_image_path: &dyn AsRef<OsStr>,
+    cdrom_images: &[CdromImage],
+) -> eyre::Result<()> {
+    let base_vm_name = &profile.base_vm_name;
+    let guest_xml_path = get_profile_configuration_path(&profile, Path::new("guest.xml"))?;
+    define_libvirt_guest(
+        base_vm_name,
+        guest_xml_path,
+        &[&"-f", &base_image_path],
+        cdrom_images,
+    )?;
 
     Ok(())
 }
@@ -87,13 +129,7 @@ pub fn create_runner(profile: &Profile, vm_name: &str) -> eyre::Result<()> {
     let base_vm_name = &profile.base_vm_name;
     spawn_with_output!(virt-clone --auto-clone --reflink -o $base_vm_name -n $prefixed_vm_name 2>&1)?
         .wait_with_pipe(&mut pipe())?;
-
-    let config_iso_path = profile.base_images_path().join("config.iso");
-    let config_iso_path = config_iso_path.to_str().ok_or_eyre("Unsupported path")?;
-    start_libvirt_guest(
-        &prefixed_vm_name,
-        &[CdromImage::new("sda", config_iso_path)],
-    )?;
+    start_libvirt_guest(&prefixed_vm_name)?;
 
     Ok(())
 }
