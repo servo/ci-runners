@@ -221,6 +221,7 @@ fn rebuild_with_rust(
         Err(error) => {
             warn!(?error, "Image rebuild error");
             delete_image(&profile, snapshot_name);
+            return Err(error);
         }
     }
 
