@@ -145,6 +145,7 @@ impl Rebuilds {
 
 #[tracing::instrument]
 fn servo_update_thread() -> eyre::Result<()> {
+    return Ok(());
     info!("Starting repo update");
 
     let main_repo_path = &DOTENV.main_repo_path;

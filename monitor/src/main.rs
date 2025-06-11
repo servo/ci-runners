@@ -375,7 +375,7 @@ async fn main() -> eyre::Result<()> {
         .launch()
     };
 
-    try_join!(rocket("::1"), rocket("192.168.100.1"))?;
+    try_join!(rocket("192.168.100.1"))?;
 
     Ok(())
 }

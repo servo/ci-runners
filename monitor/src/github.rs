@@ -80,9 +80,10 @@ impl<Response: Clone + Debug> Cache<Response> {
 
 fn list_registered_runners() -> eyre::Result<Vec<ApiRunner>> {
     let github_api_scope = &DOTENV.github_api_scope;
-    let result = run_fun!(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
-    "$github_api_scope/actions/runners" --paginate -q ".runners[]"
-    | jq -s .)?;
+    // let result = run_fun!(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
+    // "$github_api_scope/actions/runners" --paginate -q ".runners[]"
+    // | jq -s .)?;
+    let result = "[]";
 
     Ok(serde_json::from_str(&result).wrap_err("Failed to parse JSON")?)
 }
