@@ -16,7 +16,7 @@ USER root
 # Java is required for signing the hap, libatomic1 for hdc
 RUN apt-get update && \
     apt-get -y install --no-install-recommends \
-        openjdk-21-jre-headless libatomic1 libc6 jq \
+        openjdk-21-jre-headless libatomic1 libc6 build-essential jq \
     && rm -rf /var/cache/apt/lists
 
 ARG USERNAME
@@ -37,6 +37,6 @@ ADD hdc.tar /usr/bin/
 
 COPY sign.sh /usr/bin/sign-hos.sh
 
-COPY --from=rust /root/.cargo/bin/hitrace-bench /data/hitrace-bench
-ENV PATH="/home/${USERNAME}/.local/bin:/data:/data/commandline-tools/sdk/default/openharmony/toolchains/:${PATH}"
+COPY --from=rust /root/.cargo/bin /data/cargo
+ENV PATH="/home/${USERNAME}/.local/bin:/data:/data/cargo:/data/commandline-tools/sdk/default/openharmony/toolchains/:${PATH}"
 
