@@ -43,8 +43,6 @@ pub(super) fn rebuild(
         create_disk_image(base_images_path, snapshot_name, base_image_size, os_image)?;
 
     define_base_guest(profile, &base_image_path, &[])?;
-    // Clone the hand-made clean guest, since we can’t yet automate the macOS install
-    run_cmd!(virt-clone --preserve-data --check path_in_use=off -o $base_vm_name.clean -n $base_vm_name --nvram /var/lib/libvirt/images/OSX-KVM/OVMF_VARS.$base_vm_name.fd --skip-copy sda -f $base_image_path --skip-copy sdc)?;
     let ovmf_vars_clean_path =
         format!("/var/lib/libvirt/images/OSX-KVM/OVMF_VARS.{base_vm_name}.clean.fd");
     let ovmf_vars_path = format!("/var/lib/libvirt/images/OSX-KVM/OVMF_VARS.{base_vm_name}.fd");
