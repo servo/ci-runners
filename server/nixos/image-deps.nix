@@ -79,7 +79,7 @@ in linkFarm "image-deps" {
   };
   "windows10/vs_community.exe" = fetchurl {
     url = "https://aka.ms/vs/17/release/vs_community.exe";
-    hash = "sha256-nLAoAlMONtZ3NvDncAJceCMnuJzhFF/1gAKPCB1NH0k=";
+    hash = "sha256-a7Q8VAwF4JMHf3EOU6Bc9MiHBifudxBUORzOXrGOCsU=";
   };
   "windows10/rustup-init.exe" = fetchurl {
     url = "https://static.rust-lang.org/rustup/archive/1.28.1/x86_64-pc-windows-msvc/rustup-init.exe";
