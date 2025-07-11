@@ -53,7 +53,7 @@
     </disk>
     <disk type='file' device='cdrom'>
       <driver name='qemu' type='raw'/>
-      <source file='/var/lib/libvirt/images/Win10_22H2_English_x64v1.iso'/>
+      <source file='/path/to/Win10_22H2_English_x64v1.iso'/>
       <target dev='sdb' bus='sata'/>
       <readonly/>
       <boot order='2'/>
@@ -61,14 +61,14 @@
     </disk>
     <disk type='file' device='cdrom'>
       <driver name='qemu' type='raw'/>
-      <source file='/var/lib/libvirt/images/virtio-win-0.1.240.iso'/>
+      <source file='/path/to/virtio-win-0.1.240.iso'/>
       <target dev='sdc' bus='sata'/>
       <readonly/>
       <address type='drive' controller='0' bus='0' target='0' unit='2'/>
     </disk>
     <disk type='file' device='cdrom'>
       <driver name='qemu' type='raw'/>
-      <source file='/var/lib/libvirt/images/servo-windows10.config.iso'/>
+      <source file='/path/to/servo-windows10.config.iso'/>
       <target dev='sdd' bus='sata'/>
       <readonly/>
       <address type='drive' controller='0' bus='0' target='0' unit='3'/>

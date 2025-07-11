@@ -57,10 +57,13 @@ in linkFarm "image-deps" {
     url = "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.240-1/virtio-win-0.1.240.iso";
     hash = "sha256-69SCWGaPf3jgJu0nbCip0Z2D4CD/oICtaZENyGu8vMY=";
   };
-  # "windows10/Win10_22H2_English_x64v1.iso" = fetchurl {
-  #   url = "https://archive.org/download/Win10_22H2_English_x64v1/Win10_22H2_English_x64v1.iso";
-  #   hash = "sha256-pvRwym0zHrNTuBXAQ+Mno0f1lPN/9SXxd2Rzj+gShS4=";
-  # };
+  "windows10/Win10_22H2_English_x64v1.iso" = fetchurl {
+    # Sometimes it can be faster to lock in a specific mirror after trying them with `curl -I` and `curl`.
+    # You can also check how fast the mirror selected by Nix is going with `sudo pv -d $(pidof curl)`.
+    # url = "https://ia601808.us.archive.org/3/items/Win10_22H2_English_x64v1/Win10_22H2_English_x64v1.iso";
+    url = "https://archive.org/download/Win10_22H2_English_x64v1/Win10_22H2_English_x64v1.iso";
+    hash = "sha256-pvRwym0zHrNTuBXAQ+Mno0f1lPN/9SXxd2Rzj+gShS4=";
+  };
   "windows10/python-3.10.11-amd64.exe" = fetchurl {
     url = "https://www.python.org/ftp/python/3.10.11/python-3.10.11-amd64.exe";
     hash = "sha256-2N7eUAVWS0CLpQMXEIt2XtnDxRA0KlmPn9QmgcvgZIs=";
