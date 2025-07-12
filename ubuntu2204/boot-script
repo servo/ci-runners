@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eux
 
-actions_runner_version=2.323.0
+actions_runner_version=2.326.0
 
 download() {
     curl -fsSLO "http://192.168.100.1:8000/image-deps/ubuntu2204/$1"
@@ -39,8 +39,6 @@ bake_servo_repo() (
 )
 
 install_github_actions_runner() {
-    actions_runner_version=2.323.0
-
     if ! [ -e actions-runner-linux-x64-$actions_runner_version.tar.gz ]; then
         download actions-runner-linux-x64-$actions_runner_version.tar.gz
         rm -Rf actions-runner

@@ -6,7 +6,7 @@ Set-PSDebug -Trace 2
 
 # curl.exe uses the actual curl shipped in Windows 1804+, not the alias for Invoke-WebRequest
 
-$actions_runner_version = '2.323.0'
+$actions_runner_version = '2.326.0'
 
 # Pause on cmdlet errors (does not affect external processes)
 # <https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_preference_variables?view=powershell-7.5#erroractionpreference>
