@@ -88,11 +88,25 @@ pub(super) fn redefine_base_guest_with_symlinks(
         .to_str()
         .ok_or_eyre("Unsupported path")?;
     let base_image_symlink_path = base_images_path.join(format!("base.img"));
+
+    let installer_iso_path = IMAGE_DEPS_DIR
+        .join("windows10")
+        .join("Win10_22H2_English_x64v1.iso");
+    let installer_iso_path = installer_iso_path.to_str().expect("Unsupported path");
+    let drivers_iso_path = IMAGE_DEPS_DIR
+        .join("windows10")
+        .join("virtio-win-0.1.240.iso");
+    let drivers_iso_path = drivers_iso_path.to_str().expect("Unsupported path");
+
     undefine_libvirt_guest(&profile.base_vm_name)?;
     define_base_guest(
         profile,
         &base_image_symlink_path,
-        &[CdromImage::new("sdd", &config_iso_symlink_path)],
+        &[
+            CdromImage::new("sdb", installer_iso_path),
+            CdromImage::new("sdc", drivers_iso_path),
+            CdromImage::new("sdd", &config_iso_symlink_path),
+        ],
     )?;
 
     Ok(())
