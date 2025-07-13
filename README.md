@@ -129,12 +129,6 @@ Windows 10 runner
 
 Runners created from this image preinstall all dependencies (including those specified in the main repo, like GStreamer and Chocolatey deps), preload the main repo, and prebuild Servo in the release profile.
 
-To prepare a server for Windows 10 guests:
-
-- Download images into /var/lib/libvirt/images
-    - Windows 10 (multi-edition ISO), English (United States): [Win10_22H2_English_x64v1.iso](https://www.microsoft.com/en-us/software-download/windows10ISO) (sha256 = a6f470ca6d331eb353b815c043e327a347f594f37ff525f17764738fe812852e)
-    - Hint: grab the link, then `curl -Lo Win10_22H2_English_x64v1.iso '<link>'`
-
 Building the base vm image is handled automatically by the monitor.
 
 Ubuntu runner
