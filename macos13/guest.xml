@@ -74,7 +74,8 @@
       <!-- TODO: can we benefit from these OSX-KVM defaults? -->
       <!-- <driver name='qemu' type='qcow2' cache='writeback' io='threads'/> -->
       <driver name='qemu' type='raw' cache='none' io='native' discard='unmap'/>
-      <source dev='/dev/zvol/path/to/servo-macos13'/>
+      <!-- virt-clone(1) will replace this with the first `-f` -->
+      <source dev='/dev/null'/>
       <target dev='sdb' bus='sata'/>
       <boot order='1'/>
       <address type='drive' controller='0' bus='0' target='0' unit='1'/>

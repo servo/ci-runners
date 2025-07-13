@@ -1,5 +1,4 @@
 use std::ffi::OsStr;
-use std::fs::File;
 use std::path::Path;
 use std::time::Duration;
 
@@ -47,9 +46,12 @@ pub(super) fn rebuild(
     let os_image_path = IMAGE_DEPS_DIR
         .join("ubuntu2204")
         .join("jammy-server-cloudimg-amd64.raw");
-    let os_image = File::open(os_image_path)?;
-    let base_image_path =
-        create_disk_image(base_images_path, snapshot_name, base_image_size, os_image)?;
+    let base_image_path = create_disk_image(
+        base_images_path,
+        snapshot_name,
+        base_image_size,
+        Path::new(&os_image_path),
+    )?;
 
     define_base_guest(
         profile,

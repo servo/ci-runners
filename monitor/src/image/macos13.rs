@@ -1,6 +1,5 @@
 use std::ffi::OsStr;
 use std::fs::copy;
-use std::fs::File;
 use std::path::Path;
 use std::time::Duration;
 
@@ -35,12 +34,12 @@ pub(super) fn rebuild(
     let base_vm_name = &profile.base_vm_name;
 
     let base_image_symlink_path = base_images_path.join(format!("base.img"));
-    let os_image_path = Path::new("/dev/zvol")
-        .join(&DOTENV.zfs_clone_prefix)
-        .join("servo-macos13.clean@automated");
-    let os_image = File::open(os_image_path)?;
-    let base_image_path =
-        create_disk_image(base_images_path, snapshot_name, base_image_size, os_image)?;
+    let base_image_path = create_disk_image(
+        base_images_path,
+        snapshot_name,
+        base_image_size,
+        Path::new("/var/lib/libvirt/images/servo-macos13.clean.img"),
+    )?;
 
     define_base_guest(profile, &base_image_path, &[])?;
     let ovmf_vars_clean_path =

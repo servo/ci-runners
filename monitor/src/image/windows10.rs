@@ -44,7 +44,7 @@ pub(super) fn rebuild(
 
     let base_image_symlink_path = base_images_path.join(format!("base.img"));
     let base_image_path =
-        create_disk_image(base_images_path, snapshot_name, base_image_size, &b""[..])?;
+        create_disk_image(base_images_path, snapshot_name, base_image_size, None)?;
 
     let installer_iso_path = IMAGE_DEPS_DIR
         .join("windows10")

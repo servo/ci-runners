@@ -6,9 +6,10 @@ use core::str;
 use std::{
     collections::BTreeMap,
     ffi::OsStr,
-    fs::{create_dir_all, read_dir, read_link, remove_file, File},
-    io::{ErrorKind, Read, Seek, Write},
+    fs::{create_dir_all, read_dir, read_link, remove_file, set_permissions, File},
+    io::{ErrorKind, Seek, Write},
     mem::take,
+    os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     thread::{self, JoinHandle},
     time::Duration,
@@ -18,6 +19,7 @@ use bytesize::ByteSize;
 use chrono::{SecondsFormat, Utc};
 use cmd_lib::{run_cmd, spawn_with_output};
 use jane_eyre::eyre::{self, bail, OptionExt};
+use reflink::reflink_or_copy;
 use tracing::{error, info, trace, warn};
 
 use crate::{
@@ -380,18 +382,34 @@ pub(self) fn delete_base_image_file(profile: &Profile, filename: &str) {
     }
 }
 
-pub(self) fn create_disk_image(
+pub(self) fn create_disk_image<'icp>(
     base_images_path: impl AsRef<Path>,
     snapshot_name: &str,
     size: ByteSize,
-    mut initial_contents: impl Read,
+    initial_contents_path: impl Into<Option<&'icp Path>>,
 ) -> eyre::Result<PathBuf> {
     let base_images_path = base_images_path.as_ref();
     let base_image_filename = format!("base.img@{snapshot_name}");
     let base_image_path = base_images_path.join(&base_image_filename);
+
     info!(?base_image_path, "Creating base image file");
-    let mut base_image_file = File::create_new(&base_image_path)?;
-    std::io::copy(&mut initial_contents, &mut base_image_file)?;
+    let mut base_image_file = if let Some(from) = initial_contents_path.into() {
+        let to = &base_image_path;
+        if let Some(written) = reflink_or_copy(from, to)? {
+            warn!(
+                ?from,
+                ?to,
+                "Had to copy {written} bytes manually because reflink copy failed"
+            );
+        }
+
+        // Copying out of the nix store yields a file with mode 444 (read only). Make sure the file is writable.
+        set_permissions(&base_image_path, PermissionsExt::from_mode(0o644))?;
+
+        File::options().write(true).open(&base_image_path)?
+    } else {
+        File::create_new(&base_image_path)?
+    };
 
     let delta = size
         .0

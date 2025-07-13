@@ -201,6 +201,6 @@ To prepare a server for macOS 13 guests, build a clean image:
 - Press **Cmd**+**Space**, type `terminal`, press **Enter**
 - Type `curl https://ci0.servo.org/static/macos13.sh | sudo sh`, press **Enter**, type the password above, press **Enter**
 - When the guest shuts down, take another snapshot: `zfs snapshot tank/base/servo-macos13.clean@automated`
-- Enable per-snapshot block devices for the zvol: `zfs set snapdev=visible tank/base/servo-macos13.clean`
+- Copy the clean image to a file: `dd status=progress iflag=fullblock bs=1M if=/dev/zvol/tank/base/servo-macos13.clean of=/var/lib/libvirt/images/servo-macos13.clean.img`
 
 Building the base vm image is handled automatically by the monitor.
