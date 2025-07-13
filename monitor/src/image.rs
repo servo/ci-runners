@@ -14,7 +14,7 @@ use std::{
     time::Duration,
 };
 
-use bytesize::{ByteSize, MIB};
+use bytesize::ByteSize;
 use chrono::{SecondsFormat, Utc};
 use cmd_lib::{run_cmd, spawn_with_output};
 use jane_eyre::eyre::{self, bail, OptionExt};
@@ -391,41 +391,18 @@ pub(self) fn create_disk_image(
     let base_image_path = base_images_path.join(&base_image_filename);
     info!(?base_image_path, "Creating base image file");
     let mut base_image_file = File::create_new(&base_image_path)?;
-    info!("Writing base image file: {size} left");
     std::io::copy(&mut initial_contents, &mut base_image_file)?;
 
-    let size = size
+    let delta = size
         .0
         .checked_sub(base_image_file.stream_position()?)
         .ok_or_eyre("`size` is smaller than `initial_contents`")?;
-    let mut size = ByteSize(size);
 
-    // If needed, do one write of less than 1 MiB, to align the image to 1 MiB.
-    if size.0 % MIB > 0 {
-        info!("Writing base image file: {size} left");
-        let len = size.0 / MIB * MIB + MIB - size.0;
-        let len_usize = len.try_into().expect("Guaranteed by platform");
-        base_image_file.write_all(&vec![0u8; len_usize])?;
-        size.0 -= len;
-    }
-    // Continue writing 1 MiB at a time, logging progress every 1 GiB.
-    while size.0 >= MIB {
-        info!("Writing base image file: {size} left");
-        let mut limit = ByteSize::gib(1);
-        while size.0 >= MIB && limit.0 > 0 {
-            let len_usize = MIB.try_into().expect("Guaranteed by platform");
-            base_image_file.write_all(&vec![0u8; len_usize])?;
-            size.0 -= MIB;
-            limit.0 -= MIB;
-        }
-    }
-    // If needed, do one write of less than 1 MiB, to finish the image.
-    if size.0 > 0 {
-        info!("Writing base image file: {size} left");
-        let len = size.0 / MIB * MIB + MIB - size.0;
-        let len_usize = len.try_into().expect("Guaranteed by platform");
-        base_image_file.write_all(&vec![0u8; len_usize])?;
-        size.0 -= len;
+    // If `size` is bigger than `initial_contents`, extend the file quickly by seeking and writing at least one byte.
+    // We could write all the zeros, but this is not necessarily helpful since ZFS is a COW file system.
+    if let Some(delta) = delta.checked_sub(1) {
+        base_image_file.seek_relative(delta.try_into()?)?;
+        base_image_file.write_all(&[0])?;
     }
 
     Ok(base_image_path)
