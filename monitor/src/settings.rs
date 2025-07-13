@@ -19,9 +19,7 @@ pub struct Dotenv {
     pub github_api_scope: String,
     pub github_api_suffix: String,
     pub libvirt_prefix: String,
-    pub zfs_clone_prefix: String,
     pub monitor_data_path: Option<String>,
-    // SERVO_CI_ZVOL_BLOCK_DEVICE_TIMEOUT not used
     pub monitor_poll_interval: Duration,
     pub api_cache_timeout: Duration,
     pub monitor_start_timeout: Duration,
@@ -54,7 +52,6 @@ impl Dotenv {
             github_api_scope: env_string("SERVO_CI_GITHUB_API_SCOPE"),
             github_api_suffix: env_string("SERVO_CI_GITHUB_API_SUFFIX"),
             libvirt_prefix: env_string("SERVO_CI_LIBVIRT_PREFIX"),
-            zfs_clone_prefix: env_string("SERVO_CI_ZFS_CLONE_PREFIX"),
             monitor_data_path: env_option_string("SERVO_CI_MONITOR_DATA_PATH"),
             monitor_poll_interval: env_duration_secs("SERVO_CI_MONITOR_POLL_INTERVAL"),
             api_cache_timeout: env_duration_secs("SERVO_CI_API_CACHE_TIMEOUT"),
