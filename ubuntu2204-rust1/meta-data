@@ -1,0 +1,2 @@
+# https://docs.cloud-init.io/en/24.1/reference/datasources/nocloud.html#example-meta-data
+instance-id: ubuntu

@@ -198,6 +198,20 @@ fn rebuild_with_rust(
             ByteSize::gib(20),
             Duration::from_secs(90),
         ),
+        "ubuntu2204-rust1" => ubuntu2204::rebuild(
+            &base_images_path,
+            &profile,
+            snapshot_name,
+            ByteSize::gib(20),
+            Duration::from_secs(90),
+        ),
+        "ubuntu2204-rust2" => ubuntu2204::rebuild(
+            &base_images_path,
+            &profile,
+            snapshot_name,
+            ByteSize::gib(20),
+            Duration::from_secs(90),
+        ),
         "ubuntu2204-wpt" => ubuntu2204::rebuild(
             &base_images_path,
             &profile,
@@ -237,6 +251,12 @@ fn rebuild_with_rust(
                 "ubuntu2204-rust" => {
                     ubuntu2204::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
                 }
+                "ubuntu2204-rust1" => {
+                    ubuntu2204::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
+                }
+                "ubuntu2204-rust2" => {
+                    ubuntu2204::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
+                }
                 "ubuntu2204-wpt" => {
                     ubuntu2204::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
                 }
@@ -257,6 +277,8 @@ pub fn prune_images(profile: &Profile) -> eyre::Result<()> {
         "macos13" => macos13::prune_images(profile),
         "ubuntu2204" => ubuntu2204::prune_images(profile),
         "ubuntu2204-rust" => ubuntu2204::prune_images(profile),
+        "ubuntu2204-rust1" => ubuntu2204::prune_images(profile),
+        "ubuntu2204-rust2" => ubuntu2204::prune_images(profile),
         "ubuntu2204-wpt" => ubuntu2204::prune_images(profile),
         "windows10" => windows10::prune_images(profile),
         other => todo!("Image pruning not yet implemented: {other}"),
@@ -268,6 +290,8 @@ pub fn delete_image(profile: &Profile, snapshot_name: &str) {
         "macos13" => macos13::delete_image(profile, snapshot_name),
         "ubuntu2204" => ubuntu2204::delete_image(profile, snapshot_name),
         "ubuntu2204-rust" => ubuntu2204::delete_image(profile, snapshot_name),
+        "ubuntu2204-rust1" => ubuntu2204::delete_image(profile, snapshot_name),
+        "ubuntu2204-rust2" => ubuntu2204::delete_image(profile, snapshot_name),
         "ubuntu2204-wpt" => ubuntu2204::delete_image(profile, snapshot_name),
         "windows10" => windows10::delete_image(profile, snapshot_name),
         other => todo!("Image pruning not yet implemented: {other}"),
@@ -279,6 +303,8 @@ pub fn register_runner(profile: &Profile, vm_name: &str) -> eyre::Result<String>
         "macos13" => macos13::register_runner(profile, vm_name),
         "ubuntu2204" => ubuntu2204::register_runner(profile, vm_name),
         "ubuntu2204-rust" => ubuntu2204::register_runner(profile, vm_name),
+        "ubuntu2204-rust1" => ubuntu2204::register_runner(profile, vm_name),
+        "ubuntu2204-rust2" => ubuntu2204::register_runner(profile, vm_name),
         "ubuntu2204-wpt" => ubuntu2204::register_runner(profile, vm_name),
         "windows10" => windows10::register_runner(profile, vm_name),
         other => todo!("Runner registration not yet implemented: {other}"),
@@ -290,6 +316,8 @@ pub fn create_runner(profile: &Profile, vm_name: &str) -> eyre::Result<()> {
         "macos13" => macos13::create_runner(profile, vm_name),
         "ubuntu2204" => ubuntu2204::create_runner(profile, vm_name),
         "ubuntu2204-rust" => ubuntu2204::create_runner(profile, vm_name),
+        "ubuntu2204-rust1" => ubuntu2204::create_runner(profile, vm_name),
+        "ubuntu2204-rust2" => ubuntu2204::create_runner(profile, vm_name),
         "ubuntu2204-wpt" => ubuntu2204::create_runner(profile, vm_name),
         "windows10" => windows10::create_runner(profile, vm_name),
         other => todo!("Runner creation not yet implemented: {other}"),
@@ -301,6 +329,8 @@ pub fn destroy_runner(profile: &Profile, vm_name: &str) -> eyre::Result<()> {
         "macos13" => macos13::destroy_runner(vm_name),
         "ubuntu2204" => ubuntu2204::destroy_runner(vm_name),
         "ubuntu2204-rust" => ubuntu2204::destroy_runner(vm_name),
+        "ubuntu2204-rust1" => ubuntu2204::destroy_runner(vm_name),
+        "ubuntu2204-rust2" => ubuntu2204::destroy_runner(vm_name),
         "ubuntu2204-wpt" => ubuntu2204::destroy_runner(vm_name),
         "windows10" => windows10::destroy_runner(vm_name),
         other => todo!("Runner destruction not yet implemented: {other}"),

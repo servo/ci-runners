@@ -29,6 +29,8 @@
       ../../macos13
       ../../ubuntu2204
       ../../ubuntu2204-rust
+      ../../ubuntu2204-rust1
+      ../../ubuntu2204-rust2
       ../../ubuntu2204-wpt
       ../../windows10
       ../../common.sh
@@ -84,6 +86,8 @@ in stdenv.mkDerivation rec {
     cp -R macos13 $out/lib/monitor
     cp -R ubuntu2204 $out/lib/monitor
     cp -R ubuntu2204-rust $out/lib/monitor
+    cp -R ubuntu2204-rust1 $out/lib/monitor
+    cp -R ubuntu2204-rust2 $out/lib/monitor
     cp -R ubuntu2204-wpt $out/lib/monitor
     cp -R windows10 $out/lib/monitor
     cp -R common.sh $out/lib/monitor

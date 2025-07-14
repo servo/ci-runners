@@ -1,6 +1,6 @@
 <domain type='kvm'>
-  <name>servo-ubuntu2204-rust.init</name>
-  <uuid>ec747b67-ffb4-47cc-a27b-43156ca1724f</uuid>
+  <name>servo-ubuntu2204-rust1.init</name>
+  <uuid>185942af-a97d-4952-8121-7a3830b7268f</uuid>
   <metadata>
     <libosinfo:libosinfo xmlns:libosinfo="http://libosinfo.org/xmlns/libvirt/domain/1.0">
       <libosinfo:os id="http://ubuntu.com/ubuntu/22.04"/>
