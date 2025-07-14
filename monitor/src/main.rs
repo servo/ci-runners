@@ -1,4 +1,3 @@
-mod auth;
 mod dashboard;
 mod data;
 mod github;
@@ -37,10 +36,12 @@ use serde_json::json;
 use settings::{DOTENV, IMAGE_DEPS_DIR, LIB_MONITOR_DIR, TOML};
 use tokio::try_join;
 use tracing::{debug, error, info, trace, warn};
-use web::rocket_eyre::{self, EyreReport};
+use web::{
+    auth::ApiKeyGuard,
+    rocket_eyre::{self, EyreReport},
+};
 
 use crate::{
-    auth::{ApiKeyGuard, RemoteAddr},
     dashboard::Dashboard,
     data::{get_profile_data_path, get_runner_data_path, run_migrations},
     github::{list_registered_runners_for_host, Cache},
@@ -84,13 +85,13 @@ enum Request {
     /// - GET `/github-jitconfig` => application/json
     GithubJitconfig {
         response_tx: Sender<eyre::Result<Option<String>>>,
-        remote_addr: RemoteAddr,
+        remote_addr: web::auth::RemoteAddr,
     },
 
     /// - GET `/boot` => text/plain
     BootScript {
         response_tx: Sender<eyre::Result<String>>,
-        remote_addr: RemoteAddr,
+        remote_addr: web::auth::RemoteAddr,
     },
 }
 #[derive(Debug, Deserialize)]
@@ -249,7 +250,9 @@ fn runner_screenshot_now_route(runner_id: usize) -> rocket_eyre::Result<(Content
 }
 
 #[get("/github-jitconfig")]
-fn github_jitconfig_route(remote_addr: RemoteAddr) -> rocket_eyre::Result<RawJson<String>> {
+fn github_jitconfig_route(
+    remote_addr: web::auth::RemoteAddr,
+) -> rocket_eyre::Result<RawJson<String>> {
     let (response_tx, response_rx) = crossbeam_channel::bounded(0);
     REQUEST.sender.send_timeout(
         Request::GithubJitconfig {
@@ -266,7 +269,7 @@ fn github_jitconfig_route(remote_addr: RemoteAddr) -> rocket_eyre::Result<RawJso
 }
 
 #[get("/boot")]
-fn boot_script_route(remote_addr: RemoteAddr) -> rocket_eyre::Result<RawText<String>> {
+fn boot_script_route(remote_addr: web::auth::RemoteAddr) -> rocket_eyre::Result<RawText<String>> {
     let (response_tx, response_rx) = crossbeam_channel::bounded(0);
     REQUEST.sender.send_timeout(
         Request::BootScript {

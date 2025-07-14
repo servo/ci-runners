@@ -17,7 +17,6 @@ use settings::{
 use tracing::{debug, info, warn};
 
 use crate::{
-    auth::RemoteAddr,
     data::{get_profile_configuration_path, get_profile_data_path, get_runner_data_path},
     image::{create_runner, destroy_runner, register_runner},
     libvirt::get_ipv4_address,
@@ -288,7 +287,7 @@ impl Profiles {
         }
     }
 
-    pub fn boot_script(&self, remote_addr: RemoteAddr) -> eyre::Result<Option<String>> {
+    pub fn boot_script(&self, remote_addr: web::auth::RemoteAddr) -> eyre::Result<Option<String>> {
         for (key, ipv4_address) in self.ipv4_addresses.iter() {
             if let Some(ipv4_address) = ipv4_address {
                 if remote_addr == *ipv4_address {

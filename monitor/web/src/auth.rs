@@ -4,12 +4,11 @@ use std::{
 };
 
 use rocket::{
+    Request,
     http::Status,
     request::{FromRequest, Outcome},
-    Request,
 };
-
-use crate::DOTENV;
+use settings::DOTENV;
 
 pub struct ApiKeyGuard<'req> {
     /// Only FromRequest can construct this.

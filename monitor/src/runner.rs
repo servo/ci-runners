@@ -17,7 +17,6 @@ use settings::profile::ImageType;
 use tracing::{error, info, trace, warn};
 
 use crate::{
-    auth::RemoteAddr,
     data::get_runner_data_path,
     github::{unregister_runner, ApiGenerateJitconfigResponse, ApiRunner},
     libvirt::{get_ipv4_address, libvirt_prefix, take_screenshot, update_screenshot},
@@ -200,7 +199,10 @@ impl Runners {
         Ok(())
     }
 
-    pub fn github_jitconfig(&self, remote_addr: RemoteAddr) -> eyre::Result<Option<&str>> {
+    pub fn github_jitconfig(
+        &self,
+        remote_addr: web::auth::RemoteAddr,
+    ) -> eyre::Result<Option<&str>> {
         for (_id, runner) in self.runners.iter() {
             if let Some(ipv4_address) = runner.ipv4_address {
                 if remote_addr == ipv4_address {
@@ -227,7 +229,7 @@ impl Runners {
         }
     }
 
-    pub fn boot_script(&self, remote_addr: RemoteAddr) -> eyre::Result<Option<String>> {
+    pub fn boot_script(&self, remote_addr: web::auth::RemoteAddr) -> eyre::Result<Option<String>> {
         for (&id, runner) in self.runners.iter() {
             if let Some(ipv4_address) = runner.ipv4_address {
                 if remote_addr == ipv4_address {
