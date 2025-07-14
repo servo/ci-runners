@@ -30,3 +30,10 @@ base_vm_name = "servo-ubuntu2204-wpt"
 github_runner_label = "self-hosted-image:ubuntu2204-wpt"
 target_count = 1
 image_type = "Rust"
+
+[profiles.servo-ubuntu2204-rust]
+configuration_name = "ubuntu2204-rust"
+base_vm_name = "servo-ubuntu2204-rust"
+github_runner_label = "self-hosted-image:ubuntu2204-rust"
+target_count = 0
+image_type = "Rust"
