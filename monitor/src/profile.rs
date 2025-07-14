@@ -72,7 +72,7 @@ impl Profiles {
     }
 
     pub fn create_runner(&self, profile: &Profile, id: usize) -> eyre::Result<()> {
-        let Some(base_image_snapshot) = self.base_image_snapshot(&profile.base_vm_name) else {
+        if self.base_image_snapshot(&profile.base_vm_name).is_none() {
             bail!(
                 "Tried to create runner, but profile has no base image snapshot (profile {})",
                 profile.base_vm_name
