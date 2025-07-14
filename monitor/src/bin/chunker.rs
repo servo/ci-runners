@@ -2,7 +2,6 @@ use std::{collections::BTreeMap, env, sync::Mutex};
 
 use jane_eyre::eyre::{self, eyre};
 use rocket::{get, post, response::content::RawText, serde::json::Json};
-use serde::Serialize;
 use tokio::try_join;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 use web::rocket_eyre;
@@ -23,12 +22,6 @@ impl Build {
     }
 }
 
-#[derive(Serialize)]
-enum TakeChunkResponse {
-    Chunk(usize),
-    NoMoreChunks,
-}
-
 #[get("/")]
 fn index_route() -> rocket_eyre::Result<RawText<String>> {
     Ok(RawText(format!("{BUILDS:#?}")))
@@ -38,7 +31,7 @@ fn index_route() -> rocket_eyre::Result<RawText<String>> {
 fn take_chunk_route(
     unique_id: String,
     total_chunks: usize,
-) -> rocket_eyre::Result<Json<TakeChunkResponse>> {
+) -> rocket_eyre::Result<Json<Option<usize>>> {
     let mut builds = BUILDS.lock().map_err(|e| eyre!("{e:?}"))?;
     let build = builds.entry(unique_id).or_insert(Build::new(total_chunks));
 
@@ -50,11 +43,11 @@ fn take_chunk_route(
     }
 
     if build.taken_chunks < total_chunks {
-        let response = TakeChunkResponse::Chunk(build.taken_chunks);
+        let response = Some(build.taken_chunks);
         build.taken_chunks += 1;
         Ok(Json(response))
     } else {
-        Ok(Json(TakeChunkResponse::NoMoreChunks))
+        Ok(Json(None))
     }
 }
 
