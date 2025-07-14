@@ -180,6 +180,9 @@
             alias ${pkgs.copyPathToStore ../../static}/;
           '';
         };
+        locations."/chunker/" = {
+          proxyPass = "http://[::1]:8001/";
+        };
       } // ssl;
       "intermittent-tracker.servo.org" = lib.mkIf hasIntermittentTracker ({
         locations."/" = proxy // {
