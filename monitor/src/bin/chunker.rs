@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, env, sync::Mutex};
 
 use jane_eyre::eyre::{self, eyre};
-use rocket::{post, serde::json::Json};
+use rocket::{get, post, response::content::RawText, serde::json::Json};
 use serde::Serialize;
 use tokio::try_join;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -9,6 +9,7 @@ use web::rocket_eyre;
 
 static BUILDS: Mutex<BTreeMap<String, Build>> = Mutex::new(BTreeMap::new());
 
+#[derive(Debug)]
 struct Build {
     taken_chunks: usize,
     total_chunks: usize,
@@ -26,6 +27,11 @@ impl Build {
 enum TakeChunkResponse {
     Chunk(usize),
     NoMoreChunks,
+}
+
+#[get("/")]
+fn index_route() -> rocket_eyre::Result<RawText<String>> {
+    Ok(RawText(format!("{BUILDS:#?}")))
 }
 
 #[post("/take?<unique_id>&<total_chunks>")]
@@ -71,7 +77,7 @@ async fn main() -> eyre::Result<()> {
                 .merge(("port", 8001))
                 .merge(("address", listen_addr)),
         )
-        .mount("/", rocket::routes![take_chunk_route])
+        .mount("/", rocket::routes![index_route, take_chunk_route])
         .launch()
     };
 
