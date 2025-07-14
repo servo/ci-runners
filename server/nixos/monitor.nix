@@ -77,6 +77,7 @@ in stdenv.mkDerivation rec {
   installPhase = ''
     mkdir -p $out/bin
     ln -s ${monitorCrate}/bin/monitor $out/bin/monitor
+    ln -s ${monitorCrate}/bin/chunker $out/bin/chunker
     cd ..  # cd back out of sourceRoot
     mkdir -p $out/lib/monitor
     cp -R shared $out/lib/monitor
