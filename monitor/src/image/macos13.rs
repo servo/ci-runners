@@ -8,13 +8,13 @@ use cmd_lib::run_cmd;
 use cmd_lib::spawn_with_output;
 use jane_eyre::eyre;
 use jane_eyre::eyre::OptionExt;
+use settings::profile::Profile;
 
 use crate::image::delete_base_image_file;
 use crate::image::libvirt_change_media;
 use crate::image::prune_base_image_files;
 use crate::image::undefine_libvirt_guest;
 use crate::image::CdromImage;
-use crate::profile::Profile;
 use crate::shell::atomic_symlink;
 use crate::shell::log_output_as_info;
 use crate::DOTENV;

@@ -9,16 +9,19 @@ use std::{
 };
 
 use jane_eyre::eyre::{self, bail, Context, OptionExt};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
+use settings::{
+    profile::{ImageType, Profile},
+    DOTENV, TOML,
+};
 use tracing::{debug, info, warn};
 
 use crate::{
     auth::RemoteAddr,
     data::{get_profile_configuration_path, get_profile_data_path, get_runner_data_path},
     image::{create_runner, destroy_runner, register_runner},
-    libvirt::{get_ipv4_address, update_screenshot},
+    libvirt::get_ipv4_address,
     runner::{Runner, Runners, Status},
-    DOTENV, TOML,
 };
 
 #[derive(Debug)]
@@ -26,22 +29,6 @@ pub struct Profiles {
     profiles: BTreeMap<String, Profile>,
     base_image_snapshots: BTreeMap<String, String>,
     ipv4_addresses: BTreeMap<String, Option<Ipv4Addr>>,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct Profile {
-    pub configuration_name: String,
-    pub base_vm_name: String,
-    pub github_runner_label: String,
-    pub target_count: usize,
-    #[serde(default)]
-    pub image_type: ImageType,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub enum ImageType {
-    #[default]
-    Rust,
 }
 
 #[derive(Debug, Serialize)]
@@ -61,7 +48,7 @@ impl Profiles {
     pub fn new(profiles: BTreeMap<String, Profile>) -> eyre::Result<Self> {
         let mut base_image_snapshots = BTreeMap::default();
         for (profile_key, profile) in profiles.iter() {
-            if let Some(base_image_snapshot) = profile.read_base_image_snapshot()? {
+            if let Some(base_image_snapshot) = read_base_image_snapshot(profile)? {
                 base_image_snapshots.insert(profile_key.clone(), base_image_snapshot);
             }
         }
@@ -130,28 +117,7 @@ impl Profiles {
             }
         }
     }
-}
 
-impl Profile {
-    pub fn runners<'p, 'r: 'p>(
-        &'p self,
-        runners: &'r Runners,
-    ) -> impl Iterator<Item = (&'r usize, &'r Runner)> + 'p {
-        runners
-            .iter()
-            .filter(|(_id, runner)| runner.base_vm_name() == self.base_vm_name)
-    }
-
-    pub fn idle_runners<'p, 'r: 'p>(
-        &'p self,
-        runners: &'r Runners,
-    ) -> impl Iterator<Item = (&'r usize, &'r Runner)> + 'p {
-        self.runners(runners)
-            .filter(|(_id, runner)| runner.status() == Status::Idle)
-    }
-}
-
-impl Profiles {
     pub fn runner_counts(&self, profile: &Profile, runners: &Runners) -> RunnerCounts {
         RunnerCounts {
             target: self.target_runner_count(profile),
@@ -183,36 +149,31 @@ impl Profiles {
     }
 
     pub fn started_or_crashed_runner_count(&self, profile: &Profile, runners: &Runners) -> usize {
-        profile
-            .runners(runners)
+        runners_for_profile(profile, runners)
             .filter(|(_id, runner)| runner.status() == Status::StartedOrCrashed)
             .count()
     }
 
     pub fn idle_runner_count(&self, profile: &Profile, runners: &Runners) -> usize {
-        profile
-            .runners(runners)
+        runners_for_profile(profile, runners)
             .filter(|(_id, runner)| runner.status() == Status::Idle)
             .count()
     }
 
     pub fn reserved_runner_count(&self, profile: &Profile, runners: &Runners) -> usize {
-        profile
-            .runners(runners)
+        runners_for_profile(profile, runners)
             .filter(|(_id, runner)| runner.status() == Status::Reserved)
             .count()
     }
 
     pub fn busy_runner_count(&self, profile: &Profile, runners: &Runners) -> usize {
-        profile
-            .runners(runners)
+        runners_for_profile(profile, runners)
             .filter(|(_id, runner)| runner.status() == Status::Busy)
             .count()
     }
 
     pub fn done_or_unregistered_runner_count(&self, profile: &Profile, runners: &Runners) -> usize {
-        profile
-            .runners(runners)
+        runners_for_profile(profile, runners)
             .filter(|(_id, runner)| runner.status() == Status::DoneOrUnregistered)
             .count()
     }
@@ -270,7 +231,7 @@ impl Profiles {
             .wrap_err("Failed to get current time")?;
         let creation_time = match profile.image_type {
             ImageType::Rust => {
-                let base_image_path = profile.base_image_path(&**base_image_snapshot);
+                let base_image_path = base_image_path(profile, &**base_image_snapshot);
                 let metadata = match std::fs::metadata(&base_image_path) {
                     Ok(result) => result,
                     Err(error) => {
@@ -301,41 +262,7 @@ impl Profiles {
 
         Ok(Some(now - creation_time))
     }
-}
 
-impl Profile {
-    pub fn update_screenshot(&self) {
-        if let Err(error) = self.try_update_screenshot() {
-            debug!(
-                self.base_vm_name,
-                ?error,
-                "Failed to update screenshot for profile guest"
-            );
-        }
-    }
-
-    fn try_update_screenshot(&self) -> eyre::Result<()> {
-        let output_dir = get_profile_data_path(&self.base_vm_name, None)?;
-        update_screenshot(&self.base_vm_name, &output_dir)?;
-
-        Ok(())
-    }
-
-    pub fn base_images_path(&self) -> PathBuf {
-        Path::new("/var/lib/libvirt/images/base").join(&self.base_vm_name)
-    }
-
-    pub fn base_image_path<'snap>(&self, snapshot_name: impl Into<Option<&'snap str>>) -> PathBuf {
-        if let Some(snapshot_name) = snapshot_name.into() {
-            self.base_images_path()
-                .join(format!("base.img@{snapshot_name}"))
-        } else {
-            self.base_images_path().join("base.img")
-        }
-    }
-}
-
-impl Profiles {
     pub fn set_base_image_snapshot(
         &mut self,
         profile_key: &str,
@@ -346,24 +273,7 @@ impl Profiles {
 
         Ok(())
     }
-}
 
-impl Profile {
-    fn read_base_image_snapshot(&self) -> eyre::Result<Option<String>> {
-        let path = self.base_image_path(None);
-        if let Ok(path) = read_link(path) {
-            let path = path.to_str().ok_or_eyre("Symlink target is unsupported")?;
-            let (_, snapshot_name) = path
-                .split_once("@")
-                .ok_or_eyre("Symlink target has no snapshot name")?;
-            return Ok(Some(snapshot_name.to_owned()));
-        }
-
-        Ok(None)
-    }
-}
-
-impl Profiles {
     pub fn update_ipv4_addresses(&mut self) {
         for (key, profile) in self.profiles.iter() {
             let ipv4_address = get_ipv4_address(&profile.base_vm_name);
@@ -393,4 +303,65 @@ impl Profiles {
 
         Ok(None)
     }
+}
+
+pub fn runners_for_profile<'p, 'r: 'p>(
+    profile: &'p Profile,
+    runners: &'r Runners,
+) -> impl Iterator<Item = (&'r usize, &'r Runner)> + 'p {
+    runners
+        .iter()
+        .filter(|(_id, runner)| runner.base_vm_name() == profile.base_vm_name)
+}
+
+pub fn idle_runners_for_profile<'p, 'r: 'p>(
+    profile: &'p Profile,
+    runners: &'r Runners,
+) -> impl Iterator<Item = (&'r usize, &'r Runner)> + 'p {
+    runners_for_profile(profile, runners).filter(|(_id, runner)| runner.status() == Status::Idle)
+}
+
+pub fn update_screenshot_for_profile_guest(profile: &Profile) {
+    if let Err(error) = try_update_screenshot(profile) {
+        debug!(
+            profile.base_vm_name,
+            ?error,
+            "Failed to update screenshot for profile guest"
+        );
+    }
+}
+
+fn try_update_screenshot(profile: &Profile) -> eyre::Result<()> {
+    let output_dir = get_profile_data_path(&profile.base_vm_name, None)?;
+    crate::libvirt::update_screenshot(&profile.base_vm_name, &output_dir)?;
+
+    Ok(())
+}
+
+pub fn base_images_path(profile: &Profile) -> PathBuf {
+    Path::new("/var/lib/libvirt/images/base").join(&profile.base_vm_name)
+}
+
+pub fn base_image_path<'snap>(
+    profile: &Profile,
+    snapshot_name: impl Into<Option<&'snap str>>,
+) -> PathBuf {
+    if let Some(snapshot_name) = snapshot_name.into() {
+        base_images_path(profile).join(format!("base.img@{snapshot_name}"))
+    } else {
+        base_images_path(profile).join("base.img")
+    }
+}
+
+fn read_base_image_snapshot(profile: &Profile) -> eyre::Result<Option<String>> {
+    let path = base_image_path(profile, None);
+    if let Ok(path) = read_link(path) {
+        let path = path.to_str().ok_or_eyre("Symlink target is unsupported")?;
+        let (_, snapshot_name) = path
+            .split_once("@")
+            .ok_or_eyre("Symlink target has no snapshot name")?;
+        return Ok(Some(snapshot_name.to_owned()));
+    }
+
+    Ok(None)
 }

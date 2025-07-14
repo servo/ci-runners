@@ -6,9 +6,8 @@ use std::{
 
 use atomic_write_file::AtomicWriteFile;
 use jane_eyre::eyre::{self, Context};
+use settings::data::get_data_path;
 use tracing::warn;
-
-use crate::data::get_data_path;
 
 /// Generates new runner ids, with persistence to disk.
 pub struct IdGen {

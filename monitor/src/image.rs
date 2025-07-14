@@ -20,13 +20,13 @@ use chrono::{SecondsFormat, Utc};
 use cmd_lib::{run_cmd, spawn_with_output};
 use jane_eyre::eyre::{self, bail, OptionExt};
 use reflink::reflink_or_copy;
+use settings::{profile::Profile, DOTENV};
 use tracing::{error, info, trace, warn};
 
 use crate::{
-    profile::{Profile, Profiles},
+    profile::{base_images_path, runners_for_profile, Profiles},
     runner::Runners,
     shell::log_output_as_info,
-    DOTENV,
 };
 
 #[derive(Debug, Default)]
@@ -66,7 +66,7 @@ impl Rebuilds {
         for (key, profile) in profiles.iter() {
             let needs_rebuild = profiles.image_needs_rebuild(profile);
             if needs_rebuild.unwrap_or(true) {
-                let runner_count = profile.runners(&runners).count();
+                let runner_count = runners_for_profile(profile, &runners).count();
                 if needs_rebuild.is_none() {
                     info!("profile {key}: image may or may not need rebuild");
                 } else if self.cached_servo_repo_update.is_some() {
@@ -106,7 +106,7 @@ impl Rebuilds {
             let key_for_thread = key.clone();
             let snapshot_name_for_thread = snapshot_name.clone();
             let thread = match profile.image_type {
-                crate::profile::ImageType::Rust => {
+                settings::profile::ImageType::Rust => {
                     let profile = profile.clone();
                     thread::spawn(move || {
                         rebuild_with_rust(&key_for_thread, profile, &snapshot_name_for_thread)
@@ -307,7 +307,7 @@ pub fn destroy_runner(profile: &Profile, vm_name: &str) -> eyre::Result<()> {
 }
 
 pub(self) fn create_base_images_dir(profile: &Profile) -> eyre::Result<PathBuf> {
-    let base_images_path = profile.base_images_path();
+    let base_images_path = base_images_path(profile);
     info!(?base_images_path, "Creating libvirt images subdirectory");
     create_dir_all(&base_images_path)?;
 
@@ -315,7 +315,7 @@ pub(self) fn create_base_images_dir(profile: &Profile) -> eyre::Result<PathBuf> 
 }
 
 pub(self) fn prune_base_image_files(profile: &Profile, prefix: &str) -> eyre::Result<()> {
-    let base_images_path = profile.base_images_path();
+    let base_images_path = base_images_path(profile);
     info!(?base_images_path, "Pruning base image files");
     create_dir_all(&base_images_path)?;
 
@@ -374,7 +374,7 @@ pub(self) fn prune_base_image_files(profile: &Profile, prefix: &str) -> eyre::Re
 }
 
 pub(self) fn delete_base_image_file(profile: &Profile, filename: &str) {
-    let base_images_path = profile.base_images_path();
+    let base_images_path = base_images_path(profile);
     let path = base_images_path.join(filename);
     info!(?path, "Deleting");
     if let Err(error) = remove_file(&path) {

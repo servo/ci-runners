@@ -1,16 +1,42 @@
+pub mod data;
+pub mod profile;
+
 use std::{
     collections::BTreeMap,
     env::{self, VarError},
     fs::File,
     io::Read,
-    path::Path,
+    path::{Path, PathBuf},
+    sync::LazyLock,
     time::Duration,
 };
 
+use dotenv::dotenv;
 use jane_eyre::eyre::{self, bail};
 use serde::Deserialize;
 
 use crate::profile::Profile;
+
+pub static LIB_MONITOR_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
+    if let Some(lib_monitor_dir) = env::var_os("LIB_MONITOR_DIR") {
+        PathBuf::from(&lib_monitor_dir)
+    } else {
+        PathBuf::from("..")
+    }
+});
+
+pub static IMAGE_DEPS_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
+    let image_deps_dir = env::var_os("IMAGE_DEPS_DIR").expect("IMAGE_DEPS_DIR not set!");
+    PathBuf::from(&image_deps_dir)
+});
+
+pub static DOTENV: LazyLock<Dotenv> = LazyLock::new(|| {
+    dotenv().expect("Failed to load variables from .env");
+    Dotenv::load()
+});
+
+pub static TOML: LazyLock<Toml> =
+    LazyLock::new(|| Toml::load_default().expect("Failed to load settings from monitor.toml"));
 
 pub struct Dotenv {
     // GITHUB_TOKEN not used
@@ -82,7 +108,10 @@ impl Toml {
         }
 
         for (key, profile) in result.profiles.iter() {
-            assert_eq!(*key, profile.base_vm_name, "Runner::base_vm_name relies on Toml.profiles key (profile name) and base_vm_name being equal");
+            assert_eq!(
+                *key, profile.base_vm_name,
+                "Runner::base_vm_name relies on Toml.profiles key (profile name) and base_vm_name being equal"
+            );
         }
 
         Ok(result)

@@ -45,7 +45,7 @@
       }) ];
     };
     packages.x86_64-linux.monitor = pkgsUnstable.callPackage server/nixos/monitor.nix {
-      monitorCrate = monitor.rootCrate.build;
+      monitorCrate = monitor.workspaceMembers.monitor.build;
       image-deps = self.packages.x86_64-linux.image-deps;
     };
     packages.x86_64-linux.image-deps = pkgsUnstable.callPackage server/nixos/image-deps.nix {};

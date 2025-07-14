@@ -13,6 +13,7 @@ use itertools::Itertools;
 use jane_eyre::eyre::{self, bail};
 use mktemp::Temp;
 use serde::{Deserialize, Serialize};
+use settings::profile::ImageType;
 use tracing::{error, info, trace, warn};
 
 use crate::{
@@ -20,7 +21,6 @@ use crate::{
     data::get_runner_data_path,
     github::{unregister_runner, ApiGenerateJitconfigResponse, ApiRunner},
     libvirt::{get_ipv4_address, libvirt_prefix, take_screenshot, update_screenshot},
-    profile::ImageType,
     LIB_MONITOR_DIR,
 };
 

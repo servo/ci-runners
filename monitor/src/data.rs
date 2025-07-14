@@ -1,27 +1,11 @@
 use std::{
-    fs::{self, create_dir_all, read_dir, rename, File},
+    fs::{create_dir_all, read_dir, rename, File},
     path::{Path, PathBuf},
 };
 
 use jane_eyre::eyre;
+use settings::{data::get_data_path, profile::Profile, LIB_MONITOR_DIR};
 use tracing::info;
-
-use crate::{profile::Profile, DOTENV, LIB_MONITOR_DIR};
-
-pub fn get_data_path<'p>(path: impl Into<Option<&'p Path>>) -> eyre::Result<PathBuf> {
-    let data = if let Some(path) = &DOTENV.monitor_data_path {
-        path.into()
-    } else {
-        PathBuf::from("./data")
-    };
-
-    fs::create_dir_all(&data)?;
-
-    Ok(match path.into() {
-        Some(path) => data.join(path),
-        None => data,
-    })
-}
 
 pub fn get_runner_data_path<'p>(
     id: usize,

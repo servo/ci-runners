@@ -8,7 +8,6 @@ mod libvirt;
 mod profile;
 mod rocket_eyre;
 mod runner;
-mod settings;
 mod shell;
 
 use core::str;
@@ -16,7 +15,7 @@ use std::{
     collections::BTreeMap,
     env,
     fs::File,
-    path::{Path, PathBuf},
+    path::Path,
     process::exit,
     sync::{LazyLock, RwLock},
     thread::{self},
@@ -37,6 +36,7 @@ use rocket::{
 };
 use serde::Deserialize;
 use serde_json::json;
+use settings::{DOTENV, IMAGE_DEPS_DIR, LIB_MONITOR_DIR, TOML};
 use tokio::try_join;
 use tracing::{debug, error, info, trace, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -49,32 +49,13 @@ use crate::{
     id::IdGen,
     image::Rebuilds,
     libvirt::list_runner_guests,
-    profile::{Profiles, RunnerCounts},
+    profile::{
+        base_image_path, idle_runners_for_profile, update_screenshot_for_profile_guest, Profiles,
+        RunnerCounts,
+    },
     rocket_eyre::EyreReport,
     runner::{Runner, Runners, Status},
-    settings::{Dotenv, Toml},
 };
-
-static LIB_MONITOR_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
-    if let Some(lib_monitor_dir) = env::var_os("LIB_MONITOR_DIR") {
-        PathBuf::from(&lib_monitor_dir)
-    } else {
-        PathBuf::from("..")
-    }
-});
-
-static IMAGE_DEPS_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
-    let image_deps_dir = env::var_os("IMAGE_DEPS_DIR").expect("IMAGE_DEPS_DIR not set!");
-    PathBuf::from(&image_deps_dir)
-});
-
-static DOTENV: LazyLock<Dotenv> = LazyLock::new(|| {
-    dotenv().expect("Failed to load variables from .env");
-    Dotenv::load()
-});
-
-static TOML: LazyLock<Toml> =
-    LazyLock::new(|| Toml::load_default().expect("Failed to load settings from monitor.toml"));
 
 static DASHBOARD: RwLock<Option<Dashboard>> = RwLock::new(None);
 
@@ -431,8 +412,7 @@ fn monitor_thread() -> eyre::Result<()> {
                 profiles
                     .base_image_snapshot(key)
                     .map(|snapshot| match profile.image_type {
-                        profile::ImageType::Rust => profile
-                            .base_image_path(&**snapshot)
+                        settings::profile::ImageType::Rust => base_image_path(profile, &**snapshot)
                             .as_os_str()
                             .to_str()
                             .expect("Guaranteed by base_image_path()")
@@ -447,7 +427,7 @@ fn monitor_thread() -> eyre::Result<()> {
         runners.update_screenshots();
         profiles.update_ipv4_addresses();
         for (_key, profile) in profiles.iter() {
-            profile.update_screenshot();
+            update_screenshot_for_profile_guest(profile);
         }
 
         let mut unregister_and_destroy = |id, runner: &Runner| {
@@ -500,8 +480,7 @@ fn monitor_thread() -> eyre::Result<()> {
                         .map_or(true, |duration| duration > DOTENV.monitor_reserve_timeout)
             });
             let excess_idle_runners = profiles.iter().flat_map(|(_key, profile)| {
-                profile
-                    .idle_runners(&runners)
+                idle_runners_for_profile(profile, &runners)
                     .take(profiles.excess_idle_runner_count(profile, &runners))
             });
             for (&id, runner) in invalid

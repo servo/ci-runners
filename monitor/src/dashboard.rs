@@ -3,9 +3,10 @@ use std::collections::BTreeMap;
 use askama::Template;
 use jane_eyre::eyre;
 use serde_json::json;
+use settings::profile::Profile;
 
 use crate::{
-    profile::{Profile, Profiles, RunnerCounts},
+    profile::{Profiles, RunnerCounts},
     runner::{Runner, Runners},
     TOML,
 };
