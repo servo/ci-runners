@@ -1,0 +1,11 @@
+[package]
+name = "cli"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+dotenv = { workspace = true }
+jane-eyre = { workspace = true }
+settings = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

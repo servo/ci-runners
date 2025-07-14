@@ -24,7 +24,6 @@ use std::{
 
 use askama::Template;
 use crossbeam_channel::{Receiver, Sender};
-use dotenv::dotenv;
 use jane_eyre::eyre::{self, eyre, Context, OptionExt};
 use mktemp::Temp;
 use rocket::{
@@ -39,7 +38,6 @@ use serde_json::json;
 use settings::{DOTENV, IMAGE_DEPS_DIR, LIB_MONITOR_DIR, TOML};
 use tokio::try_join;
 use tracing::{debug, error, info, trace, warn};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 use crate::{
     auth::{ApiKeyGuard, RemoteAddr},
@@ -287,20 +285,12 @@ fn boot_script_route(remote_addr: RemoteAddr) -> rocket_eyre::Result<RawText<Str
 
 #[rocket::main]
 async fn main() -> eyre::Result<()> {
-    jane_eyre::install()?;
     if env::var_os("RUST_LOG").is_none() {
         // EnvFilter Builder::with_default_directive doesn’t support multiple directives,
         // so we need to apply defaults ourselves.
         env::set_var("RUST_LOG", "monitor=info,rocket=info,cmd_lib::child=info");
     }
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer().with_writer(std::io::stderr))
-        .with(EnvFilter::builder().from_env_lossy())
-        .init();
-
-    dotenv()?;
-    info!(LIB_MONITOR_DIR = ?*LIB_MONITOR_DIR);
-    info!(IMAGE_DEPS_DIR = ?*IMAGE_DEPS_DIR);
+    cli::init()?;
     run_migrations()?;
 
     tokio::task::spawn(async move {

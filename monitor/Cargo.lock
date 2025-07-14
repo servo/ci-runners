@@ -264,6 +264,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cli"
+version = "0.1.0"
+dependencies = [
+ "dotenv",
+ "jane-eyre",
+ "settings",
+ "tracing",
+ "tracing-subscriber 0.3.18",
+]
+
+[[package]]
 name = "cmd_lib"
 version = "1.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -931,6 +942,7 @@ dependencies = [
  "atomic-write-file",
  "bytesize",
  "chrono",
+ "cli",
  "cmd_lib",
  "crossbeam-channel",
  "dotenv",
