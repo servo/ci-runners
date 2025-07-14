@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, env, sync::Mutex};
 use jane_eyre::eyre::{self, eyre};
 use rocket::{get, post, response::content::RawText, serde::json::Json};
 use tokio::try_join;
+use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 use web::rocket_eyre;
 
@@ -33,21 +34,28 @@ fn take_chunk_route(
     total_chunks: usize,
 ) -> rocket_eyre::Result<Json<Option<usize>>> {
     let mut builds = BUILDS.lock().map_err(|e| eyre!("{e:?}"))?;
-    let build = builds.entry(unique_id).or_insert(Build::new(total_chunks));
+    let build = builds
+        .entry(unique_id.clone())
+        .or_insert(Build::new(total_chunks));
 
     if total_chunks != build.total_chunks {
-        Err(eyre!(
+        let error = eyre!(
             "Wrong number of total chunks (expected {}, actual {total_chunks})",
             build.total_chunks
-        ))?;
+        );
+        error!(?unique_id, ?error);
+        Err(error)?;
     }
 
     if build.taken_chunks < total_chunks {
         let response = Some(build.taken_chunks);
         build.taken_chunks += 1;
+        info!(?unique_id, ?response);
         Ok(Json(response))
     } else {
-        Ok(Json(None))
+        let response = None;
+        info!(?unique_id, ?response);
+        Ok(Json(response))
     }
 }
 
@@ -57,7 +65,10 @@ async fn main() -> eyre::Result<()> {
     if env::var_os("RUST_LOG").is_none() {
         // EnvFilter Builder::with_default_directive doesn’t support multiple directives,
         // so we need to apply defaults ourselves.
-        env::set_var("RUST_LOG", "chunker=info,rocket=info");
+        env::set_var(
+            "RUST_LOG",
+            "chunker=info,rocket=info,rocket::server=info,rocket::server::_=off",
+        );
     }
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer().with_writer(std::io::stderr))
