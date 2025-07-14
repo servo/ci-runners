@@ -6,7 +6,6 @@ mod id;
 mod image;
 mod libvirt;
 mod profile;
-mod rocket_eyre;
 mod runner;
 mod shell;
 
@@ -38,6 +37,7 @@ use serde_json::json;
 use settings::{DOTENV, IMAGE_DEPS_DIR, LIB_MONITOR_DIR, TOML};
 use tokio::try_join;
 use tracing::{debug, error, info, trace, warn};
+use web::rocket_eyre::{self, EyreReport};
 
 use crate::{
     auth::{ApiKeyGuard, RemoteAddr},
@@ -51,7 +51,6 @@ use crate::{
         base_image_path, idle_runners_for_profile, update_screenshot_for_profile_guest, Profiles,
         RunnerCounts,
     },
-    rocket_eyre::EyreReport,
     runner::{Runner, Runners, Status},
 };
 

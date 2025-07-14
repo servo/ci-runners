@@ -1,9 +1,9 @@
 //! Most of this is lifted from <https://github.com/yuk1ty/rocket-errors/blob/b617f860d27d8f162e97e92311eeeba1abd38b95/src/eyre.rs>
 use jane_eyre::eyre;
 use rocket::{
-    http::Status,
-    response::{self, content::RawText, Responder},
     Request,
+    http::Status,
+    response::{self, Responder, content::RawText},
 };
 use tracing::warn;
 

@@ -1,0 +1,9 @@
+[package]
+name = "web"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+jane-eyre = { workspace = true }
+rocket = { workspace = true }
+tracing = { workspace = true }
