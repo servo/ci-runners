@@ -241,6 +241,24 @@
         Restart = "on-failure";
       };
     };
+
+    chunker = {
+      # Wait for networking
+      wants = ["network-online.target"];
+      after = ["network-online.target"];
+
+      # Start on boot.
+      wantedBy = ["multi-user.target"];
+
+      script = ''
+        RUST_LOG=chunker=info ${monitor}/bin/chunker
+      '';
+
+      serviceConfig = {
+        WorkingDirectory = "/config/monitor";
+        Restart = "on-failure";
+      };
+    };
   };
 
   networking.firewall.allowedTCPPorts = [
