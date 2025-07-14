@@ -63,6 +63,7 @@ pub struct Dotenv {
 pub struct Toml {
     pub external_base_url: String,
     base_image_max_age: u64,
+    dont_update_cached_servo_repo: Option<bool>,
     profiles: BTreeMap<String, Profile>,
 }
 
@@ -119,6 +120,10 @@ impl Toml {
 
     pub fn base_image_max_age(&self) -> Duration {
         Duration::from_secs(self.base_image_max_age)
+    }
+
+    pub fn dont_update_cached_servo_repo(&self) -> bool {
+        self.dont_update_cached_servo_repo.unwrap_or(false)
     }
 
     pub fn initial_profiles(&self) -> BTreeMap<String, Profile> {

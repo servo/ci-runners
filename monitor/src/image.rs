@@ -20,7 +20,7 @@ use chrono::{SecondsFormat, Utc};
 use cmd_lib::{run_cmd, spawn_with_output};
 use jane_eyre::eyre::{self, bail, OptionExt};
 use reflink::reflink_or_copy;
-use settings::{profile::Profile, DOTENV};
+use settings::{profile::Profile, DOTENV, TOML};
 use tracing::{error, info, trace, warn};
 
 use crate::{
@@ -90,6 +90,7 @@ impl Rebuilds {
         if self.rebuilds.is_empty()
             && !profiles_needing_rebuild.is_empty()
             && !cached_servo_repo_was_just_updated
+            && !TOML.dont_update_cached_servo_repo()
         {
             assert!(self.cached_servo_repo_update.is_none());
 
