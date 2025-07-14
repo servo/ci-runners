@@ -57,7 +57,7 @@ async fn main() -> eyre::Result<()> {
     if env::var_os("RUST_LOG").is_none() {
         // EnvFilter Builder::with_default_directive doesn’t support multiple directives,
         // so we need to apply defaults ourselves.
-        env::set_var("RUST_LOG", "monitor=info,rocket=info,cmd_lib::child=info");
+        env::set_var("RUST_LOG", "chunker=info,rocket=info");
     }
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer().with_writer(std::io::stderr))
