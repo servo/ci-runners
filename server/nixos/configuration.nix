@@ -254,7 +254,7 @@
       wantedBy = ["multi-user.target"];
 
       script = ''
-        RUST_LOG=chunker=info ${monitor}/bin/chunker
+        ${monitor}/bin/chunker
       '';
 
       serviceConfig = {
