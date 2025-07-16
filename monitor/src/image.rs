@@ -63,7 +63,7 @@ impl Rebuilds {
         }
 
         // Determine which profiles need their images rebuilt.
-        for (key, profile) in policy.iter() {
+        for (key, profile) in policy.profiles() {
             let needs_rebuild = policy.image_needs_rebuild(profile);
             if needs_rebuild.unwrap_or(true) {
                 let runner_count = runners_for_profile(profile, &runners).count();

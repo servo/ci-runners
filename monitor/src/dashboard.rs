@@ -57,7 +57,7 @@ impl Dashboard {
 
 impl DashboardTemplate<'_> {
     fn profile(&self, key: impl AsRef<str>) -> Option<&Profile> {
-        self.policy.get(key.as_ref())
+        self.policy.profile(key.as_ref())
     }
 
     fn status(&self, runner: &Runner) -> String {

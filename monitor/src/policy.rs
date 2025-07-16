@@ -59,11 +59,11 @@ impl Policy {
         })
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&String, &Profile)> {
+    pub fn profiles(&self) -> impl Iterator<Item = (&String, &Profile)> {
         self.profiles.iter()
     }
 
-    pub fn get(&self, profile_key: &str) -> Option<&Profile> {
+    pub fn profile(&self, profile_key: &str) -> Option<&Profile> {
         self.profiles.get(profile_key)
     }
 

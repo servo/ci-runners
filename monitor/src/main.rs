@@ -381,7 +381,7 @@ fn monitor_thread() -> eyre::Result<()> {
         image_rebuilds.run(&mut policy, &runners)?;
 
         let profile_runner_counts: BTreeMap<_, _> = policy
-            .iter()
+            .profiles()
             .map(|(key, profile)| (key.clone(), policy.runner_counts(profile, &runners)))
             .collect();
         for (
@@ -399,7 +399,7 @@ fn monitor_thread() -> eyre::Result<()> {
             },
         ) in profile_runner_counts.iter()
         {
-            let profile = policy.get(key).ok_or_eyre("Failed to get profile")?;
+            let profile = policy.profile(key).ok_or_eyre("Failed to get profile")?;
             let image = policy
                 .base_image_snapshot(key)
                 .map(|snapshot| match profile.image_type {
@@ -417,7 +417,7 @@ fn monitor_thread() -> eyre::Result<()> {
 
         runners.update_screenshots();
         policy.update_ipv4_addresses();
-        for (_key, profile) in policy.iter() {
+        for (_key, profile) in policy.profiles() {
             update_screenshot_for_profile_guest(profile);
         }
 
@@ -427,7 +427,7 @@ fn monitor_thread() -> eyre::Result<()> {
                     warn!(?error, "Failed to unregister runner: {error}");
                 }
             }
-            if let Some(profile) = policy.get(runner.base_vm_name()) {
+            if let Some(profile) = policy.profile(runner.base_vm_name()) {
                 if let Err(error) = policy.destroy_runner(profile, id) {
                     warn!(?error, "Failed to destroy runner: {error}");
                 }
@@ -470,7 +470,7 @@ fn monitor_thread() -> eyre::Result<()> {
                         .flatten()
                         .map_or(true, |duration| duration > DOTENV.monitor_reserve_timeout)
             });
-            let excess_idle_runners = policy.iter().flat_map(|(_key, profile)| {
+            let excess_idle_runners = policy.profiles().flat_map(|(_key, profile)| {
                 idle_runners_for_profile(profile, &runners)
                     .take(policy.excess_idle_runner_count(profile, &runners))
             });
@@ -484,7 +484,7 @@ fn monitor_thread() -> eyre::Result<()> {
             }
 
             let profile_wanted_counts = policy
-                .iter()
+                .profiles()
                 .map(|(_key, profile)| (profile, policy.wanted_runner_count(profile, &runners)));
             for (profile, wanted_count) in profile_wanted_counts {
                 for _ in 0..wanted_count {
