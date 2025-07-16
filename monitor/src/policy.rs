@@ -8,6 +8,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use cfg_if::cfg_if;
 use jane_eyre::eyre::{self, bail, Context, OptionExt};
 use mktemp::Temp;
 use serde::Serialize;
@@ -302,19 +303,9 @@ impl Policy {
         let creation_time = match profile.image_type {
             ImageType::Rust => {
                 let base_image_path = base_image_path(profile, &**base_image_snapshot);
-                let metadata = match std::fs::metadata(&base_image_path) {
-                    Ok(result) => result,
-                    Err(error) => {
-                        debug!(
-                            profile.base_vm_name,
-                            ?base_image_path,
-                            ?error,
-                            "Failed to get file metadata"
-                        );
-                        return Ok(None);
-                    }
+                let Some(mtime) = base_image_mtime(profile, &base_image_path) else {
+                    return Ok(None);
                 };
-                let mtime = metadata.modified().expect("Guaranteed by platform");
                 match mtime.duration_since(UNIX_EPOCH) {
                     Ok(result) => result,
                     Err(error) => {
@@ -523,4 +514,48 @@ fn read_base_image_snapshot(profile: &Profile) -> eyre::Result<Option<String>> {
     }
 
     Ok(None)
+}
+
+cfg_if! {
+    if #[cfg(not(test))] {
+        fn base_image_mtime(profile: &Profile, base_image_path: impl AsRef<Path>) -> Option<SystemTime> {
+            let base_image_path = base_image_path.as_ref();
+            let metadata = match std::fs::metadata(&base_image_path) {
+                Ok(result) => result,
+                Err(error) => {
+                    debug!(
+                        profile.base_vm_name,
+                        ?base_image_path,
+                        ?error,
+                        "Failed to get file metadata"
+                    );
+                    return None;
+                }
+            };
+
+            Some(metadata.modified().expect("Guaranteed by platform"))
+        }
+    } else {
+        use std::cell::RefCell;
+
+        thread_local! {
+            static BASE_IMAGE_MTIMES: RefCell<BTreeMap<String, SystemTime>> = RefCell::new(BTreeMap::new());
+        }
+
+        fn base_image_mtime(_profile: &Profile, base_image_path: impl AsRef<Path>) -> Option<SystemTime> {
+            let base_image_path = base_image_path.as_ref().to_str().expect("Unsupported path");
+
+            BASE_IMAGE_MTIMES.with_borrow(|mtimes| mtimes.get(base_image_path).copied())
+        }
+
+        fn set_base_image_mtime_for_test(base_image_path: &str, mtime: impl Into<Option<SystemTime>>) {
+            BASE_IMAGE_MTIMES.with_borrow_mut(|mtimes| {
+                if let Some(mtime) = mtime.into() {
+                    mtimes.insert(base_image_path.to_owned(), mtime);
+                } else {
+                    mtimes.remove(base_image_path);
+                }
+            });
+        }
+    }
 }

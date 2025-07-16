@@ -1,7 +1,7 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{Debug, Display},
-    fs::{self, File},
+    fs::File,
     io::Read,
     net::Ipv4Addr,
     path::Path,
@@ -9,6 +9,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use cfg_if::cfg_if;
 use itertools::Itertools;
 use jane_eyre::eyre::{self, bail};
 use mktemp::Temp;
@@ -18,7 +19,7 @@ use tracing::{error, info, trace, warn};
 
 use crate::{
     data::get_runner_data_path,
-    github::{unregister_runner, ApiGenerateJitconfigResponse, ApiRunner},
+    github::{unregister_runner, ApiRunner},
     libvirt::{get_ipv4_address, libvirt_prefix, take_screenshot, update_screenshot},
     LIB_MONITOR_DIR,
 };
@@ -45,7 +46,7 @@ pub struct RunnerDetails {
     image_type: ImageType,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Status {
     Invalid,
     StartedOrCrashed,
@@ -101,7 +102,7 @@ impl Runners {
         }
         for (id, guest_name) in guest_ids.iter().zip(guest_names) {
             if let Some(runner) = runners.get_mut(id) {
-                let ipv4_address = get_ipv4_address(&guest_name);
+                let ipv4_address = runner_ipv4_address(&guest_name);
                 runner.guest_name = Some(guest_name);
                 runner.ipv4_address = ipv4_address;
             }
@@ -254,20 +255,10 @@ impl Runner {
     ///
     /// For use by [`Runners::new`] only. Does not create a runner.
     fn new(id: usize) -> eyre::Result<Self> {
-        let created_time_path = get_runner_data_path(id, Path::new("created-time"))?;
-        let runner_toml_path = get_runner_data_path(id, Path::new("runner.toml"))?;
-        let created_time = fs::metadata(created_time_path)
-            .or_else(|_| fs::metadata(&runner_toml_path))?
-            .modified()?;
+        let created_time = runner_created_time(id)?;
         trace!(?created_time, "[{id}]");
 
-        let github_jitconfig = || -> eyre::Result<String> {
-            let result = get_runner_data_path(id, Path::new("github-api-registration"))?;
-            let result: ApiGenerateJitconfigResponse =
-                serde_json::from_reader(File::open(result)?)?;
-            Ok(result.encoded_jit_config)
-        };
-        let github_jitconfig = match github_jitconfig() {
+        let github_jitconfig = match read_github_jitconfig(id) {
             Ok(result) => Some(result),
             Err(error) => {
                 warn!(?error, "Failed to get GitHub jitconfig of runner");
@@ -275,13 +266,7 @@ impl Runner {
             }
         };
 
-        let details = if let Ok(mut runner_toml) = File::open(&runner_toml_path) {
-            let mut contents = String::default();
-            runner_toml.read_to_string(&mut contents)?;
-            toml::from_str(&contents)?
-        } else {
-            RunnerDetails::default()
-        };
+        let details = runner_details(id)?;
 
         Ok(Self {
             id,
@@ -370,7 +355,7 @@ impl Runner {
     pub fn base_vm_name(&self) -> &str {
         self.base_vm_name_from_registration()
             .or_else(|| self.base_vm_name_from_guest_name())
-            .expect("Guaranteed by Runners::new")
+            .expect("Bug in list_runner_guests() or the call to Runners::new()")
     }
 
     fn base_vm_name_from_registration(&self) -> Option<&str> {
@@ -390,5 +375,80 @@ impl Runner {
             .flat_map(|name| name.rsplit_once('.'))
             .map(|(base, _id)| base)
             .next()
+    }
+}
+
+cfg_if! {
+    if #[cfg(not(test))] {
+        use crate::github::ApiGenerateJitconfigResponse;
+
+        fn read_github_jitconfig(id: usize) -> eyre::Result<String> {
+            let result = get_runner_data_path(id, Path::new("github-api-registration"))?;
+            let result: ApiGenerateJitconfigResponse =
+                serde_json::from_reader(File::open(result)?)?;
+            Ok(result.encoded_jit_config)
+        }
+
+        fn runner_created_time(id: usize) -> eyre::Result<SystemTime> {
+            let created_time_path = get_runner_data_path(id, Path::new("created-time"))?;
+            let runner_toml_path = get_runner_data_path(id, Path::new("runner.toml"))?;
+            let result = std::fs::metadata(created_time_path)
+                .or_else(|_| std::fs::metadata(&runner_toml_path))?
+                .modified()?;
+
+            Ok(result)
+        }
+
+        fn runner_details(id: usize) -> eyre::Result<RunnerDetails> {
+            let runner_toml_path = get_runner_data_path(id, Path::new("runner.toml"))?;
+
+            if let Ok(mut runner_toml) = File::open(&runner_toml_path) {
+                let mut contents = String::default();
+                runner_toml.read_to_string(&mut contents)?;
+                Ok(toml::from_str(&contents)?)
+            } else {
+                Ok(RunnerDetails::default())
+            }
+        }
+
+        fn runner_ipv4_address(guest_name: &String) -> Option<Ipv4Addr> {
+            get_ipv4_address(guest_name)
+        }
+    } else {
+        use std::cell::RefCell;
+
+        use jane_eyre::eyre::OptionExt;
+
+        thread_local! {
+            static RUNNER_CREATED_TIMES: RefCell<BTreeMap<usize, SystemTime>> = RefCell::new(BTreeMap::new());
+        }
+
+        fn read_github_jitconfig(_id: usize) -> eyre::Result<String> {
+            Ok("".to_owned())
+        }
+
+        fn runner_created_time(id: usize) -> eyre::Result<SystemTime> {
+            RUNNER_CREATED_TIMES.with_borrow(|created_times| {
+                created_times.get(&id).copied().ok_or_eyre("Failed to check runner created time (fake)")
+            })
+        }
+
+        pub(crate) fn set_runner_created_time_for_test(id: usize, created_time: impl Into<Option<SystemTime>>) {
+            RUNNER_CREATED_TIMES.with_borrow_mut(|created_times| {
+                if let Some(created_time) = created_time.into() {
+                    created_times.insert(id, created_time);
+                } else {
+                    created_times.remove(&id);
+                }
+            });
+        }
+
+        fn runner_details(_id: usize) -> eyre::Result<RunnerDetails> {
+            Ok(RunnerDetails::default())
+        }
+
+        fn runner_ipv4_address(_guest_name: &String) -> Option<Ipv4Addr> {
+            None
+        }
     }
 }
