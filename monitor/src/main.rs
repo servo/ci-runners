@@ -360,7 +360,7 @@ fn monitor_thread() -> eyre::Result<()> {
         IdGen::new_empty()
     });
 
-    let mut policy = Policy::new(TOML.initial_profiles());
+    let mut policy = Policy::new(TOML.initial_profiles())?;
     let mut registrations_cache = Cache::default();
     let mut image_rebuilds = Rebuilds::default();
     policy.read_base_image_snapshots()?;

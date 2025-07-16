@@ -14,6 +14,7 @@ use mktemp::Temp;
 use serde::Serialize;
 use settings::{
     profile::{ImageType, Profile},
+    units::MemorySize,
     DOTENV, TOML,
 };
 use tracing::{debug, info, warn};
@@ -53,13 +54,29 @@ pub struct RunnerCounts {
 }
 
 impl Policy {
-    pub fn new(profiles: BTreeMap<String, Profile>) -> Self {
-        Self {
+    pub fn new(profiles: BTreeMap<String, Profile>) -> eyre::Result<Self> {
+        let required_1g_hugepages = profiles
+            .values()
+            .map(|profile| profile.target_count * profile.requires_1g_hugepages)
+            .sum::<usize>();
+        if required_1g_hugepages > TOML.available_1g_hugepages {
+            bail!("Profile configuration requires too many 1G hugepages");
+        }
+
+        let required_normal_memory = profiles
+            .values()
+            .map(|profile| profile.target_count * profile.requires_normal_memory)
+            .sum::<MemorySize>();
+        if required_normal_memory > TOML.available_normal_memory {
+            bail!("Profile configuration requires too much normal memory");
+        }
+
+        Ok(Self {
             profiles,
             base_image_snapshots: BTreeMap::default(),
             ipv4_addresses: BTreeMap::default(),
             runners: None,
-        }
+        })
     }
 
     pub fn read_base_image_snapshots(&mut self) -> eyre::Result<()> {
@@ -597,13 +614,20 @@ mod test {
 
     use super::Policy;
 
-    fn profile(key: &'static str, target_count: usize) -> Profile {
+    fn profile(
+        key: &'static str,
+        target_count: usize,
+        requires_1g_hugepages: usize,
+        requires_normal_memory: &'static str,
+    ) -> Profile {
         Profile {
             configuration_name: key.to_owned(),
             base_vm_name: key.to_owned(),
             github_runner_label: key.to_owned(),
             target_count,
             image_type: settings::profile::ImageType::Rust,
+            requires_1g_hugepages,
+            requires_normal_memory: requires_normal_memory.parse().expect("Bad value in test"),
         }
     }
 
@@ -713,16 +737,68 @@ mod test {
     }
 
     #[test]
+    fn test_new_policy() -> eyre::Result<()> {
+        // No profiles is always ok.
+        assert!(Policy::new([].into()).is_ok());
+
+        // Sum of `target_count * requires_1g_hugepages` must not exceed `available_1g_hugepages`.
+        assert!(Policy::new(
+            [
+                ("linux".to_owned(), profile("linux", 2, 24, "0B")),
+                ("windows".to_owned(), profile("windows", 1, 24, "0B")),
+                ("macos".to_owned(), profile("macos", 1, 24, "0B")),
+                ("wpt".to_owned(), profile("wpt", 0, 12, "0B")),
+            ]
+            .into()
+        )
+        .is_ok());
+        assert!(Policy::new(
+            [
+                ("linux".to_owned(), profile("linux", 2, 24, "0B")),
+                ("windows".to_owned(), profile("windows", 1, 24, "0B")),
+                ("macos".to_owned(), profile("macos", 1, 24, "0B")),
+                ("wpt".to_owned(), profile("wpt", 1, 12, "0B")),
+            ]
+            .into()
+        )
+        .is_err());
+
+        // Sum of `target_count * requires_normal_memory` must not exceed `available_normal_memory`.
+        assert!(Policy::new(
+            [
+                ("linux".to_owned(), profile("linux", 2, 0, "4G")),
+                ("windows".to_owned(), profile("windows", 1, 0, "4G")),
+                ("macos".to_owned(), profile("macos", 1, 0, "4G")),
+                ("wpt".to_owned(), profile("wpt", 0, 0, "4G")),
+            ]
+            .into()
+        )
+        .is_ok());
+        assert!(Policy::new(
+            [
+                ("linux".to_owned(), profile("linux", 2, 0, "4G")),
+                ("windows".to_owned(), profile("windows", 1, 0, "4G")),
+                ("macos".to_owned(), profile("macos", 1, 0, "4G")),
+                ("wpt".to_owned(), profile("wpt", 1, 0, "4G")),
+            ]
+            .into()
+        )
+        .is_err());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_compute_runner_changes() -> eyre::Result<()> {
         let mut policy = Policy::new(
             [
-                ("linux".to_owned(), profile("linux", 5)),
-                ("windows".to_owned(), profile("windows", 3)),
-                ("macos".to_owned(), profile("macos", 3)),
-                ("wpt".to_owned(), profile("wpt", 0)),
+                ("linux".to_owned(), profile("linux", 5, 0, "0B")),
+                ("windows".to_owned(), profile("windows", 3, 0, "0B")),
+                ("macos".to_owned(), profile("macos", 3, 0, "0B")),
+                ("wpt".to_owned(), profile("wpt", 0, 0, "0B")),
             ]
             .into(),
-        );
+        )?;
 
         // Images need rebuild, because there is no good image.
         policy.set_runners(runners(vec![]));

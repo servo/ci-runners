@@ -1,5 +1,7 @@
 pub mod data;
+
 pub mod profile;
+pub mod units;
 
 use std::{
     collections::BTreeMap,
@@ -14,7 +16,7 @@ use std::{
 use jane_eyre::eyre::{self, bail};
 use serde::Deserialize;
 
-use crate::profile::Profile;
+use crate::{profile::Profile, units::MemorySize};
 
 pub static LIB_MONITOR_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     if let Some(lib_monitor_dir) = env::var_os("LIB_MONITOR_DIR") {
@@ -75,6 +77,8 @@ pub struct Toml {
     pub external_base_url: String,
     base_image_max_age: u64,
     dont_update_cached_servo_repo: Option<bool>,
+    pub available_1g_hugepages: usize,
+    pub available_normal_memory: MemorySize,
     profiles: BTreeMap<String, Profile>,
 }
 
