@@ -391,7 +391,7 @@ fn monitor_thread() -> eyre::Result<()> {
                 idle,
                 reserved,
                 busy,
-                excess_idle,
+                excess_healthy,
                 wanted,
                 image_age,
             },
@@ -407,7 +407,7 @@ fn monitor_thread() -> eyre::Result<()> {
                         .expect("Guaranteed by base_image_path()")
                         .to_owned(),
                 });
-            info!("profile {key}: {healthy}/{target} healthy runners ({idle} idle, {reserved} reserved, {busy} busy, {started_or_crashed} started or crashed, {excess_idle} excess idle, {wanted} wanted), image {:?} age {image_age:?}", image);
+            info!("profile {key}: {healthy}/{target} healthy runners ({idle} idle, {reserved} reserved, {busy} busy, {started_or_crashed} started or crashed, {excess_healthy} excess healthy, {wanted} wanted), image {:?} age {image_age:?}", image);
         }
         for (_id, runner) in policy.runners() {
             runner.log_info();

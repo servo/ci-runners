@@ -47,7 +47,7 @@ pub struct RunnerCounts {
     pub idle: usize,
     pub reserved: usize,
     pub busy: usize,
-    pub excess_idle: usize,
+    pub excess_healthy: usize,
     pub wanted: usize,
     pub image_age: Option<Duration>,
 }
@@ -119,16 +119,35 @@ impl Policy {
                     .flatten()
                     .map_or(true, |duration| duration > DOTENV.monitor_reserve_timeout)
         });
-        let excess_idle_runners = self.profiles().flat_map(|(_key, profile)| {
-            self.idle_runners_for_profile(profile)
-                .take(self.excess_idle_runner_count(profile))
-        });
-        for (&id, _runner) in invalid
-            .chain(done_or_unregistered)
+
+        // Destroy invalid runners, but don’t count them as healthy.
+        for (&id, _runner) in invalid {
+            result.unregister_and_destroy_runner_ids.push(id);
+        }
+
+        // Destroy other healthy runners that need to be destroyed, keeping counts per profile.
+        let mut proposed_healthy_destroy_counts = self
+            .profiles()
+            .map(|(key, _)| (&**key, 0))
+            .collect::<BTreeMap<_, _>>();
+        for (&id, runner) in done_or_unregistered
             .chain(started_or_crashed_and_too_old)
             .chain(reserved_for_too_long)
-            .chain(excess_idle_runners)
         {
+            result.unregister_and_destroy_runner_ids.push(id);
+            *proposed_healthy_destroy_counts
+                .get_mut(runner.base_vm_name())
+                .expect("Guaranteed by initialiser") += 1;
+        }
+
+        // Excess healthy runners should be destroyed if they are idle.
+        // Compute this in a separate step, so we can take into account how many destroys we’ve already proposed.
+        let excess_idle_runners = self.profiles().flat_map(|(key, profile)| {
+            self.idle_runners_for_profile(profile).take(
+                self.excess_healthy_runner_count(profile) - proposed_healthy_destroy_counts[&**key],
+            )
+        });
+        for (&id, _runner) in excess_idle_runners {
             result.unregister_and_destroy_runner_ids.push(id);
         }
 
@@ -139,6 +158,12 @@ impl Policy {
             result
                 .create_counts_by_profile_key
                 .insert(profile_key.clone(), wanted_count);
+        }
+
+        // If there are runners to destroy, do not create any new runners.
+        // Destroying runners may fail, so we can’t assume that their resources will necessarily be freed.
+        if !result.unregister_and_destroy_runner_ids.is_empty() {
+            result.create_counts_by_profile_key.clear();
         }
 
         result
@@ -198,7 +223,7 @@ impl Policy {
             idle: self.idle_runner_count(profile),
             reserved: self.reserved_runner_count(profile),
             busy: self.busy_runner_count(profile),
-            excess_idle: self.excess_idle_runner_count(profile),
+            excess_healthy: self.excess_healthy_runner_count(profile),
             wanted: self.wanted_runner_count(profile),
             image_age: self.image_age(profile).ok().flatten(),
         }
@@ -250,16 +275,13 @@ impl Policy {
             .count()
     }
 
-    pub fn excess_idle_runner_count(&self, profile: &Profile) -> usize {
+    pub fn excess_healthy_runner_count(&self, profile: &Profile) -> usize {
         // Healthy runners beyond the target count are excess runners.
-        let excess = if self.healthy_runner_count(profile) > self.target_runner_count(profile) {
+        if self.healthy_runner_count(profile) > self.target_runner_count(profile) {
             self.healthy_runner_count(profile) - self.target_runner_count(profile)
         } else {
             0
-        };
-
-        // But we can only destroy idle runners, since busy runners have work to do.
-        excess.min(self.idle_runner_count(profile))
+        }
     }
 
     pub fn wanted_runner_count(&self, profile: &Profile) -> usize {
@@ -557,5 +579,347 @@ cfg_if! {
                 }
             });
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+    use jane_eyre::eyre;
+    use settings::{profile::Profile, DOTENV};
+
+    use crate::{
+        github::{ApiRunner, ApiRunnerLabel},
+        policy::{set_base_image_mtime_for_test, RunnerChanges},
+        runner::{set_runner_created_time_for_test, Runners, Status},
+    };
+
+    use super::Policy;
+
+    fn profile(key: &'static str, target_count: usize) -> Profile {
+        Profile {
+            configuration_name: key.to_owned(),
+            base_vm_name: key.to_owned(),
+            github_runner_label: key.to_owned(),
+            target_count,
+            image_type: settings::profile::ImageType::Rust,
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    struct FakeRunner {
+        profile_key: &'static str,
+        status: Status,
+        created_time: SystemTime,
+        reserved_since: Option<Duration>,
+    }
+    impl FakeRunner {
+        fn idle(profile_key: &'static str) -> Self {
+            Self {
+                profile_key,
+                status: Status::Idle,
+                created_time: system_time_minus_seconds(9001),
+                reserved_since: None,
+            }
+        }
+        fn busy(profile_key: &'static str) -> Self {
+            Self {
+                profile_key,
+                status: Status::Busy,
+                created_time: system_time_minus_seconds(9001),
+                reserved_since: None,
+            }
+        }
+    }
+    fn runners(fake_runners: Vec<FakeRunner>) -> Runners {
+        let mut next_runner_id = 0;
+        let mut make_runner_id_and_guest_name = |profile_key: &str| -> (usize, String) {
+            let id = next_runner_id;
+            let name = format!("{}.{}", profile_key, id,);
+            next_runner_id += 1;
+            (id, name)
+        };
+        let make_registration = |guest_name: &str| -> ApiRunner {
+            ApiRunner {
+                id: 0,       // any
+                busy: false, // any
+                name: format!("{}@{}", guest_name, DOTENV.github_api_suffix),
+                status: "".to_owned(), // any
+                labels: vec![],        // any
+            }
+        };
+
+        let mut registrations = vec![];
+        let mut guest_names = vec![];
+        for fake in fake_runners {
+            let (runner_id, guest_name) = make_runner_id_and_guest_name(fake.profile_key);
+            set_runner_created_time_for_test(runner_id, fake.created_time);
+            match fake.status {
+                Status::Invalid => registrations.push(make_registration(&guest_name)),
+                Status::DoneOrUnregistered => {
+                    guest_names.push(format!("{}-{}", DOTENV.libvirt_prefix, guest_name))
+                }
+                Status::Busy => {
+                    let mut api_runner = make_registration(&guest_name);
+                    api_runner.busy = true;
+                    registrations.push(api_runner);
+                    guest_names.push(format!("{}-{}", DOTENV.libvirt_prefix, guest_name));
+                }
+                Status::Reserved => {
+                    let mut api_runner = make_registration(&guest_name);
+                    api_runner.labels.push(ApiRunnerLabel {
+                        name: "reserved-for:".to_owned(), // any value
+                    });
+                    if let Some(reserved_since) = fake.reserved_since {
+                        let reserved_since = reserved_since.as_secs();
+                        api_runner.labels.push(ApiRunnerLabel {
+                            name: format!("reserved-since:{reserved_since}"),
+                        });
+                    }
+                    registrations.push(api_runner);
+                    guest_names.push(format!("{}-{}", DOTENV.libvirt_prefix, guest_name));
+                }
+                Status::Idle => {
+                    let mut api_runner = make_registration(&guest_name);
+                    api_runner.status = "online".to_owned();
+                    registrations.push(api_runner);
+                    guest_names.push(format!("{}-{}", DOTENV.libvirt_prefix, guest_name));
+                }
+                Status::StartedOrCrashed => {
+                    registrations.push(make_registration(&guest_name));
+                    guest_names.push(format!("{}-{}", DOTENV.libvirt_prefix, guest_name));
+                }
+            }
+        }
+
+        Runners::new(registrations, guest_names)
+    }
+
+    fn system_time_minus_seconds(delta: u64) -> SystemTime {
+        SystemTime::now()
+            .checked_sub(Duration::from_secs(delta))
+            .expect("Bad delta")
+    }
+    fn epoch_duration_minus_seconds(delta: u64) -> Duration {
+        let now = epoch_duration_now();
+
+        now - Duration::from_secs(delta)
+    }
+    fn epoch_duration_now() -> Duration {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("Bad time to run this test")
+    }
+
+    #[test]
+    fn test_compute_runner_changes() -> eyre::Result<()> {
+        let mut policy = Policy::new(
+            [
+                ("linux".to_owned(), profile("linux", 5)),
+                ("windows".to_owned(), profile("windows", 3)),
+                ("macos".to_owned(), profile("macos", 3)),
+                ("wpt".to_owned(), profile("wpt", 0)),
+            ]
+            .into(),
+        );
+
+        // Images need rebuild, because there is no good image.
+        policy.set_runners(runners(vec![]));
+        assert_eq!(
+            policy.compute_runner_changes(),
+            RunnerChanges {
+                unregister_and_destroy_runner_ids: vec![],
+                create_counts_by_profile_key: [
+                    ("linux".to_owned(), 0),
+                    ("windows".to_owned(), 0),
+                    ("macos".to_owned(), 0),
+                    ("wpt".to_owned(), 0),
+                ]
+                .into(),
+            },
+        );
+
+        // Images need rebuild, because they are too old.
+        let too_old = system_time_minus_seconds(86500);
+        set_base_image_mtime_for_test("/var/lib/libvirt/images/base/linux/base.img@", too_old);
+        set_base_image_mtime_for_test("/var/lib/libvirt/images/base/macos/base.img@", too_old);
+        set_base_image_mtime_for_test("/var/lib/libvirt/images/base/windows/base.img@", too_old);
+        policy.set_base_image_snapshot("linux", "")?;
+        policy.set_base_image_snapshot("macos", "")?;
+        policy.set_base_image_snapshot("windows", "")?;
+        policy.set_base_image_snapshot("wpt", "")?;
+        assert_eq!(
+            policy.compute_runner_changes(),
+            RunnerChanges {
+                unregister_and_destroy_runner_ids: vec![],
+                create_counts_by_profile_key: [
+                    ("linux".to_owned(), 0),
+                    ("windows".to_owned(), 0),
+                    ("macos".to_owned(), 0),
+                    ("wpt".to_owned(), 0),
+                ]
+                .into(),
+            },
+        );
+
+        // Empty state.
+        let fresh = system_time_minus_seconds(0);
+        set_base_image_mtime_for_test("/var/lib/libvirt/images/base/linux/base.img@", fresh);
+        set_base_image_mtime_for_test("/var/lib/libvirt/images/base/macos/base.img@", fresh);
+        set_base_image_mtime_for_test("/var/lib/libvirt/images/base/windows/base.img@", fresh);
+        assert_eq!(
+            policy.compute_runner_changes(),
+            RunnerChanges {
+                unregister_and_destroy_runner_ids: vec![],
+                create_counts_by_profile_key: [
+                    ("linux".to_owned(), 5),
+                    ("windows".to_owned(), 3),
+                    ("macos".to_owned(), 3),
+                    ("wpt".to_owned(), 0),
+                ]
+                .into(),
+            },
+        );
+
+        // All of the reasons we might destroy runners.
+        let fake_runners = vec![
+            // [0] Invalid => unregister and destroy
+            FakeRunner {
+                profile_key: "linux",
+                status: Status::Invalid,
+                created_time: SystemTime::now(),
+                reserved_since: None,
+            },
+            // [1] DoneOrUnregistered => unregister and destroy
+            FakeRunner {
+                profile_key: "linux",
+                status: Status::DoneOrUnregistered,
+                created_time: SystemTime::now(),
+                reserved_since: None,
+            },
+            // [2] StartedOrCrashed, but not too old => keep (1/5)
+            FakeRunner {
+                profile_key: "linux",
+                status: Status::StartedOrCrashed,
+                created_time: SystemTime::now(),
+                reserved_since: None,
+            },
+            // [3] StartedOrCrashed and too old => unregister and destroy
+            FakeRunner {
+                profile_key: "linux",
+                status: Status::StartedOrCrashed,
+                created_time: system_time_minus_seconds(130),
+                reserved_since: None,
+            },
+            // [4] Reserved, but not for too long => keep (2/5)
+            FakeRunner {
+                profile_key: "linux",
+                status: Status::Reserved,
+                created_time: system_time_minus_seconds(9001),
+                reserved_since: Some(epoch_duration_now()),
+            },
+            // [5] Reserved for too long => unregister and destroy
+            FakeRunner {
+                profile_key: "linux",
+                status: Status::Reserved,
+                created_time: system_time_minus_seconds(9001),
+                reserved_since: Some(epoch_duration_minus_seconds(210)),
+            },
+            // [6] [7] [8] [9] [10] [11] [12] Idle or Busy => bleed off excess Idle runners
+            // => destroy (1) (2) (3) (4) keep (3/5) (4/5) (5/5)
+            FakeRunner::idle("linux"),
+            FakeRunner::idle("linux"),
+            FakeRunner::idle("linux"),
+            FakeRunner::idle("linux"),
+            FakeRunner::idle("linux"),
+            FakeRunner::idle("linux"),
+            FakeRunner::idle("linux"),
+        ];
+        policy.set_runners(runners(fake_runners.clone()));
+        assert_eq!(
+            policy.compute_runner_changes(),
+            RunnerChanges {
+                unregister_and_destroy_runner_ids: vec![0, 1, 3, 5, 6, 7, 8, 9],
+                create_counts_by_profile_key: [].into(),
+            },
+        );
+
+        // Destroys failed? Propose those destroys again.
+        assert_eq!(
+            policy.compute_runner_changes(),
+            RunnerChanges {
+                unregister_and_destroy_runner_ids: vec![0, 1, 3, 5, 6, 7, 8, 9],
+                create_counts_by_profile_key: [].into(),
+            },
+        );
+
+        // All destroys succeeded? Now create runners.
+        let fake_runners = fake_runners
+            .into_iter()
+            .enumerate()
+            .filter(|(i, _)| ![0, 1, 3, 5, 6, 7, 8, 9].contains(i))
+            .map(|(_, fake)| fake)
+            .collect::<Vec<_>>();
+        policy.set_runners(runners(fake_runners.clone()));
+        assert_eq!(
+            policy.compute_runner_changes(),
+            RunnerChanges {
+                unregister_and_destroy_runner_ids: vec![],
+                create_counts_by_profile_key: [
+                    ("linux".to_owned(), 0),
+                    ("windows".to_owned(), 3),
+                    ("macos".to_owned(), 3),
+                    ("wpt".to_owned(), 0),
+                ]
+                .into(),
+            },
+        );
+
+        // Creates failed? Propose those creates again.
+        assert_eq!(
+            policy.compute_runner_changes(),
+            RunnerChanges {
+                unregister_and_destroy_runner_ids: vec![],
+                create_counts_by_profile_key: [
+                    ("linux".to_owned(), 0),
+                    ("windows".to_owned(), 3),
+                    ("macos".to_owned(), 3),
+                    ("wpt".to_owned(), 0),
+                ]
+                .into(),
+            },
+        );
+
+        // Only idle runners can be considered for destruction.
+        let fake_runners = vec![
+            // [0] [1] [2] [3] [4] [5] [6] [7] [8] Idle or Busy => bleed off excess Idle runners
+            // => keep (1/5) (2/5) (3/5) (4/5) (5/5) (6/5) (7/5) (8/5) (9/5)
+            FakeRunner::busy("linux"),
+            FakeRunner::busy("linux"),
+            FakeRunner::busy("linux"),
+            FakeRunner::busy("linux"),
+            FakeRunner::busy("linux"),
+            FakeRunner::busy("linux"),
+            FakeRunner::busy("linux"),
+            FakeRunner::busy("linux"),
+            FakeRunner::busy("linux"),
+        ];
+        policy.set_runners(runners(fake_runners.clone()));
+        assert_eq!(
+            policy.compute_runner_changes(),
+            RunnerChanges {
+                unregister_and_destroy_runner_ids: vec![],
+                create_counts_by_profile_key: [
+                    ("linux".to_owned(), 0),
+                    ("windows".to_owned(), 3),
+                    ("macos".to_owned(), 3),
+                    ("wpt".to_owned(), 0),
+                ]
+                .into(),
+            },
+        );
+
+        Ok(())
     }
 }
