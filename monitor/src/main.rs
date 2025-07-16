@@ -437,52 +437,18 @@ fn monitor_thread() -> eyre::Result<()> {
                 unregister_and_destroy(id, runner);
             }
         } else {
-            // Invalid => unregister and destroy
-            // DoneOrUnregistered => destroy (no need to unregister)
-            // StartedOrCrashed and too old => unregister and destroy
-            // Reserved for too long => unregister and destroy
-            // Idle or Busy => bleed off excess Idle runners
-            let invalid = policy
-                .runners()
-                .filter(|(_id, runner)| runner.status() == Status::Invalid);
-            let done_or_unregistered = policy
-                .runners()
-                .filter(|(_id, runner)| runner.status() == Status::DoneOrUnregistered)
-                // Don’t destroy unregistered runners if we aren’t registering them in the first place.
-                .filter(|_| !DOTENV.dont_register_runners);
-            let started_or_crashed_and_too_old = policy.runners().filter(|(_id, runner)| {
-                runner.status() == Status::StartedOrCrashed
-                    && runner
-                        .age()
-                        .map_or(true, |age| age > DOTENV.monitor_start_timeout)
-            });
-            let reserved_for_too_long = policy.runners().filter(|(_id, runner)| {
-                runner.status() == Status::Reserved
-                    && runner
-                        .reserved_since()
-                        .ok()
-                        .flatten()
-                        .map_or(true, |duration| duration > DOTENV.monitor_reserve_timeout)
-            });
-            let excess_idle_runners = policy.profiles().flat_map(|(_key, profile)| {
-                policy
-                    .idle_runners_for_profile(profile)
-                    .take(policy.excess_idle_runner_count(profile))
-            });
-            for (&id, runner) in invalid
-                .chain(done_or_unregistered)
-                .chain(started_or_crashed_and_too_old)
-                .chain(reserved_for_too_long)
-                .chain(excess_idle_runners)
-            {
-                unregister_and_destroy(id, runner);
+            let changes = policy.compute_runner_changes();
+            for runner_id in changes.unregister_and_destroy_runner_ids {
+                let runner = policy
+                    .runner(runner_id)
+                    .expect("Guaranteed by compute_runner_changes()");
+                unregister_and_destroy(runner_id, runner);
             }
-
-            let profile_wanted_counts = policy
-                .profiles()
-                .map(|(_key, profile)| (profile, policy.wanted_runner_count(profile)));
-            for (profile, wanted_count) in profile_wanted_counts {
-                for _ in 0..wanted_count {
+            for (profile_key, count) in changes.create_counts_by_profile_key {
+                let profile = policy
+                    .profile(&profile_key)
+                    .expect("Guaranteed by compute_runner_changes()");
+                for _ in 0..count {
                     if let Err(error) = policy.create_runner(profile, id_gen.next()) {
                         warn!(?error, "Failed to create runner: {error}");
                     }

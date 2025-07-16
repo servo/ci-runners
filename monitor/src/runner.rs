@@ -114,6 +114,10 @@ impl Runners {
         self.runners.iter()
     }
 
+    pub fn get(&self, id: usize) -> Option<&Runner> {
+        self.runners.get(&id)
+    }
+
     pub fn by_profile<'s>(&'s self, key: &'s str) -> impl Iterator<Item = (&'s usize, &'s Runner)> {
         self.runners
             .iter()

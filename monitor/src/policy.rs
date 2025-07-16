@@ -32,6 +32,12 @@ pub struct Policy {
     runners: Option<Runners>,
 }
 
+#[derive(Debug, PartialEq, Default)]
+pub struct RunnerChanges {
+    pub unregister_and_destroy_runner_ids: Vec<usize>,
+    pub create_counts_by_profile_key: BTreeMap<String, usize>,
+}
+
 #[derive(Debug, Serialize)]
 pub struct RunnerCounts {
     pub target: usize,
@@ -76,6 +82,61 @@ impl Policy {
 
     pub fn set_runners(&mut self, runners: Runners) {
         self.runners = Some(runners);
+    }
+
+    pub fn compute_runner_changes(&self) -> RunnerChanges {
+        let mut result = RunnerChanges::default();
+
+        // Invalid => unregister and destroy
+        // DoneOrUnregistered => destroy (no need to unregister)
+        // StartedOrCrashed and too old => unregister and destroy
+        // Reserved for too long => unregister and destroy
+        // Idle or Busy => bleed off excess Idle runners
+        let invalid = self
+            .runners()
+            .filter(|(_id, runner)| runner.status() == Status::Invalid);
+        let done_or_unregistered = self
+            .runners()
+            .filter(|(_id, runner)| runner.status() == Status::DoneOrUnregistered)
+            // Don’t destroy unregistered runners if we aren’t registering them in the first place.
+            .filter(|_| !DOTENV.dont_register_runners);
+        let started_or_crashed_and_too_old = self.runners().filter(|(_id, runner)| {
+            runner.status() == Status::StartedOrCrashed
+                && runner
+                    .age()
+                    .map_or(true, |age| age > DOTENV.monitor_start_timeout)
+        });
+        let reserved_for_too_long = self.runners().filter(|(_id, runner)| {
+            runner.status() == Status::Reserved
+                && runner
+                    .reserved_since()
+                    .ok()
+                    .flatten()
+                    .map_or(true, |duration| duration > DOTENV.monitor_reserve_timeout)
+        });
+        let excess_idle_runners = self.profiles().flat_map(|(_key, profile)| {
+            self.idle_runners_for_profile(profile)
+                .take(self.excess_idle_runner_count(profile))
+        });
+        for (&id, _runner) in invalid
+            .chain(done_or_unregistered)
+            .chain(started_or_crashed_and_too_old)
+            .chain(reserved_for_too_long)
+            .chain(excess_idle_runners)
+        {
+            result.unregister_and_destroy_runner_ids.push(id);
+        }
+
+        let profile_wanted_counts = self
+            .profiles()
+            .map(|(key, profile)| (key, self.wanted_runner_count(profile)));
+        for (profile_key, wanted_count) in profile_wanted_counts {
+            result
+                .create_counts_by_profile_key
+                .insert(profile_key.clone(), wanted_count);
+        }
+
+        result
     }
 
     pub fn create_runner(&self, profile: &Profile, id: usize) -> eyre::Result<()> {
@@ -314,6 +375,10 @@ impl Policy {
 
     pub fn runners(&self) -> impl Iterator<Item = (&usize, &Runner)> {
         self.runners.iter().flat_map(|runners| runners.iter())
+    }
+
+    pub fn runner(&self, id: usize) -> Option<&Runner> {
+        self.runners.as_ref().and_then(|runners| runners.get(id))
     }
 
     pub fn runners_for_profile<'s, 'p: 's>(
