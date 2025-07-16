@@ -24,8 +24,7 @@ use settings::{profile::Profile, DOTENV, TOML};
 use tracing::{error, info, trace, warn};
 
 use crate::{
-    policy::{base_images_path, runners_for_profile, Policy},
-    runner::Runners,
+    policy::{base_images_path, Policy},
     shell::log_output_as_info,
 };
 
@@ -42,7 +41,7 @@ struct Rebuild {
 }
 
 impl Rebuilds {
-    pub fn run(&mut self, policy: &mut Policy, runners: &Runners) -> eyre::Result<()> {
+    pub fn run(&mut self, policy: &mut Policy) -> eyre::Result<()> {
         let mut profiles_needing_rebuild = BTreeMap::default();
         let mut cached_servo_repo_was_just_updated = false;
 
@@ -66,7 +65,7 @@ impl Rebuilds {
         for (key, profile) in policy.profiles() {
             let needs_rebuild = policy.image_needs_rebuild(profile);
             if needs_rebuild.unwrap_or(true) {
-                let runner_count = runners_for_profile(profile, &runners).count();
+                let runner_count = policy.runners_for_profile(profile).count();
                 if needs_rebuild.is_none() {
                     info!("profile {key}: image may or may not need rebuild");
                 } else if self.cached_servo_repo_update.is_some() {

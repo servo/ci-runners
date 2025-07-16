@@ -6,7 +6,7 @@
     <li>image rebuild, <a class="screenshot" href="/profile/{{ key }}/screenshot.png" data-profile-key="{{ key }}">screenshot</a>
 {% endif %}
 {% endif %}
-{% for (id, runner) in runners.by_profile(key) %}
+{% for (id, runner) in policy.runners_for_profile_key(key) %}
     <li>id {{ id }}, <a class="screenshot" href="/runner/{{ id }}/screenshot.png" data-runner-id="{{ id }}">screenshot</a>, status {{ self.status(runner) }}, age {{ self.age(runner)? }}, reserved for {{ self.reserved_since(runner)? }}
     <div class="labels">
         {% for label in self.labels(runner) %}

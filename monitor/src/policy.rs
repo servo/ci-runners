@@ -9,6 +9,7 @@ use std::{
 };
 
 use jane_eyre::eyre::{self, bail, Context, OptionExt};
+use mktemp::Temp;
 use serde::Serialize;
 use settings::{
     profile::{ImageType, Profile},
@@ -19,7 +20,7 @@ use tracing::{debug, info, warn};
 use crate::{
     data::{get_profile_configuration_path, get_profile_data_path, get_runner_data_path},
     image::{create_runner, destroy_runner, register_runner},
-    libvirt::get_ipv4_address,
+    libvirt::{get_ipv4_address, update_screenshot},
     runner::{Runner, Runners, Status},
 };
 
@@ -28,6 +29,7 @@ pub struct Policy {
     profiles: BTreeMap<String, Profile>,
     base_image_snapshots: BTreeMap<String, String>,
     ipv4_addresses: BTreeMap<String, Option<Ipv4Addr>>,
+    runners: Option<Runners>,
 }
 
 #[derive(Debug, Serialize)]
@@ -56,6 +58,7 @@ impl Policy {
             profiles,
             base_image_snapshots,
             ipv4_addresses: BTreeMap::default(),
+            runners: None,
         })
     }
 
@@ -69,6 +72,10 @@ impl Policy {
 
     pub fn base_image_snapshot(&self, profile_key: &str) -> Option<&String> {
         self.base_image_snapshots.get(profile_key)
+    }
+
+    pub fn set_runners(&mut self, runners: Runners) {
+        self.runners = Some(runners);
     }
 
     pub fn create_runner(&self, profile: &Profile, id: usize) -> eyre::Result<()> {
@@ -117,16 +124,16 @@ impl Policy {
         }
     }
 
-    pub fn runner_counts(&self, profile: &Profile, runners: &Runners) -> RunnerCounts {
+    pub fn runner_counts(&self, profile: &Profile) -> RunnerCounts {
         RunnerCounts {
             target: self.target_runner_count(profile),
-            healthy: self.healthy_runner_count(profile, runners),
-            started_or_crashed: self.started_or_crashed_runner_count(profile, runners),
-            idle: self.idle_runner_count(profile, runners),
-            reserved: self.reserved_runner_count(profile, runners),
-            busy: self.busy_runner_count(profile, runners),
-            excess_idle: self.excess_idle_runner_count(profile, runners),
-            wanted: self.wanted_runner_count(profile, runners),
+            healthy: self.healthy_runner_count(profile),
+            started_or_crashed: self.started_or_crashed_runner_count(profile),
+            idle: self.idle_runner_count(profile),
+            reserved: self.reserved_runner_count(profile),
+            busy: self.busy_runner_count(profile),
+            excess_idle: self.excess_idle_runner_count(profile),
+            wanted: self.wanted_runner_count(profile),
             image_age: self.image_age(profile).ok().flatten(),
         }
     }
@@ -139,61 +146,60 @@ impl Policy {
         }
     }
 
-    pub fn healthy_runner_count(&self, profile: &Profile, runners: &Runners) -> usize {
-        self.started_or_crashed_runner_count(profile, runners)
-            + self.idle_runner_count(profile, runners)
-            + self.reserved_runner_count(profile, runners)
-            + self.busy_runner_count(profile, runners)
-            + self.done_or_unregistered_runner_count(profile, runners)
+    pub fn healthy_runner_count(&self, profile: &Profile) -> usize {
+        self.started_or_crashed_runner_count(profile)
+            + self.idle_runner_count(profile)
+            + self.reserved_runner_count(profile)
+            + self.busy_runner_count(profile)
+            + self.done_or_unregistered_runner_count(profile)
     }
 
-    pub fn started_or_crashed_runner_count(&self, profile: &Profile, runners: &Runners) -> usize {
-        runners_for_profile(profile, runners)
+    pub fn started_or_crashed_runner_count(&self, profile: &Profile) -> usize {
+        self.runners_for_profile(profile)
             .filter(|(_id, runner)| runner.status() == Status::StartedOrCrashed)
             .count()
     }
 
-    pub fn idle_runner_count(&self, profile: &Profile, runners: &Runners) -> usize {
-        runners_for_profile(profile, runners)
+    pub fn idle_runner_count(&self, profile: &Profile) -> usize {
+        self.runners_for_profile(profile)
             .filter(|(_id, runner)| runner.status() == Status::Idle)
             .count()
     }
 
-    pub fn reserved_runner_count(&self, profile: &Profile, runners: &Runners) -> usize {
-        runners_for_profile(profile, runners)
+    pub fn reserved_runner_count(&self, profile: &Profile) -> usize {
+        self.runners_for_profile(profile)
             .filter(|(_id, runner)| runner.status() == Status::Reserved)
             .count()
     }
 
-    pub fn busy_runner_count(&self, profile: &Profile, runners: &Runners) -> usize {
-        runners_for_profile(profile, runners)
+    pub fn busy_runner_count(&self, profile: &Profile) -> usize {
+        self.runners_for_profile(profile)
             .filter(|(_id, runner)| runner.status() == Status::Busy)
             .count()
     }
 
-    pub fn done_or_unregistered_runner_count(&self, profile: &Profile, runners: &Runners) -> usize {
-        runners_for_profile(profile, runners)
+    pub fn done_or_unregistered_runner_count(&self, profile: &Profile) -> usize {
+        self.runners_for_profile(profile)
             .filter(|(_id, runner)| runner.status() == Status::DoneOrUnregistered)
             .count()
     }
 
-    pub fn excess_idle_runner_count(&self, profile: &Profile, runners: &Runners) -> usize {
+    pub fn excess_idle_runner_count(&self, profile: &Profile) -> usize {
         // Healthy runners beyond the target count are excess runners.
-        let excess =
-            if self.healthy_runner_count(profile, runners) > self.target_runner_count(profile) {
-                self.healthy_runner_count(profile, runners) - self.target_runner_count(profile)
-            } else {
-                0
-            };
+        let excess = if self.healthy_runner_count(profile) > self.target_runner_count(profile) {
+            self.healthy_runner_count(profile) - self.target_runner_count(profile)
+        } else {
+            0
+        };
 
         // But we can only destroy idle runners, since busy runners have work to do.
-        excess.min(self.idle_runner_count(profile, runners))
+        excess.min(self.idle_runner_count(profile))
     }
 
-    pub fn wanted_runner_count(&self, profile: &Profile, runners: &Runners) -> usize {
+    pub fn wanted_runner_count(&self, profile: &Profile) -> usize {
         // Healthy runners below the target count are wanted runners.
-        if self.target_runner_count(profile) > self.healthy_runner_count(profile, runners) {
-            self.target_runner_count(profile) - self.healthy_runner_count(profile, runners)
+        if self.target_runner_count(profile) > self.healthy_runner_count(profile) {
+            self.target_runner_count(profile) - self.healthy_runner_count(profile)
         } else {
             0
         }
@@ -273,7 +279,7 @@ impl Policy {
         Ok(())
     }
 
-    pub fn update_ipv4_addresses(&mut self) {
+    pub fn update_ipv4_addresses_for_profile_guests(&mut self) {
         for (key, profile) in self.profiles.iter() {
             let ipv4_address = get_ipv4_address(&profile.base_vm_name);
             let entry = self.ipv4_addresses.entry(key.clone()).or_default();
@@ -287,7 +293,10 @@ impl Policy {
         }
     }
 
-    pub fn boot_script(&self, remote_addr: web::auth::RemoteAddr) -> eyre::Result<Option<String>> {
+    pub fn boot_script_for_profile_guest(
+        &self,
+        remote_addr: web::auth::RemoteAddr,
+    ) -> eyre::Result<Option<String>> {
         for (key, ipv4_address) in self.ipv4_addresses.iter() {
             if let Some(ipv4_address) = ipv4_address {
                 if remote_addr == *ipv4_address {
@@ -302,39 +311,121 @@ impl Policy {
 
         Ok(None)
     }
-}
 
-pub fn runners_for_profile<'p, 'r: 'p>(
-    profile: &'p Profile,
-    runners: &'r Runners,
-) -> impl Iterator<Item = (&'r usize, &'r Runner)> + 'p {
-    runners
-        .iter()
-        .filter(|(_id, runner)| runner.base_vm_name() == profile.base_vm_name)
-}
+    pub fn runners(&self) -> impl Iterator<Item = (&usize, &Runner)> {
+        self.runners.iter().flat_map(|runners| runners.iter())
+    }
 
-pub fn idle_runners_for_profile<'p, 'r: 'p>(
-    profile: &'p Profile,
-    runners: &'r Runners,
-) -> impl Iterator<Item = (&'r usize, &'r Runner)> + 'p {
-    runners_for_profile(profile, runners).filter(|(_id, runner)| runner.status() == Status::Idle)
-}
+    pub fn runners_for_profile<'s, 'p: 's>(
+        &'s self,
+        profile: &'p Profile,
+    ) -> impl Iterator<Item = (&'s usize, &'s Runner)> {
+        self.runners_for_profile_key(&profile.base_vm_name)
+    }
 
-pub fn update_screenshot_for_profile_guest(profile: &Profile) {
-    if let Err(error) = try_update_screenshot(profile) {
-        debug!(
-            profile.base_vm_name,
-            ?error,
-            "Failed to update screenshot for profile guest"
-        );
+    pub fn runners_for_profile_key<'s, 'p: 's>(
+        &'s self,
+        profile_key: &'p str,
+    ) -> impl Iterator<Item = (&'s usize, &'s Runner)> {
+        self.runners
+            .iter()
+            .flat_map(|runners| runners.by_profile(profile_key))
+    }
+
+    pub fn idle_runners_for_profile<'s, 'p: 's>(
+        &'s self,
+        profile: &'p Profile,
+    ) -> impl Iterator<Item = (&'s usize, &'s Runner)> {
+        self.runners_for_profile(profile)
+            .filter(|(_id, runner)| runner.status() == Status::Idle)
+    }
+
+    pub fn update_screenshots(&self) {
+        if let Some(runners) = self.runners.as_ref() {
+            runners.update_screenshots();
+        }
+        for (_key, profile) in self.profiles() {
+            if let Err(error) = self.try_update_screenshot(profile) {
+                debug!(
+                    profile.base_vm_name,
+                    ?error,
+                    "Failed to update screenshot for profile guest"
+                );
+            }
+        }
+    }
+
+    fn try_update_screenshot(&self, profile: &Profile) -> eyre::Result<()> {
+        let output_dir = get_profile_data_path(&profile.base_vm_name, None)?;
+        update_screenshot(&profile.base_vm_name, &output_dir)?;
+
+        Ok(())
     }
 }
 
-fn try_update_screenshot(profile: &Profile) -> eyre::Result<()> {
-    let output_dir = get_profile_data_path(&profile.base_vm_name, None)?;
-    crate::libvirt::update_screenshot(&profile.base_vm_name, &output_dir)?;
+/// Proxies to [Runner].
+impl Policy {
+    pub fn reserve_runner(
+        &self,
+        id: usize,
+        unique_id: &str,
+        qualified_repo: &str,
+        run_id: &str,
+    ) -> eyre::Result<()> {
+        let Some(runners) = self.runners.as_ref() else {
+            bail!("Policy has no Runners!");
+        };
 
-    Ok(())
+        runners.reserve_runner(id, unique_id, qualified_repo, run_id)
+    }
+
+    pub fn unregister_runner(&self, id: usize) -> eyre::Result<()> {
+        let Some(runners) = self.runners.as_ref() else {
+            bail!("Policy has no Runners!");
+        };
+
+        runners.unregister_runner(id)
+    }
+
+    pub fn screenshot_runner(&self, id: usize) -> eyre::Result<Temp> {
+        let Some(runners) = self.runners.as_ref() else {
+            bail!("Policy has no Runners!");
+        };
+
+        runners.screenshot_runner(id)
+    }
+
+    pub fn github_jitconfig(
+        &self,
+        remote_addr: web::auth::RemoteAddr,
+    ) -> eyre::Result<Option<&str>> {
+        let Some(runners) = self.runners.as_ref() else {
+            bail!("Policy has no Runners!");
+        };
+
+        runners.github_jitconfig(remote_addr)
+    }
+
+    pub fn update_ipv4_addresses_for_runner_guests(&mut self) -> eyre::Result<()> {
+        let Some(runners) = self.runners.as_mut() else {
+            bail!("Policy has no Runners!");
+        };
+
+        runners.update_ipv4_addresses();
+
+        Ok(())
+    }
+
+    pub fn boot_script_for_runner_guest(
+        &self,
+        remote_addr: web::auth::RemoteAddr,
+    ) -> eyre::Result<Option<String>> {
+        let Some(runners) = self.runners.as_ref() else {
+            bail!("Policy has no Runners!");
+        };
+
+        runners.boot_script(remote_addr)
+    }
 }
 
 pub fn base_images_path(profile: &Profile) -> PathBuf {

@@ -48,10 +48,7 @@ use crate::{
     id::IdGen,
     image::Rebuilds,
     libvirt::list_runner_guests,
-    policy::{
-        base_image_path, idle_runners_for_profile, update_screenshot_for_profile_guest, Policy,
-        RunnerCounts,
-    },
+    policy::{base_image_path, Policy, RunnerCounts},
     runner::{Runner, Runners, Status},
 };
 
@@ -377,12 +374,12 @@ fn monitor_thread() -> eyre::Result<()> {
             guests.len(),
         );
 
-        let runners = Runners::new(registrations, guests);
-        image_rebuilds.run(&mut policy, &runners)?;
+        policy.set_runners(Runners::new(registrations, guests));
+        image_rebuilds.run(&mut policy)?;
 
         let profile_runner_counts: BTreeMap<_, _> = policy
             .profiles()
-            .map(|(key, profile)| (key.clone(), policy.runner_counts(profile, &runners)))
+            .map(|(key, profile)| (key.clone(), policy.runner_counts(profile)))
             .collect();
         for (
             key,
@@ -411,19 +408,16 @@ fn monitor_thread() -> eyre::Result<()> {
                 });
             info!("profile {key}: {healthy}/{target} healthy runners ({idle} idle, {reserved} reserved, {busy} busy, {started_or_crashed} started or crashed, {excess_idle} excess idle, {wanted} wanted), image {:?} age {image_age:?}", image);
         }
-        for (_id, runner) in runners.iter() {
+        for (_id, runner) in policy.runners() {
             runner.log_info();
         }
 
-        runners.update_screenshots();
-        policy.update_ipv4_addresses();
-        for (_key, profile) in policy.profiles() {
-            update_screenshot_for_profile_guest(profile);
-        }
+        policy.update_screenshots();
+        policy.update_ipv4_addresses_for_profile_guests();
 
         let mut unregister_and_destroy = |id, runner: &Runner| {
             if runner.registration().is_some() {
-                if let Err(error) = runners.unregister_runner(id) {
+                if let Err(error) = policy.unregister_runner(id) {
                     warn!(?error, "Failed to unregister runner: {error}");
                 }
             }
@@ -436,8 +430,8 @@ fn monitor_thread() -> eyre::Result<()> {
         };
 
         if DOTENV.destroy_all_non_busy_runners {
-            let non_busy_runners = runners
-                .iter()
+            let non_busy_runners = policy
+                .runners()
                 .filter(|(_id, runner)| runner.status() != Status::Busy);
             for (&id, runner) in non_busy_runners {
                 unregister_and_destroy(id, runner);
@@ -448,21 +442,21 @@ fn monitor_thread() -> eyre::Result<()> {
             // StartedOrCrashed and too old => unregister and destroy
             // Reserved for too long => unregister and destroy
             // Idle or Busy => bleed off excess Idle runners
-            let invalid = runners
-                .iter()
+            let invalid = policy
+                .runners()
                 .filter(|(_id, runner)| runner.status() == Status::Invalid);
-            let done_or_unregistered = runners
-                .iter()
+            let done_or_unregistered = policy
+                .runners()
                 .filter(|(_id, runner)| runner.status() == Status::DoneOrUnregistered)
                 // Don’t destroy unregistered runners if we aren’t registering them in the first place.
                 .filter(|_| !DOTENV.dont_register_runners);
-            let started_or_crashed_and_too_old = runners.iter().filter(|(_id, runner)| {
+            let started_or_crashed_and_too_old = policy.runners().filter(|(_id, runner)| {
                 runner.status() == Status::StartedOrCrashed
                     && runner
                         .age()
                         .map_or(true, |age| age > DOTENV.monitor_start_timeout)
             });
-            let reserved_for_too_long = runners.iter().filter(|(_id, runner)| {
+            let reserved_for_too_long = policy.runners().filter(|(_id, runner)| {
                 runner.status() == Status::Reserved
                     && runner
                         .reserved_since()
@@ -471,8 +465,9 @@ fn monitor_thread() -> eyre::Result<()> {
                         .map_or(true, |duration| duration > DOTENV.monitor_reserve_timeout)
             });
             let excess_idle_runners = policy.profiles().flat_map(|(_key, profile)| {
-                idle_runners_for_profile(profile, &runners)
-                    .take(policy.excess_idle_runner_count(profile, &runners))
+                policy
+                    .idle_runners_for_profile(profile)
+                    .take(policy.excess_idle_runner_count(profile))
             });
             for (&id, runner) in invalid
                 .chain(done_or_unregistered)
@@ -485,7 +480,7 @@ fn monitor_thread() -> eyre::Result<()> {
 
             let profile_wanted_counts = policy
                 .profiles()
-                .map(|(_key, profile)| (profile, policy.wanted_runner_count(profile, &runners)));
+                .map(|(_key, profile)| (profile, policy.wanted_runner_count(profile)));
             for (profile, wanted_count) in profile_wanted_counts {
                 for _ in 0..wanted_count {
                     if let Err(error) = policy.create_runner(profile, id_gen.next()) {
@@ -498,11 +493,7 @@ fn monitor_thread() -> eyre::Result<()> {
 
         // Update dashboard data, for the API.
         if let Ok(mut dashboard) = DASHBOARD.write() {
-            *dashboard = Some(Dashboard::render(
-                &policy,
-                &profile_runner_counts,
-                &runners,
-            )?);
+            *dashboard = Some(Dashboard::render(&policy, &profile_runner_counts)?);
         }
 
         // Handle one request from the API.
@@ -522,8 +513,8 @@ fn monitor_thread() -> eyre::Result<()> {
                     count,
                 } => {
                     let mut result = vec![];
-                    let matching_runners = runners
-                        .iter()
+                    let matching_runners = policy
+                        .runners()
                         .filter(|(_, runner)| {
                             runner.status() == Status::Idle && runner.base_vm_name() == profile
                         })
@@ -531,7 +522,7 @@ fn monitor_thread() -> eyre::Result<()> {
                         .collect::<Vec<_>>();
                     for (&id, runner) in matching_runners {
                         registrations_cache.invalidate();
-                        if runners
+                        if policy
                             .reserve_runner(id, &unique_id, &qualified_repo, &run_id)
                             .is_ok()
                         {
@@ -557,7 +548,7 @@ fn monitor_thread() -> eyre::Result<()> {
                     runner_id,
                 } => {
                     response_tx
-                        .send(runners.screenshot_runner(runner_id))
+                        .send(policy.screenshot_runner(runner_id))
                         .expect("Failed to send Response to API thread");
                 }
                 Request::GithubJitconfig {
@@ -568,12 +559,11 @@ fn monitor_thread() -> eyre::Result<()> {
                     // (2) wait for up to 5 seconds for a message, (3) handle one message. If the DHCP lease and the
                     // GET /github-jitconfig request both happen in step (2) without step (1) in between, we won’t know
                     // the IPv4 address, so let’s update the IPv4 addresses before continuing.
-                    let mut runners = runners;
-                    runners.update_ipv4_addresses();
+                    policy.update_ipv4_addresses_for_runner_guests()?;
 
                     response_tx
                         .send(
-                            runners
+                            policy
                                 .github_jitconfig(remote_addr)
                                 .map(|result| result.map(|ip| ip.to_owned())),
                         )
@@ -587,14 +577,17 @@ fn monitor_thread() -> eyre::Result<()> {
                     // (2) wait for up to 5 seconds for a message, (3) handle one message. If the DHCP lease and the
                     // GET /github-jitconfig request both happen in step (2) without step (1) in between, we won’t know
                     // the IPv4 address, so let’s update the IPv4 addresses before continuing.
-                    let mut runners = runners;
-                    runners.update_ipv4_addresses();
-                    policy.update_ipv4_addresses();
+                    policy.update_ipv4_addresses_for_runner_guests()?;
+                    policy.update_ipv4_addresses_for_profile_guests();
 
-                    let result = runners
-                        .boot_script(remote_addr.clone())
+                    let result = policy
+                        .boot_script_for_runner_guest(remote_addr.clone())
                         .transpose()
-                        .or_else(|| policy.boot_script(remote_addr).transpose())
+                        .or_else(|| {
+                            policy
+                                .boot_script_for_profile_guest(remote_addr)
+                                .transpose()
+                        })
                         .transpose()
                         .and_then(|result| result.ok_or_eyre("No guest found with IP address"));
                     response_tx
