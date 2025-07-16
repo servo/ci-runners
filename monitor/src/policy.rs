@@ -52,20 +52,24 @@ pub struct RunnerCounts {
 }
 
 impl Policy {
-    pub fn new(profiles: BTreeMap<String, Profile>) -> eyre::Result<Self> {
-        let mut base_image_snapshots = BTreeMap::default();
-        for (profile_key, profile) in profiles.iter() {
+    pub fn new(profiles: BTreeMap<String, Profile>) -> Self {
+        Self {
+            profiles,
+            base_image_snapshots: BTreeMap::default(),
+            ipv4_addresses: BTreeMap::default(),
+            runners: None,
+        }
+    }
+
+    pub fn read_base_image_snapshots(&mut self) -> eyre::Result<()> {
+        for (profile_key, profile) in self.profiles.iter() {
             if let Some(base_image_snapshot) = read_base_image_snapshot(profile)? {
-                base_image_snapshots.insert(profile_key.clone(), base_image_snapshot);
+                self.base_image_snapshots
+                    .insert(profile_key.clone(), base_image_snapshot);
             }
         }
 
-        Ok(Self {
-            profiles,
-            base_image_snapshots,
-            ipv4_addresses: BTreeMap::default(),
-            runners: None,
-        })
+        Ok(())
     }
 
     pub fn profiles(&self) -> impl Iterator<Item = (&String, &Profile)> {
