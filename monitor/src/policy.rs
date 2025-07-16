@@ -32,6 +32,17 @@ pub struct Policy {
     base_image_snapshots: BTreeMap<String, String>,
     ipv4_addresses: BTreeMap<String, Option<Ipv4Addr>>,
     runners: Option<Runners>,
+    current_override: Option<Override>,
+}
+
+/// Overrides compromise on some of our usual guarantees:
+/// - We may agree to start a runner that we ultimately can’t start or reserve
+/// - We may forget our override if the monitor is restarted (for now at least)
+#[derive(Debug, Clone, Serialize)]
+pub struct Override {
+    profile_override_counts: BTreeMap<String, usize>,
+    profile_target_counts: BTreeMap<String, usize>,
+    actual_runner_ids: Vec<usize>,
 }
 
 #[derive(Debug, PartialEq, Default)]
@@ -55,28 +66,50 @@ pub struct RunnerCounts {
 
 impl Policy {
     pub fn new(profiles: BTreeMap<String, Profile>) -> eyre::Result<Self> {
-        let required_1g_hugepages = profiles
-            .values()
-            .map(|profile| profile.target_count * profile.requires_1g_hugepages)
+        let result = Self {
+            profiles,
+            base_image_snapshots: BTreeMap::default(),
+            ipv4_addresses: BTreeMap::default(),
+            runners: None,
+            current_override: None,
+        };
+
+        let profile_target_counts = result
+            .profiles()
+            .map(|(key, profile)| (key.clone(), profile.target_count))
+            .collect();
+        result.validate_resource_requirements(&profile_target_counts)?;
+
+        Ok(result)
+    }
+
+    pub fn validate_resource_requirements(
+        &self,
+        profile_target_counts: &BTreeMap<String, usize>,
+    ) -> eyre::Result<()> {
+        let required_1g_hugepages = self
+            .profiles()
+            .map(|(key, profile)| {
+                let target_count = profile_target_counts.get(&**key).copied().unwrap_or(0);
+                target_count * profile.requires_1g_hugepages
+            })
             .sum::<usize>();
         if required_1g_hugepages > TOML.available_1g_hugepages {
             bail!("Profile configuration requires too many 1G hugepages");
         }
 
-        let required_normal_memory = profiles
-            .values()
-            .map(|profile| profile.target_count * profile.requires_normal_memory)
+        let required_normal_memory = self
+            .profiles()
+            .map(|(key, profile)| {
+                let target_count = profile_target_counts.get(&**key).copied().unwrap_or(0);
+                target_count * profile.requires_normal_memory
+            })
             .sum::<MemorySize>();
         if required_normal_memory > TOML.available_normal_memory {
             bail!("Profile configuration requires too much normal memory");
         }
 
-        Ok(Self {
-            profiles,
-            base_image_snapshots: BTreeMap::default(),
-            ipv4_addresses: BTreeMap::default(),
-            runners: None,
-        })
+        Ok(())
     }
 
     pub fn read_base_image_snapshots(&mut self) -> eyre::Result<()> {
@@ -106,7 +139,11 @@ impl Policy {
         self.runners = Some(runners);
     }
 
-    pub fn compute_runner_changes(&self) -> RunnerChanges {
+    pub fn compute_runner_changes(&self) -> eyre::Result<RunnerChanges> {
+        if self.runners.is_none() {
+            bail!("Policy has no Runners!");
+        }
+
         let mut result = RunnerChanges::default();
 
         // Invalid => unregister and destroy
@@ -183,7 +220,7 @@ impl Policy {
             result.create_counts_by_profile_key.clear();
         }
 
-        result
+        Ok(result)
     }
 
     pub fn create_runner(&self, profile: &Profile, id: usize) -> eyre::Result<()> {
@@ -250,6 +287,21 @@ impl Policy {
         if DOTENV.dont_create_runners || self.image_needs_rebuild(profile).unwrap_or(true) {
             0
         } else {
+            self.target_runner_count_with_override(profile)
+        }
+    }
+
+    fn target_runner_count_with_override(&self, profile: &Profile) -> usize {
+        if let Some(current_override) = self.current_override.as_ref() {
+            if let Some(target_count) = current_override
+                .profile_target_counts
+                .get(&profile.base_vm_name)
+            {
+                *target_count
+            } else {
+                0
+            }
+        } else {
             profile.target_count
         }
     }
@@ -310,10 +362,14 @@ impl Policy {
         }
     }
 
+    pub fn critical_runner_count(&self, profile: &Profile) -> usize {
+        self.busy_runner_count(profile) + self.reserved_runner_count(profile)
+    }
+
     /// Returns whether the image definitely needs to be rebuilt or not, or None
     /// if we don’t know.
     pub fn image_needs_rebuild(&self, profile: &Profile) -> Option<bool> {
-        if profile.target_count == 0 {
+        if self.target_runner_count_with_override(profile) == 0 {
             // Profiles with zero target_count may have been set to zero because
             // there is insufficient hugepages space to run them
             return Some(false);
@@ -459,6 +515,115 @@ impl Policy {
         update_screenshot(&profile.base_vm_name, &output_dir)?;
 
         Ok(())
+    }
+
+    pub fn get_override(&self) -> Option<&Override> {
+        self.current_override.as_ref()
+    }
+
+    pub fn try_override(
+        &mut self,
+        profile_override_counts: BTreeMap<String, usize>,
+    ) -> eyre::Result<BTreeMap<String, usize>> {
+        info!(override_counts = ?profile_override_counts, "Override request");
+
+        // TODO: do we need to take this into account?
+        let _runner_changes = self
+            .compute_runner_changes()
+            .wrap_err("Please wait a few seconds")?;
+
+        if self.current_override.is_some() {
+            bail!("Unable to set override while another override is active");
+        }
+        if profile_override_counts.is_empty() {
+            bail!("No point in setting an empty override");
+        }
+
+        // Compute the extra demand: subtract counts that are already covered by our static configuration,
+        // except for any runners that are currently critical.
+        let mut profile_extra_counts = profile_override_counts.clone();
+        for (profile_key, count) in profile_extra_counts.iter_mut() {
+            let Some(profile) = self.profile(&profile_key) else {
+                bail!("No profile with key: {profile_key}");
+            };
+            let delta = if profile.target_count > self.critical_runner_count(profile) {
+                profile.target_count - self.critical_runner_count(profile)
+            } else {
+                0
+            };
+            *count = if *count > delta { *count - delta } else { 0 };
+        }
+
+        // Fail loudly if the requested override would exceed available resources when taken alone.
+        if self
+            .validate_resource_requirements(&profile_extra_counts)
+            .is_err()
+        {
+            bail!("Unable to set override because it would exceed our available resources");
+        }
+
+        // Ideally we can satisfy both the extra demand and our static configuration in full.
+        // Compute the counts for this ideal scenario.
+        let mut scenario = self
+            .profiles()
+            .map(|(key, profile)| (key.clone(), profile.target_count))
+            .collect::<BTreeMap<_, _>>();
+        for (profile_key, count) in scenario.iter_mut() {
+            if let Some(extra_count) = profile_extra_counts.get(profile_key) {
+                *count += *extra_count;
+            }
+        }
+
+        // Starting with the ideal scenario, try to adjust the scenario until it validates.
+        let mut adjusted_override_counts = profile_override_counts;
+        'validate: while self.validate_resource_requirements(&scenario).is_err() {
+            for (profile_key, count) in scenario.iter_mut() {
+                let profile = self
+                    .profile(profile_key)
+                    .expect("Guaranteed by initialiser");
+                // Only try decrementing profiles that have non-critical runners to spare.
+                if *count > self.critical_runner_count(profile) {
+                    // Try decrementing a profile that was not requested.
+                    if !adjusted_override_counts.contains_key(profile_key) {
+                        *count -= 1;
+                        continue 'validate;
+                    }
+                    // Otherwise try decrementing a profile that was requested.
+                    if adjusted_override_counts.contains_key(profile_key) {
+                        if let Some(override_count) = adjusted_override_counts.get_mut(profile_key)
+                        {
+                            let extra_count = profile_extra_counts
+                                .get_mut(profile_key)
+                                .expect("Guaranteed by initialiser");
+                            if *extra_count > 0 {
+                                *count -= 1;
+                                *override_count -= 1;
+                                *extra_count -= 1;
+                                continue 'validate;
+                            }
+                        }
+                    }
+                }
+            }
+            // No more adjustments are possible.
+            break;
+        }
+
+        // Fail if the requested override had to be adjusted so far that it became meaningless.
+        if profile_extra_counts.values().sum::<usize>() == 0 {
+            bail!("Requested override had to be adjusted so far that it became meaningless");
+        }
+
+        info!(adjusted_override_counts = ?adjusted_override_counts, extra_counts = ?profile_extra_counts, ?scenario, "Found solution for override request");
+
+        self.current_override = Some(Override {
+            profile_override_counts: adjusted_override_counts.clone(),
+            profile_target_counts: scenario,
+            // TODO: pick up existing idle runners here, or later?
+            actual_runner_ids: vec![],
+        });
+
+        Ok(adjusted_override_counts)
     }
 }
 
@@ -655,6 +820,14 @@ mod test {
                 reserved_since: None,
             }
         }
+        fn reserved(profile_key: &'static str) -> Self {
+            Self {
+                profile_key,
+                status: Status::Reserved,
+                created_time: system_time_minus_seconds(9001),
+                reserved_since: Some(epoch_duration_now()),
+            }
+        }
     }
     fn runners(fake_runners: Vec<FakeRunner>) -> Runners {
         let mut next_runner_id = 0;
@@ -800,10 +973,13 @@ mod test {
             .into(),
         )?;
 
+        // If the runners are not yet known, return an error.
+        assert!(policy.compute_runner_changes().is_err());
+
         // Images need rebuild, because there is no good image.
         policy.set_runners(runners(vec![]));
         assert_eq!(
-            policy.compute_runner_changes(),
+            policy.compute_runner_changes()?,
             RunnerChanges {
                 unregister_and_destroy_runner_ids: vec![],
                 create_counts_by_profile_key: [
@@ -826,7 +1002,7 @@ mod test {
         policy.set_base_image_snapshot("windows", "")?;
         policy.set_base_image_snapshot("wpt", "")?;
         assert_eq!(
-            policy.compute_runner_changes(),
+            policy.compute_runner_changes()?,
             RunnerChanges {
                 unregister_and_destroy_runner_ids: vec![],
                 create_counts_by_profile_key: [
@@ -845,7 +1021,7 @@ mod test {
         set_base_image_mtime_for_test("/var/lib/libvirt/images/base/macos/base.img@", fresh);
         set_base_image_mtime_for_test("/var/lib/libvirt/images/base/windows/base.img@", fresh);
         assert_eq!(
-            policy.compute_runner_changes(),
+            policy.compute_runner_changes()?,
             RunnerChanges {
                 unregister_and_destroy_runner_ids: vec![],
                 create_counts_by_profile_key: [
@@ -914,7 +1090,7 @@ mod test {
         ];
         policy.set_runners(runners(fake_runners.clone()));
         assert_eq!(
-            policy.compute_runner_changes(),
+            policy.compute_runner_changes()?,
             RunnerChanges {
                 unregister_and_destroy_runner_ids: vec![0, 1, 3, 5, 6, 7, 8, 9],
                 create_counts_by_profile_key: [].into(),
@@ -923,7 +1099,7 @@ mod test {
 
         // Destroys failed? Propose those destroys again.
         assert_eq!(
-            policy.compute_runner_changes(),
+            policy.compute_runner_changes()?,
             RunnerChanges {
                 unregister_and_destroy_runner_ids: vec![0, 1, 3, 5, 6, 7, 8, 9],
                 create_counts_by_profile_key: [].into(),
@@ -939,7 +1115,7 @@ mod test {
             .collect::<Vec<_>>();
         policy.set_runners(runners(fake_runners.clone()));
         assert_eq!(
-            policy.compute_runner_changes(),
+            policy.compute_runner_changes()?,
             RunnerChanges {
                 unregister_and_destroy_runner_ids: vec![],
                 create_counts_by_profile_key: [
@@ -954,7 +1130,7 @@ mod test {
 
         // Creates failed? Propose those creates again.
         assert_eq!(
-            policy.compute_runner_changes(),
+            policy.compute_runner_changes()?,
             RunnerChanges {
                 unregister_and_destroy_runner_ids: vec![],
                 create_counts_by_profile_key: [
@@ -983,7 +1159,7 @@ mod test {
         ];
         policy.set_runners(runners(fake_runners.clone()));
         assert_eq!(
-            policy.compute_runner_changes(),
+            policy.compute_runner_changes()?,
             RunnerChanges {
                 unregister_and_destroy_runner_ids: vec![],
                 create_counts_by_profile_key: [
@@ -991,6 +1167,125 @@ mod test {
                     ("windows".to_owned(), 3),
                     ("macos".to_owned(), 3),
                     ("wpt".to_owned(), 0),
+                ]
+                .into(),
+            },
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_try_override() -> eyre::Result<()> {
+        let mut policy = Policy::new(
+            [
+                ("linux".to_owned(), profile("linux", 2, 24, "1G")),
+                ("windows".to_owned(), profile("windows", 1, 24, "1G")),
+                ("macos".to_owned(), profile("macos", 1, 24, "1G")),
+                ("wpt".to_owned(), profile("wpt", 0, 12, "1G")),
+            ]
+            .into(),
+        )?;
+        set_base_image_mtime_for_test(
+            "/var/lib/libvirt/images/base/linux/base.img@",
+            SystemTime::now(),
+        );
+        set_base_image_mtime_for_test(
+            "/var/lib/libvirt/images/base/windows/base.img@",
+            SystemTime::now(),
+        );
+        set_base_image_mtime_for_test(
+            "/var/lib/libvirt/images/base/macos/base.img@",
+            SystemTime::now(),
+        );
+        policy.set_base_image_snapshot("linux", "")?;
+        policy.set_base_image_snapshot("windows", "")?;
+        policy.set_base_image_snapshot("macos", "")?;
+
+        // If the runners are not yet known, refuse the request.
+        assert!(policy.try_override([].into()).is_err());
+
+        // The runners are now known.
+        let fake_runners = vec![
+            FakeRunner::idle("linux"),
+            FakeRunner::busy("linux"),
+            FakeRunner::reserved("windows"),
+            FakeRunner::idle("macos"),
+        ];
+        policy.set_runners(runners(fake_runners.clone()));
+
+        // If the request literally asks for no runners, refuse the request.
+        assert!(policy.try_override([].into()).is_err());
+
+        // If the request effectively asks for no extra runners, refuse the request.
+        assert!(policy.try_override([("wpt".to_owned(), 0)].into()).is_err());
+        assert!(policy
+            .try_override([("linux".to_owned(), 0)].into())
+            .is_err());
+        assert!(policy
+            .try_override([("linux".to_owned(), 1)].into())
+            .is_err());
+
+        // If the request would exceed available resources when taken alone, refuse the request.
+        assert!(policy.try_override([("wpt".to_owned(), 9)].into()).is_err());
+
+        // Allow the request, adjusted for critical runners.
+        assert_eq!(
+            policy.try_override([("wpt".to_owned(), 8)].into())?,
+            [("wpt".to_owned(), 4)].into(),
+        );
+
+        // If an override is already active, refuse the request.
+        assert!(policy.try_override([("wpt".to_owned(), 8)].into()).is_err());
+
+        // When computing runner changes, take the override into account.
+        assert_eq!(
+            policy.compute_runner_changes()?,
+            RunnerChanges {
+                unregister_and_destroy_runner_ids: vec![0, 3],
+                create_counts_by_profile_key: [].into(),
+            },
+        );
+
+        // All destroys succeeded? Now create runners, taking the override into account.
+        let fake_runners = fake_runners
+            .into_iter()
+            .enumerate()
+            .filter(|(i, _)| ![0, 3].contains(i))
+            .map(|(_, fake)| fake)
+            .collect::<Vec<_>>();
+        policy.set_runners(runners(fake_runners.clone()));
+
+        // We can’t create runners yet, because the image needs rebuild.
+        assert_eq!(
+            policy.compute_runner_changes()?,
+            RunnerChanges {
+                unregister_and_destroy_runner_ids: vec![],
+                create_counts_by_profile_key: [
+                    ("linux".to_owned(), 0),
+                    ("windows".to_owned(), 0),
+                    ("macos".to_owned(), 0),
+                    ("wpt".to_owned(), 0),
+                ]
+                .into(),
+            },
+        );
+
+        // The image is ready. Let’s create runners.
+        set_base_image_mtime_for_test(
+            "/var/lib/libvirt/images/base/wpt/base.img@",
+            SystemTime::now(),
+        );
+        policy.set_base_image_snapshot("wpt", "")?;
+        assert_eq!(
+            policy.compute_runner_changes()?,
+            RunnerChanges {
+                unregister_and_destroy_runner_ids: vec![],
+                create_counts_by_profile_key: [
+                    ("linux".to_owned(), 0),
+                    ("windows".to_owned(), 0),
+                    ("macos".to_owned(), 0),
+                    ("wpt".to_owned(), 4),
                 ]
                 .into(),
             },

@@ -30,6 +30,7 @@ use rocket::{
     http::ContentType,
     post,
     response::content::{RawJson, RawText},
+    serde::json::Json,
 };
 use serde::Deserialize;
 use serde_json::json;
@@ -48,7 +49,7 @@ use crate::{
     id::IdGen,
     image::Rebuilds,
     libvirt::list_runner_guests,
-    policy::{base_image_path, Policy, RunnerCounts},
+    policy::{base_image_path, Override, Policy, RunnerCounts},
     runner::{Runner, Runners, Status},
 };
 
@@ -71,6 +72,17 @@ enum Request {
         profile_key: String,
         query: TakeRunnerQuery,
         count: usize,
+    },
+
+    /// GET `/policy/override`
+    GetOverridePolicy {
+        response_tx: Sender<Option<Override>>,
+    },
+
+    /// POST `/policy/override?<profile_key...>=<count>` => `{"<profile_key...>": <count...>}`
+    OverridePolicy {
+        response_tx: Sender<eyre::Result<BTreeMap<String, usize>>>,
+        profile_override_counts: BTreeMap<String, usize>,
     },
 
     /// GET `/runner/<our runner id>/screenshot/now` => image/png
@@ -211,6 +223,38 @@ fn take_runners_route(
     Ok(RawJson(result))
 }
 
+#[get("/policy/override")]
+fn get_override_policy_route() -> rocket_eyre::Result<Json<Option<Override>>> {
+    let (response_tx, response_rx) = crossbeam_channel::bounded(0);
+    REQUEST.sender.send_timeout(
+        Request::GetOverridePolicy { response_tx },
+        DOTENV.monitor_thread_send_timeout,
+    )?;
+
+    Ok(Json(
+        response_rx.recv_timeout(DOTENV.monitor_thread_recv_timeout)?,
+    ))
+}
+
+#[post("/policy/override?<profile_override_counts..>")]
+fn override_policy_route(
+    profile_override_counts: BTreeMap<String, usize>,
+    _auth: ApiKeyGuard,
+) -> rocket_eyre::Result<Json<BTreeMap<String, usize>>> {
+    let (response_tx, response_rx) = crossbeam_channel::bounded(0);
+    REQUEST.sender.send_timeout(
+        Request::OverridePolicy {
+            response_tx,
+            profile_override_counts,
+        },
+        DOTENV.monitor_thread_send_timeout,
+    )?;
+
+    Ok(Json(
+        response_rx.recv_timeout(DOTENV.monitor_thread_recv_timeout)??,
+    ))
+}
+
 #[get("/profile/<profile_key>/screenshot.png")]
 async fn profile_screenshot_route(profile_key: String) -> rocket_eyre::Result<NamedFile> {
     let path = get_profile_data_path(&profile_key, Path::new("screenshot.png"))
@@ -324,6 +368,8 @@ async fn main() -> eyre::Result<()> {
                 dashboard_json_route,
                 take_runner_route,
                 take_runners_route,
+                get_override_policy_route,
+                override_policy_route,
                 profile_screenshot_route,
                 runner_screenshot_route,
                 runner_screenshot_now_route,
@@ -438,7 +484,7 @@ fn monitor_thread() -> eyre::Result<()> {
                 unregister_and_destroy(id, runner);
             }
         } else {
-            let changes = policy.compute_runner_changes();
+            let changes = policy.compute_runner_changes()?;
             for runner_id in changes.unregister_and_destroy_runner_ids {
                 let runner = policy
                     .runner(runner_id)
@@ -508,6 +554,19 @@ fn monitor_thread() -> eyre::Result<()> {
                     };
                     response_tx
                         .send(response)
+                        .expect("Failed to send Response to API thread");
+                }
+                Request::GetOverridePolicy { response_tx } => {
+                    response_tx
+                        .send(policy.get_override().cloned())
+                        .expect("Failed to send Response to API thread");
+                }
+                Request::OverridePolicy {
+                    response_tx,
+                    profile_override_counts,
+                } => {
+                    response_tx
+                        .send(policy.try_override(profile_override_counts))
                         .expect("Failed to send Response to API thread");
                 }
                 Request::Screenshot {

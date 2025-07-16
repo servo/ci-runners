@@ -7,7 +7,7 @@ cli = { path = "cli" }
 dotenv = "0.15.0"
 jane-eyre = "0.3.0"
 mktemp = "0.5.1"
-rocket = "0.5.1"
+rocket = { version = "0.5.1", features = ["json"] }
 serde = { version = "1.0.204", features = ["derive"] }
 settings = { path = "settings" }
 toml = "0.8.15"
