@@ -5,6 +5,7 @@ members = ["cli", "settings", "web"]
 cli = { path = "cli" }
 dotenv = "0.15.0"
 jane-eyre = "0.3.0"
+mktemp = "0.5.1"
 rocket = "0.5.1"
 serde = { version = "1.0.204", features = ["derive"] }
 settings = { path = "settings" }
@@ -31,7 +32,7 @@ dotenv = { workspace = true }
 http = "0.2"
 itertools = "0.13.0"
 jane-eyre = { workspace = true }
-mktemp = "0.5.1"
+mktemp = { workspace = true }
 reflink = "0.1.3"
 rocket = { workspace = true }
 serde = { workspace = true }
@@ -43,3 +44,6 @@ toml = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 web = { workspace = true }
+
+[dev-dependencies]
+settings = { workspace = true, features = ["test"] }

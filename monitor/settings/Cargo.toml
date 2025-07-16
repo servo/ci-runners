@@ -3,9 +3,13 @@ name = "settings"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+test = []
+
 [dependencies]
 dotenv = { workspace = true }
 jane-eyre = { workspace = true }
+mktemp = { workspace = true }
 serde = { workspace = true }
 toml = { workspace = true }
 tracing = { workspace = true }
