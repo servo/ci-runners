@@ -24,7 +24,7 @@ use settings::{profile::Profile, DOTENV, TOML};
 use tracing::{error, info, trace, warn};
 
 use crate::{
-    policy::{base_images_path, runners_for_profile, Profiles},
+    policy::{base_images_path, runners_for_profile, Policy},
     runner::Runners,
     shell::log_output_as_info,
 };
@@ -42,7 +42,7 @@ struct Rebuild {
 }
 
 impl Rebuilds {
-    pub fn run(&mut self, profiles: &mut Profiles, runners: &Runners) -> eyre::Result<()> {
+    pub fn run(&mut self, policy: &mut Policy, runners: &Runners) -> eyre::Result<()> {
         let mut profiles_needing_rebuild = BTreeMap::default();
         let mut cached_servo_repo_was_just_updated = false;
 
@@ -63,8 +63,8 @@ impl Rebuilds {
         }
 
         // Determine which profiles need their images rebuilt.
-        for (key, profile) in profiles.iter() {
-            let needs_rebuild = profiles.image_needs_rebuild(profile);
+        for (key, profile) in policy.iter() {
+            let needs_rebuild = policy.image_needs_rebuild(profile);
             if needs_rebuild.unwrap_or(true) {
                 let runner_count = runners_for_profile(profile, &runners).count();
                 if needs_rebuild.is_none() {
@@ -131,7 +131,7 @@ impl Rebuilds {
                 match rebuild.thread.join() {
                     Ok(Ok(())) => {
                         info!(profile_key, "Image rebuild thread exited");
-                        profiles.set_base_image_snapshot(&profile_key, &rebuild.snapshot_name)?;
+                        policy.set_base_image_snapshot(&profile_key, &rebuild.snapshot_name)?;
                     }
                     Ok(Err(report)) => error!(profile_key, %report, "Image rebuild thread error"),
                     Err(panic) => error!(profile_key, ?panic, "Image rebuild thread panic"),

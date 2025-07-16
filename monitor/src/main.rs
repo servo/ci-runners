@@ -49,7 +49,7 @@ use crate::{
     image::Rebuilds,
     libvirt::list_runner_guests,
     policy::{
-        base_image_path, idle_runners_for_profile, update_screenshot_for_profile_guest, Profiles,
+        base_image_path, idle_runners_for_profile, update_screenshot_for_profile_guest, Policy,
         RunnerCounts,
     },
     runner::{Runner, Runners, Status},
@@ -363,7 +363,7 @@ fn monitor_thread() -> eyre::Result<()> {
         IdGen::new_empty()
     });
 
-    let mut profiles = Profiles::new(TOML.initial_profiles())?;
+    let mut policy = Policy::new(TOML.initial_profiles())?;
     let mut registrations_cache = Cache::default();
     let mut image_rebuilds = Rebuilds::default();
 
@@ -378,11 +378,11 @@ fn monitor_thread() -> eyre::Result<()> {
         );
 
         let runners = Runners::new(registrations, guests);
-        image_rebuilds.run(&mut profiles, &runners)?;
+        image_rebuilds.run(&mut policy, &runners)?;
 
-        let profile_runner_counts: BTreeMap<_, _> = profiles
+        let profile_runner_counts: BTreeMap<_, _> = policy
             .iter()
-            .map(|(key, profile)| (key.clone(), profiles.runner_counts(profile, &runners)))
+            .map(|(key, profile)| (key.clone(), policy.runner_counts(profile, &runners)))
             .collect();
         for (
             key,
@@ -399,17 +399,16 @@ fn monitor_thread() -> eyre::Result<()> {
             },
         ) in profile_runner_counts.iter()
         {
-            let profile = profiles.get(key).ok_or_eyre("Failed to get profile")?;
-            let image =
-                profiles
-                    .base_image_snapshot(key)
-                    .map(|snapshot| match profile.image_type {
-                        settings::profile::ImageType::Rust => base_image_path(profile, &**snapshot)
-                            .as_os_str()
-                            .to_str()
-                            .expect("Guaranteed by base_image_path()")
-                            .to_owned(),
-                    });
+            let profile = policy.get(key).ok_or_eyre("Failed to get profile")?;
+            let image = policy
+                .base_image_snapshot(key)
+                .map(|snapshot| match profile.image_type {
+                    settings::profile::ImageType::Rust => base_image_path(profile, &**snapshot)
+                        .as_os_str()
+                        .to_str()
+                        .expect("Guaranteed by base_image_path()")
+                        .to_owned(),
+                });
             info!("profile {key}: {healthy}/{target} healthy runners ({idle} idle, {reserved} reserved, {busy} busy, {started_or_crashed} started or crashed, {excess_idle} excess idle, {wanted} wanted), image {:?} age {image_age:?}", image);
         }
         for (_id, runner) in runners.iter() {
@@ -417,8 +416,8 @@ fn monitor_thread() -> eyre::Result<()> {
         }
 
         runners.update_screenshots();
-        profiles.update_ipv4_addresses();
-        for (_key, profile) in profiles.iter() {
+        policy.update_ipv4_addresses();
+        for (_key, profile) in policy.iter() {
             update_screenshot_for_profile_guest(profile);
         }
 
@@ -428,8 +427,8 @@ fn monitor_thread() -> eyre::Result<()> {
                     warn!(?error, "Failed to unregister runner: {error}");
                 }
             }
-            if let Some(profile) = profiles.get(runner.base_vm_name()) {
-                if let Err(error) = profiles.destroy_runner(profile, id) {
+            if let Some(profile) = policy.get(runner.base_vm_name()) {
+                if let Err(error) = policy.destroy_runner(profile, id) {
                     warn!(?error, "Failed to destroy runner: {error}");
                 }
             }
@@ -471,9 +470,9 @@ fn monitor_thread() -> eyre::Result<()> {
                         .flatten()
                         .map_or(true, |duration| duration > DOTENV.monitor_reserve_timeout)
             });
-            let excess_idle_runners = profiles.iter().flat_map(|(_key, profile)| {
+            let excess_idle_runners = policy.iter().flat_map(|(_key, profile)| {
                 idle_runners_for_profile(profile, &runners)
-                    .take(profiles.excess_idle_runner_count(profile, &runners))
+                    .take(policy.excess_idle_runner_count(profile, &runners))
             });
             for (&id, runner) in invalid
                 .chain(done_or_unregistered)
@@ -484,12 +483,12 @@ fn monitor_thread() -> eyre::Result<()> {
                 unregister_and_destroy(id, runner);
             }
 
-            let profile_wanted_counts = profiles
+            let profile_wanted_counts = policy
                 .iter()
-                .map(|(_key, profile)| (profile, profiles.wanted_runner_count(profile, &runners)));
+                .map(|(_key, profile)| (profile, policy.wanted_runner_count(profile, &runners)));
             for (profile, wanted_count) in profile_wanted_counts {
                 for _ in 0..wanted_count {
-                    if let Err(error) = profiles.create_runner(profile, id_gen.next()) {
+                    if let Err(error) = policy.create_runner(profile, id_gen.next()) {
                         warn!(?error, "Failed to create runner: {error}");
                     }
                     registrations_cache.invalidate();
@@ -500,7 +499,7 @@ fn monitor_thread() -> eyre::Result<()> {
         // Update dashboard data, for the API.
         if let Ok(mut dashboard) = DASHBOARD.write() {
             *dashboard = Some(Dashboard::render(
-                &profiles,
+                &policy,
                 &profile_runner_counts,
                 &runners,
             )?);
@@ -590,12 +589,12 @@ fn monitor_thread() -> eyre::Result<()> {
                     // the IPv4 address, so let’s update the IPv4 addresses before continuing.
                     let mut runners = runners;
                     runners.update_ipv4_addresses();
-                    profiles.update_ipv4_addresses();
+                    policy.update_ipv4_addresses();
 
                     let result = runners
                         .boot_script(remote_addr.clone())
                         .transpose()
-                        .or_else(|| profiles.boot_script(remote_addr).transpose())
+                        .or_else(|| policy.boot_script(remote_addr).transpose())
                         .transpose()
                         .and_then(|result| result.ok_or_eyre("No guest found with IP address"));
                     response_tx

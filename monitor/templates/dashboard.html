@@ -2,7 +2,7 @@
 <h2>{{ counts.healthy }}/{{ counts.target }} runners for {{ key }}</h2>
 <ul>
 {% if let Some(profile) = self.profile(key) %}
-{% if profiles.image_needs_rebuild(profile).unwrap_or(true) %}
+{% if policy.image_needs_rebuild(profile).unwrap_or(true) %}
     <li>image rebuild, <a class="screenshot" href="/profile/{{ key }}/screenshot.png" data-profile-key="{{ key }}">screenshot</a>
 {% endif %}
 {% endif %}

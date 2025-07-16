@@ -6,7 +6,7 @@ use serde_json::json;
 use settings::profile::Profile;
 
 use crate::{
-    policy::{Profiles, RunnerCounts},
+    policy::{Policy, RunnerCounts},
     runner::{Runner, Runners},
     TOML,
 };
@@ -20,14 +20,14 @@ pub struct Dashboard {
 #[derive(Clone, Debug, Template)]
 #[template(path = "dashboard.html")]
 struct DashboardTemplate<'monitor> {
-    profiles: &'monitor Profiles,
+    policy: &'monitor Policy,
     profile_runner_counts: &'monitor BTreeMap<String, RunnerCounts>,
     runners: &'monitor Runners,
 }
 
 impl Dashboard {
     pub fn render(
-        profiles: &Profiles,
+        policy: &Policy,
         profile_runner_counts: &BTreeMap<String, RunnerCounts>,
         runners: &Runners,
     ) -> eyre::Result<Self> {
@@ -45,7 +45,7 @@ impl Dashboard {
                 .collect::<Vec<_>>(),
         }))?;
         let html = DashboardTemplate {
-            profiles,
+            policy,
             profile_runner_counts,
             runners,
         }
@@ -57,7 +57,7 @@ impl Dashboard {
 
 impl DashboardTemplate<'_> {
     fn profile(&self, key: impl AsRef<str>) -> Option<&Profile> {
-        self.profiles.get(key.as_ref())
+        self.policy.get(key.as_ref())
     }
 
     fn status(&self, runner: &Runner) -> String {

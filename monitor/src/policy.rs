@@ -24,7 +24,7 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct Profiles {
+pub struct Policy {
     profiles: BTreeMap<String, Profile>,
     base_image_snapshots: BTreeMap<String, String>,
     ipv4_addresses: BTreeMap<String, Option<Ipv4Addr>>,
@@ -43,7 +43,7 @@ pub struct RunnerCounts {
     pub image_age: Option<Duration>,
 }
 
-impl Profiles {
+impl Policy {
     pub fn new(profiles: BTreeMap<String, Profile>) -> eyre::Result<Self> {
         let mut base_image_snapshots = BTreeMap::default();
         for (profile_key, profile) in profiles.iter() {
