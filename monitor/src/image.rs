@@ -24,7 +24,7 @@ use settings::{profile::Profile, DOTENV, TOML};
 use tracing::{error, info, trace, warn};
 
 use crate::{
-    profile::{base_images_path, runners_for_profile, Profiles},
+    policy::{base_images_path, runners_for_profile, Profiles},
     runner::Runners,
     shell::log_output_as_info,
 };

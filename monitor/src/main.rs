@@ -4,7 +4,7 @@ mod github;
 mod id;
 mod image;
 mod libvirt;
-mod profile;
+mod policy;
 mod runner;
 mod shell;
 
@@ -48,7 +48,7 @@ use crate::{
     id::IdGen,
     image::Rebuilds,
     libvirt::list_runner_guests,
-    profile::{
+    policy::{
         base_image_path, idle_runners_for_profile, update_screenshot_for_profile_guest, Profiles,
         RunnerCounts,
     },

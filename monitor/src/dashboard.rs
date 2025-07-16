@@ -6,7 +6,7 @@ use serde_json::json;
 use settings::profile::Profile;
 
 use crate::{
-    profile::{Profiles, RunnerCounts},
+    policy::{Profiles, RunnerCounts},
     runner::{Runner, Runners},
     TOML,
 };
