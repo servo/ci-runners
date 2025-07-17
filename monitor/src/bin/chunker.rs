@@ -28,10 +28,11 @@ fn index_route() -> rocket_eyre::Result<RawText<String>> {
     Ok(RawText(format!("{BUILDS:#?}")))
 }
 
-#[post("/take?<unique_id>&<total_chunks>")]
+#[post("/take?<unique_id>&<total_chunks>&<runs_on>")]
 fn take_chunk_route(
     unique_id: String,
     total_chunks: usize,
+    runs_on: String,
 ) -> rocket_eyre::Result<Json<Option<usize>>> {
     let mut builds = BUILDS.lock().map_err(|e| eyre!("{e:?}"))?;
     let build = builds
@@ -47,7 +48,12 @@ fn take_chunk_route(
         Err(error)?;
     }
 
-    if build.taken_chunks < total_chunks {
+    if build.taken_chunks >= total_chunks * 2 / 3 && runs_on == "ubuntu-22.04" {
+        // Forbid slow GitHub-hosted runners from taking the last 1/3 of chunks.
+        let response = None;
+        info!(?unique_id, ?response);
+        Ok(Json(response))
+    } else if build.taken_chunks < total_chunks {
         let response = Some(build.taken_chunks);
         build.taken_chunks += 1;
         info!(?unique_id, ?response);
