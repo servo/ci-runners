@@ -557,10 +557,15 @@ impl Policy {
 
         // Fail loudly if the requested override would exceed available resources when taken alone.
         if self
-            .validate_resource_requirements(&profile_extra_counts)
+            .validate_resource_requirements(&profile_override_counts)
             .is_err()
         {
             bail!("Unable to set override because it would exceed our available resources");
+        }
+
+        // Fail loudly if the requested override is meaningless.
+        if profile_extra_counts.values().sum::<usize>() == 0 {
+            bail!("Requested override is meaningless");
         }
 
         // Ideally we can satisfy both the extra demand and our static configuration in full.
@@ -577,20 +582,31 @@ impl Policy {
 
         // Starting with the ideal scenario, try to adjust the scenario until it validates.
         let mut adjusted_override_counts = profile_override_counts;
-        'validate: while self.validate_resource_requirements(&scenario).is_err() {
+        'validate: while self
+            .validate_resource_requirements(dbg!(&scenario))
+            .is_err()
+        {
+            // First try decrementing a profile that was not requested.
             for (profile_key, count) in scenario.iter_mut() {
-                let profile = self
-                    .profile(profile_key)
-                    .expect("Guaranteed by initialiser");
-                // Only try decrementing profiles that have non-critical runners to spare.
-                if *count > self.critical_runner_count(profile) {
-                    // Try decrementing a profile that was not requested.
-                    if !adjusted_override_counts.contains_key(profile_key) {
+                if !adjusted_override_counts.contains_key(profile_key) {
+                    let profile = self
+                        .profile(profile_key)
+                        .expect("Guaranteed by initialiser");
+                    // Only try decrementing profiles that have non-critical runners to spare.
+                    if *count > self.critical_runner_count(profile) {
                         *count -= 1;
                         continue 'validate;
                     }
-                    // Otherwise try decrementing a profile that was requested.
-                    if adjusted_override_counts.contains_key(profile_key) {
+                }
+            }
+            // If none of those profiles could be decremented, try decrementing a profile that was requested.
+            for (profile_key, count) in scenario.iter_mut() {
+                if adjusted_override_counts.contains_key(profile_key) {
+                    let profile = self
+                        .profile(profile_key)
+                        .expect("Guaranteed by initialiser");
+                    // Only try decrementing profiles that have non-critical runners to spare.
+                    if *count > self.critical_runner_count(profile) {
                         if let Some(override_count) = adjusted_override_counts.get_mut(profile_key)
                         {
                             let extra_count = profile_extra_counts
@@ -1361,6 +1377,61 @@ mod test {
                 .into(),
             },
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_try_override_sweep_one_profile() -> eyre::Result<()> {
+        let make_policy = || -> eyre::Result<_> {
+            let mut policy = Policy::new(
+                [
+                    ("linux".to_owned(), profile("linux", 1, 24, "1G")),
+                    ("windows".to_owned(), profile("windows", 1, 24, "1G")),
+                    ("macos".to_owned(), profile("macos", 1, 24, "1G")),
+                    ("wpt".to_owned(), profile("wpt", 2, 12, "1G")),
+                ]
+                .into(),
+            )?;
+            policy.set_runners(runners(vec![]));
+            Ok(policy)
+        };
+        for count in 0..=5 {
+            let mut policy = make_policy()?;
+            let result = policy.try_override([("linux".to_owned(), count)].into());
+            if [0, 1, 5].contains(&count) {
+                assert!(result.is_err(), "{count}: {result:?}");
+            } else {
+                assert!(result.is_ok(), "{count}: {result:?}");
+            }
+        }
+        for count in 0..=5 {
+            let mut policy = make_policy()?;
+            let result = policy.try_override([("windows".to_owned(), count)].into());
+            if [0, 1, 5].contains(&count) {
+                assert!(result.is_err(), "{count}: {result:?}");
+            } else {
+                assert!(result.is_ok(), "{count}: {result:?}");
+            }
+        }
+        for count in 0..=5 {
+            let mut policy = make_policy()?;
+            let result = policy.try_override([("macos".to_owned(), count)].into());
+            if [0, 1, 5].contains(&count) {
+                assert!(result.is_err(), "{count}: {result:?}");
+            } else {
+                assert!(result.is_ok(), "{count}: {result:?}");
+            }
+        }
+        for count in 0..=9 {
+            let mut policy = make_policy()?;
+            let result = policy.try_override([("wpt".to_owned(), count)].into());
+            if [0, 1, 2, 9].contains(&count) {
+                assert!(result.is_err(), "{count}: {result:?}");
+            } else {
+                assert!(result.is_ok(), "{count}: {result:?}");
+            }
+        }
 
         Ok(())
     }
