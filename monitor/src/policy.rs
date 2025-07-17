@@ -9,6 +9,7 @@ use std::{
 };
 
 use cfg_if::cfg_if;
+use itertools::Itertools;
 use jane_eyre::eyre::{self, bail, Context, OptionExt};
 use mktemp::Temp;
 use serde::Serialize;
@@ -586,12 +587,23 @@ impl Policy {
             .validate_resource_requirements(dbg!(&scenario))
             .is_err()
         {
+            // Try profiles in descending count order, to avoid starving niche runners.
+            let candidate_profile_keys = scenario
+                .clone()
+                .into_iter()
+                .sorted_by_key(|(_, count)| *count)
+                .rev()
+                .map(|(profile_key, _)| profile_key)
+                .collect::<Vec<_>>();
             // First try decrementing a profile that was not requested.
-            for (profile_key, count) in scenario.iter_mut() {
+            for profile_key in candidate_profile_keys.iter() {
                 if !adjusted_override_counts.contains_key(profile_key) {
                     let profile = self
                         .profile(profile_key)
                         .expect("Guaranteed by initialiser");
+                    let count = scenario
+                        .get_mut(profile_key)
+                        .expect("Guaranteed by candidate_profile_keys");
                     // Only try decrementing profiles that have non-critical runners to spare.
                     if *count > self.critical_runner_count(profile) {
                         *count -= 1;
@@ -600,11 +612,14 @@ impl Policy {
                 }
             }
             // If none of those profiles could be decremented, try decrementing a profile that was requested.
-            for (profile_key, count) in scenario.iter_mut() {
+            for profile_key in candidate_profile_keys.iter() {
                 if adjusted_override_counts.contains_key(profile_key) {
                     let profile = self
                         .profile(profile_key)
                         .expect("Guaranteed by initialiser");
+                    let count = scenario
+                        .get_mut(profile_key)
+                        .expect("Guaranteed by candidate_profile_keys");
                     // Only try decrementing profiles that have non-critical runners to spare.
                     if *count > self.critical_runner_count(profile) {
                         if let Some(override_count) = adjusted_override_counts.get_mut(profile_key)
@@ -1445,6 +1460,43 @@ mod test {
                 assert!(result.is_ok(), "{count}: {result:?}");
             }
         }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_try_override_adjustment_order() -> eyre::Result<()> {
+        let make_policy = || -> eyre::Result<_> {
+            let mut policy = Policy::new(
+                [
+                    ("a-niche".to_owned(), profile("a-niche", 2, 6, "0B")),
+                    ("b-common".to_owned(), profile("b-common", 6, 6, "0B")),
+                    ("override".to_owned(), profile("override", 0, 6, "0B")),
+                    ("y-common".to_owned(), profile("y-common", 6, 6, "0B")),
+                    ("z-niche".to_owned(), profile("z-niche", 2, 6, "0B")),
+                ]
+                .into(),
+            )?;
+            policy.set_runners(runners(vec![]));
+            Ok(policy)
+        };
+
+        let mut policy = make_policy()?;
+        assert_eq!(
+            policy.try_override([("override".to_owned(), 2)].into())?,
+            &Override {
+                profile_override_counts: [("override".to_owned(), 2)].into(),
+                profile_target_counts: [
+                    ("a-niche".to_owned(), 2),
+                    ("b-common".to_owned(), 5),
+                    ("override".to_owned(), 2),
+                    ("y-common".to_owned(), 5),
+                    ("z-niche".to_owned(), 2),
+                ]
+                .into(),
+                actual_runner_ids_by_profile_key: [].into(),
+            },
+        );
 
         Ok(())
     }
