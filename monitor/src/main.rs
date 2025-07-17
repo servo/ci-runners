@@ -21,6 +21,7 @@ use std::{
 };
 
 use askama::Template;
+use askama_web::WebTemplate;
 use crossbeam_channel::{Receiver, Sender};
 use jane_eyre::eyre::{self, eyre, Context, OptionExt};
 use mktemp::Temp;
@@ -119,7 +120,7 @@ static REQUEST: LazyLock<Channel<Request>> = LazyLock::new(|| {
     Channel { sender, receiver }
 });
 
-#[derive(Clone, Debug, Template)]
+#[derive(Clone, Debug, Template, WebTemplate)]
 #[template(path = "index.html")]
 pub struct IndexTemplate {
     pub content: String,

@@ -40,9 +40,9 @@ pub struct Policy {
 /// - We may forget our override if the monitor is restarted (for now at least)
 #[derive(Debug, Clone, Serialize)]
 pub struct Override {
-    profile_override_counts: BTreeMap<String, usize>,
-    profile_target_counts: BTreeMap<String, usize>,
-    actual_runner_ids: Vec<usize>,
+    pub profile_override_counts: BTreeMap<String, usize>,
+    pub profile_target_counts: BTreeMap<String, usize>,
+    pub actual_runner_ids: Vec<usize>,
 }
 
 #[derive(Debug, PartialEq, Default)]

@@ -21,7 +21,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-askama = { version = "0.12.1", features = ["with-rocket"] }
+askama = { version = "0.14.0" }
+askama_web = { version = "0.14.4", features = ["rocket-0.5"] }
 askama_rocket = "0.12.0"
 atomic-write-file = { version = "0.2.2", features = ["unnamed-tmpfile"] }
 bytesize = { workspace = true }

@@ -1,3 +1,7 @@
+{% if let Some(current_override) = policy.get_override() %}
+<h2>current policy override</h2>
+<pre>{{ "{:#?}" | format(current_override) }}</pre>
+{% endif %}
 {% for (key, counts) in profile_runner_counts.iter() %}
 <h2>{{ counts.healthy }}/{{ counts.target }} runners for {{ key }}</h2>
 <ul>
