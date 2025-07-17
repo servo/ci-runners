@@ -82,7 +82,7 @@ enum Request {
 
     /// POST `/policy/override?<profile_key...>=<count>` => `{"<profile_key...>": <count...>}`
     OverridePolicy {
-        response_tx: Sender<eyre::Result<BTreeMap<String, usize>>>,
+        response_tx: Sender<eyre::Result<Override>>,
         profile_override_counts: BTreeMap<String, usize>,
     },
 
@@ -241,7 +241,7 @@ fn get_override_policy_route() -> rocket_eyre::Result<Json<Option<Override>>> {
 fn override_policy_route(
     profile_override_counts: BTreeMap<String, usize>,
     _auth: ApiKeyGuard,
-) -> rocket_eyre::Result<Json<BTreeMap<String, usize>>> {
+) -> rocket_eyre::Result<Json<Override>> {
     let (response_tx, response_rx) = crossbeam_channel::bounded(0);
     REQUEST.sender.send_timeout(
         Request::OverridePolicy {
@@ -567,7 +567,7 @@ fn monitor_thread() -> eyre::Result<()> {
                     profile_override_counts,
                 } => {
                     response_tx
-                        .send(policy.try_override(profile_override_counts))
+                        .send(policy.try_override(profile_override_counts).cloned())
                         .expect("Failed to send Response to API thread");
                 }
                 Request::Screenshot {

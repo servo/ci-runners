@@ -38,7 +38,7 @@ pub struct Policy {
 /// Overrides compromise on some of our usual guarantees:
 /// - We may agree to start a runner that we ultimately can’t start or reserve
 /// - We may forget our override if the monitor is restarted (for now at least)
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct Override {
     pub profile_override_counts: BTreeMap<String, usize>,
     pub profile_target_counts: BTreeMap<String, usize>,
@@ -525,7 +525,7 @@ impl Policy {
     pub fn try_override(
         &mut self,
         profile_override_counts: BTreeMap<String, usize>,
-    ) -> eyre::Result<BTreeMap<String, usize>> {
+    ) -> eyre::Result<&Override> {
         info!(override_counts = ?profile_override_counts, "Override request");
 
         // TODO: do we need to take this into account?
@@ -634,12 +634,15 @@ impl Policy {
         info!(adjusted_override_counts = ?adjusted_override_counts, extra_counts = ?profile_extra_counts, ?scenario, "Found solution for override request");
 
         self.current_override = Some(Override {
-            profile_override_counts: adjusted_override_counts.clone(),
+            profile_override_counts: adjusted_override_counts,
             profile_target_counts: scenario,
             actual_runner_ids_by_profile_key: BTreeMap::default(),
         });
 
-        Ok(adjusted_override_counts)
+        Ok(self
+            .current_override
+            .as_ref()
+            .expect("Guaranteed by assignment"))
     }
 
     fn update_override_internal(&mut self) {
@@ -860,7 +863,7 @@ mod test {
 
     use crate::{
         github::{ApiRunner, ApiRunnerLabel},
-        policy::{set_base_image_mtime_for_test, RunnerChanges},
+        policy::{set_base_image_mtime_for_test, Override, RunnerChanges},
         runner::{set_runner_created_time_for_test, Runners, Status},
     };
 
@@ -1319,7 +1322,17 @@ mod test {
         // Allow the request, adjusted for critical runners.
         assert_eq!(
             policy.try_override([("wpt".to_owned(), 8)].into())?,
-            [("wpt".to_owned(), 4)].into(),
+            &Override {
+                profile_override_counts: [("wpt".to_owned(), 4)].into(),
+                profile_target_counts: [
+                    ("linux".to_owned(), 1),
+                    ("macos".to_owned(), 0),
+                    ("windows".to_owned(), 1),
+                    ("wpt".to_owned(), 4),
+                ]
+                .into(),
+                actual_runner_ids_by_profile_key: [].into(),
+            },
         );
 
         // If an override is already active, refuse the request.
