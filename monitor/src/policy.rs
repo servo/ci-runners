@@ -1,5 +1,5 @@
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     fs::{create_dir, read_link, File},
     io::{Read, Write},
     net::Ipv4Addr,
@@ -42,7 +42,7 @@ pub struct Policy {
 pub struct Override {
     pub profile_override_counts: BTreeMap<String, usize>,
     pub profile_target_counts: BTreeMap<String, usize>,
-    pub actual_runner_ids: Vec<usize>,
+    pub actual_runner_ids_by_profile_key: BTreeMap<String, BTreeSet<usize>>,
 }
 
 #[derive(Debug, PartialEq, Default)]
@@ -137,6 +137,7 @@ impl Policy {
 
     pub fn set_runners(&mut self, runners: Runners) {
         self.runners = Some(runners);
+        self.update_override_internal();
     }
 
     pub fn compute_runner_changes(&self) -> eyre::Result<RunnerChanges> {
@@ -619,11 +620,81 @@ impl Policy {
         self.current_override = Some(Override {
             profile_override_counts: adjusted_override_counts.clone(),
             profile_target_counts: scenario,
-            // TODO: pick up existing idle runners here, or later?
-            actual_runner_ids: vec![],
+            actual_runner_ids_by_profile_key: BTreeMap::default(),
         });
 
         Ok(adjusted_override_counts)
+    }
+
+    fn update_override_internal(&mut self) {
+        // If the current override is finished, remove it.
+        if self.override_is_finished() {
+            self.current_override = None;
+            return;
+        }
+        // Get all currently idle runners.
+        let idle_runners = self
+            .profiles()
+            .map(|(profile_key, profile)| {
+                let idle_runners = self
+                    .idle_runners_for_profile(profile)
+                    .map(|(id, _runner)| *id)
+                    .collect::<Vec<_>>();
+                (profile_key.clone(), idle_runners)
+            })
+            .collect::<BTreeMap<_, _>>();
+        // Try to take ownership of idle runners that belong to the override.
+        if let Some(current_override) = self.current_override.as_mut() {
+            for (profile_key, count) in current_override.profile_override_counts.clone() {
+                let actual_runner_ids = current_override
+                    .actual_runner_ids_by_profile_key
+                    .entry(profile_key.clone())
+                    .or_default();
+                while actual_runner_ids.len() < count {
+                    // Find an idle runner that we don’t already own.
+                    if let Some(idle_runners) = idle_runners.get(&profile_key) {
+                        if let Some(id) = idle_runners
+                            .iter()
+                            .find(|id| !actual_runner_ids.contains(id))
+                        {
+                            actual_runner_ids.insert(*id);
+                            continue;
+                        }
+                    }
+                    // No more idle runners available right now.
+                    break;
+                }
+            }
+        }
+    }
+
+    fn override_is_finished(&self) -> bool {
+        if let Some(current_override) = self.current_override.as_ref() {
+            // If the override has delivered all of its runners...
+            let actual_runner_count = current_override
+                .actual_runner_ids_by_profile_key
+                .values()
+                .map(|ids| ids.len())
+                .sum::<usize>();
+            let sum_override_counts = current_override
+                .profile_override_counts
+                .values()
+                .sum::<usize>();
+            if actual_runner_count == sum_override_counts {
+                // If all of those runners no longer exist...
+                if !current_override
+                    .actual_runner_ids_by_profile_key
+                    .values()
+                    .flat_map(|ids| ids.iter())
+                    .any(|id| self.runner(*id).is_some())
+                {
+                    // The override is finished.
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 }
 
