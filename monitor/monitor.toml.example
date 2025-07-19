@@ -43,7 +43,7 @@ base_vm_name = "servo-ubuntu2204-wpt"
 github_runner_label = "self-hosted-image:ubuntu2204-wpt"
 target_count = 1
 image_type = "Rust"
-requires_1g_hugepages = 12
+requires_1g_hugepages = 24
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
 
 [profiles.servo-ubuntu2204-rust]
