@@ -604,14 +604,6 @@ impl Policy {
             *count = if *count > delta { *count - delta } else { 0 };
         }
 
-        // Fail loudly if the requested override would exceed available resources when taken alone.
-        if self
-            .validate_resource_requirements(&profile_override_counts)
-            .is_err()
-        {
-            bail!("Unable to set override because it would exceed our available resources");
-        }
-
         // Fail loudly if the requested override is meaningless.
         if profile_extra_counts.values().sum::<usize>() == 0 {
             bail!("Requested override is meaningless");
@@ -1379,12 +1371,10 @@ mod test {
             .try_override([("linux".to_owned(), 1)].into())
             .is_err());
 
-        // If the request would exceed available resources when taken alone, refuse the request.
-        assert!(policy.try_override([("wpt".to_owned(), 9)].into()).is_err());
-
-        // Allow the request, adjusted for critical runners.
+        // Accept the request, adjusted for critical runners.
+        // Requests that would exceed available resources when taken alone are still acceptable.
         assert_eq!(
-            policy.try_override([("wpt".to_owned(), 8)].into())?,
+            policy.try_override([("wpt".to_owned(), 9)].into())?,
             &Override {
                 profile_override_counts: [("wpt".to_owned(), 4)].into(),
                 profile_target_counts: [
@@ -1475,7 +1465,7 @@ mod test {
         for count in 0..=5 {
             let mut policy = make_policy()?;
             let result = policy.try_override([("linux".to_owned(), count)].into());
-            if [0, 1, 5].contains(&count) {
+            if [0, 1].contains(&count) {
                 assert!(result.is_err(), "{count}: {result:?}");
             } else {
                 assert!(result.is_ok(), "{count}: {result:?}");
@@ -1484,7 +1474,7 @@ mod test {
         for count in 0..=5 {
             let mut policy = make_policy()?;
             let result = policy.try_override([("windows".to_owned(), count)].into());
-            if [0, 1, 5].contains(&count) {
+            if [0, 1].contains(&count) {
                 assert!(result.is_err(), "{count}: {result:?}");
             } else {
                 assert!(result.is_ok(), "{count}: {result:?}");
@@ -1493,7 +1483,7 @@ mod test {
         for count in 0..=5 {
             let mut policy = make_policy()?;
             let result = policy.try_override([("macos".to_owned(), count)].into());
-            if [0, 1, 5].contains(&count) {
+            if [0, 1].contains(&count) {
                 assert!(result.is_err(), "{count}: {result:?}");
             } else {
                 assert!(result.is_ok(), "{count}: {result:?}");
@@ -1502,7 +1492,7 @@ mod test {
         for count in 0..=9 {
             let mut policy = make_policy()?;
             let result = policy.try_override([("wpt".to_owned(), count)].into());
-            if [0, 1, 2, 9].contains(&count) {
+            if [0, 1, 2].contains(&count) {
                 assert!(result.is_err(), "{count}: {result:?}");
             } else {
                 assert!(result.is_ok(), "{count}: {result:?}");
