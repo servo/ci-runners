@@ -1,8 +1,20 @@
-use std::{collections::BTreeMap, env, fmt::Debug, sync::Mutex};
+use std::{
+    collections::BTreeMap,
+    env,
+    fmt::Debug,
+    sync::Mutex,
+    time::{Duration, Instant},
+};
 
 use jane_eyre::eyre::{self, eyre};
 use rand::distr::{Alphanumeric, SampleString};
-use rocket::{get, post, response::content::RawText, serde::json::Json};
+use rocket::{
+    form::{FromFormField, ValueField},
+    get, post,
+    response::content::RawText,
+    serde::json::Json,
+};
+use serde::Deserialize;
 use tokio::try_join;
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -15,19 +27,65 @@ struct Build {
     unique_id: String,
     qualified_repo: String,
     run_id: String,
+    runners: BTreeMap<usize, Runner>,
     total_chunks: usize,
     taken_chunks: usize,
+    started_at: Instant,
     secret_token: SecretToken,
 }
 impl Build {
-    fn new(unique_id: String, qualified_repo: String, run_id: String, total_chunks: usize) -> Self {
+    fn new(
+        unique_id: String,
+        qualified_repo: String,
+        run_id: String,
+        runners: BTreeMap<usize, RunnerEnvironment>,
+        total_chunks: usize,
+    ) -> Self {
         Self {
             unique_id,
             qualified_repo,
             run_id,
+            runners: runners
+                .into_iter()
+                .map(|(runner, environment)| (runner, Runner::new(environment)))
+                .collect(),
             total_chunks,
             taken_chunks: 0,
+            started_at: Instant::now(),
             secret_token: SecretToken::default(),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct Runner {
+    environment: RunnerEnvironment,
+    taken_chunks: usize,
+    started_at: Vec<Duration>,
+}
+impl Runner {
+    fn new(environment: RunnerEnvironment) -> Self {
+        Self {
+            environment,
+            taken_chunks: 0,
+            started_at: vec![],
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+enum RunnerEnvironment {
+    GithubHosted,
+    SelfHosted,
+}
+impl<'v> FromFormField<'v> for RunnerEnvironment {
+    fn from_value(field: ValueField<'v>) -> rocket::form::Result<'v, Self> {
+        match field.value {
+            "github-hosted" => Ok(Self::GithubHosted),
+            "self-hosted" => Ok(Self::SelfHosted),
+            _ => Err(rocket::form::Error::validation(
+                "Bad runner environment value",
+            ))?,
         }
     }
 }
@@ -50,11 +108,12 @@ fn index_route() -> rocket_eyre::Result<RawText<String>> {
 }
 
 /// POST `/start?qualified_repo=<user>/<repo>` => `<secret_token>`
-#[post("/start?<unique_id>&<qualified_repo>&<run_id>&<total_chunks>")]
+#[post("/start?<unique_id>&<qualified_repo>&<run_id>&<runners>&<total_chunks>")]
 fn start_route(
     unique_id: String,
     qualified_repo: String,
     run_id: String,
+    runners: BTreeMap<usize, RunnerEnvironment>,
     total_chunks: usize,
 ) -> rocket_eyre::Result<RawText<String>> {
     let mut builds = BUILDS.lock().map_err(|e| eyre!("{e:?}"))?;
@@ -64,16 +123,22 @@ fn start_route(
     let build = builds
         .entry(unique_id.clone())
         .and_modify(|_| unreachable!())
-        .or_insert(Build::new(unique_id, qualified_repo, run_id, total_chunks));
+        .or_insert(Build::new(
+            unique_id,
+            qualified_repo,
+            run_id,
+            runners,
+            total_chunks,
+        ));
 
     Ok(RawText(build.secret_token.0.clone()))
 }
 
-#[post("/take?<unique_id>&<secret_token>&<runs_on>")]
+#[post("/take?<unique_id>&<secret_token>&<runner>")]
 fn take_chunk_route(
     unique_id: String,
     secret_token: String,
-    runs_on: String,
+    runner: usize,
 ) -> rocket_eyre::Result<Json<Option<usize>>> {
     let mut builds = BUILDS.lock().map_err(|e| eyre!("{e:?}"))?;
     let Some(build) = builds.get_mut(&unique_id) else {
@@ -82,8 +147,13 @@ fn take_chunk_route(
     if secret_token != build.secret_token.0 {
         return Err(eyre!("Incorrect secret token"))?;
     }
+    let Some(runner) = build.runners.get_mut(&runner) else {
+        return Err(eyre!("Unknown runner {runner} ({unique_id})"))?;
+    };
 
-    if build.taken_chunks >= build.total_chunks * 2 / 3 && runs_on == "ubuntu-22.04" {
+    if build.taken_chunks >= build.total_chunks * 2 / 3
+        && runner.environment == RunnerEnvironment::GithubHosted
+    {
         // Forbid slow GitHub-hosted runners from taking the last 1/3 of chunks.
         let response = None;
         info!(?unique_id, ?response);
@@ -91,6 +161,10 @@ fn take_chunk_route(
     } else if build.taken_chunks < build.total_chunks {
         let response = Some(build.taken_chunks);
         build.taken_chunks += 1;
+        runner.taken_chunks += 1;
+        runner
+            .started_at
+            .push(Instant::now().duration_since(build.started_at));
         info!(?unique_id, ?response);
         Ok(Json(response))
     } else {
