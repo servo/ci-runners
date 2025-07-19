@@ -26,6 +26,7 @@ use crossbeam_channel::{Receiver, Sender};
 use jane_eyre::eyre::{self, eyre, Context, OptionExt};
 use mktemp::Temp;
 use rocket::{
+    delete,
     fs::{FileServer, NamedFile},
     get,
     http::ContentType,
@@ -84,6 +85,11 @@ enum Request {
     OverridePolicy {
         response_tx: Sender<eyre::Result<Override>>,
         profile_override_counts: BTreeMap<String, usize>,
+    },
+
+    /// DELETE `/policy/override` => `{"<profile_key...>": <count...>}`
+    CancelOverridePolicy {
+        response_tx: Sender<eyre::Result<Option<Override>>>,
     },
 
     /// GET `/runner/<our runner id>/screenshot/now` => image/png
@@ -256,6 +262,19 @@ fn override_policy_route(
     ))
 }
 
+#[delete("/policy/override")]
+fn delete_override_policy_route(_auth: ApiKeyGuard) -> rocket_eyre::Result<Json<Option<Override>>> {
+    let (response_tx, response_rx) = crossbeam_channel::bounded(0);
+    REQUEST.sender.send_timeout(
+        Request::CancelOverridePolicy { response_tx },
+        DOTENV.monitor_thread_send_timeout,
+    )?;
+
+    Ok(Json(
+        response_rx.recv_timeout(DOTENV.monitor_thread_recv_timeout)??,
+    ))
+}
+
 #[get("/profile/<profile_key>/screenshot.png")]
 async fn profile_screenshot_route(profile_key: String) -> rocket_eyre::Result<NamedFile> {
     let path = get_profile_data_path(&profile_key, Path::new("screenshot.png"))
@@ -371,6 +390,7 @@ async fn main() -> eyre::Result<()> {
                 take_runners_route,
                 get_override_policy_route,
                 override_policy_route,
+                delete_override_policy_route,
                 profile_screenshot_route,
                 runner_screenshot_route,
                 runner_screenshot_now_route,
@@ -568,6 +588,11 @@ fn monitor_thread() -> eyre::Result<()> {
                 } => {
                     response_tx
                         .send(policy.try_override(profile_override_counts).cloned())
+                        .expect("Failed to send Response to API thread");
+                }
+                Request::CancelOverridePolicy { response_tx } => {
+                    response_tx
+                        .send(policy.cancel_override())
                         .expect("Failed to send Response to API thread");
                 }
                 Request::Screenshot {

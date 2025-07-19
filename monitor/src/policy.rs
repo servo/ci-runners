@@ -660,6 +660,10 @@ impl Policy {
             .expect("Guaranteed by assignment"))
     }
 
+    pub fn cancel_override(&mut self) -> eyre::Result<Option<Override>> {
+        Ok(self.current_override.take())
+    }
+
     fn update_override_internal(&mut self) {
         // If the current override is finished, remove it.
         if self.override_is_finished() {
