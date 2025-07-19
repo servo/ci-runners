@@ -165,12 +165,13 @@ fn take_chunk_route(
         info!(?unique_id, ?response);
         Ok(Json(response))
     } else {
-        let response = Some(build.taken_chunks);
         build.taken_chunks += 1;
         runner.taken_chunks += 1;
         runner
             .started_at
             .push(Instant::now().duration_since(build.started_at));
+        let response = Some(build.taken_chunks);
+        assert!(response.unwrap() > 0, "WPT runner chunks must be non-zero");
         info!(?unique_id, ?response);
         Ok(Json(response))
     }
