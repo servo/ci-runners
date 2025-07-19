@@ -1,0 +1,61 @@
+<!doctype html><meta charset="utf-8">
+<style>
+    .chart {
+        --div: 1;
+        overflow: hidden;
+    }
+    .runner {
+        display: flex;
+        margin-bottom: 0.25em;
+    }
+    .blank, .chunk {
+        flex: 0 0 calc(100% * var(--size) / var(--div));
+        height: 1em;
+    }
+    .chunk:nth-child(2n) {
+        background: #1192e8;
+    }
+    .chunk:nth-child(2n+1) {
+        background: #42be65;
+    }
+    .scale {
+        display: flex;
+        justify-content: space-between;
+    }
+    .scale * {
+        display: flex;
+        width: 0;
+        justify-content: center;
+        text-align: center;
+    }
+</style>
+<div class="chart">
+</div>
+<script>
+    const update = async () => {
+        const result = await (await fetch(`${location}/data`)).json();
+        const div = result.width;
+        const chart = document.querySelector(".chart");
+        chart.style.setProperty("--div", div);
+        let html = "";
+        for (const runnerTimes of result.runnerTimes) {
+            html += "<div class=runner>";
+            html += `<div class=blank style=--size:${runnerTimes[0]}></div>`;
+            for (let i = 0; i < runnerTimes.length - 1; i++) {
+                html += `<div class=chunk style=--size:${runnerTimes[i+1] - runnerTimes[i]}></div>`;
+            }
+            html += "</div>";
+        }
+        html += "<div class=scale><div></div>";
+        const ticks = 20;
+        for (let i = 1; i <= ticks - 1; i++) {
+            const t = i / ticks * div;
+            const time = `${t/60|0}:${`${t%60|0}`.padStart(2,0)}`;
+            html += `<div>|<br>${time}</div>`;
+        }
+        html += "<div></div></div>";
+        chart.innerHTML = html;
+        setTimeout(update, 125);
+    };
+    update();
+</script>

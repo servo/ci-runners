@@ -2,6 +2,7 @@ use std::{
     collections::BTreeMap,
     env,
     fmt::Debug,
+    iter::once,
     sync::Mutex,
     time::{Duration, Instant},
 };
@@ -11,10 +12,11 @@ use rand::distr::{Alphanumeric, SampleString};
 use rocket::{
     form::{FromFormField, ValueField},
     get, post,
-    response::content::RawText,
+    response::content::{RawHtml, RawText},
     serde::json::Json,
 };
 use serde::Deserialize;
+use serde_json::json;
 use tokio::try_join;
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
@@ -73,6 +75,16 @@ impl Runner {
             finished_at: None,
         }
     }
+    fn times(&self, now: Duration) -> Vec<f64> {
+        let started_at = self.started_at.iter().copied();
+        let result = if let Some(finished_at) = self.finished_at {
+            started_at.chain(once(finished_at))
+        } else {
+            started_at.chain(once(now))
+        };
+
+        result.map(|t| t.as_secs_f64()).collect()
+    }
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -109,6 +121,49 @@ fn index_route() -> rocket_eyre::Result<RawText<String>> {
     Ok(RawText(format!("{BUILDS:#?}")))
 }
 
+#[get("/chart/<unique_id>")]
+fn chart_route(unique_id: String) -> rocket_eyre::Result<RawHtml<&'static str>> {
+    let builds = BUILDS.lock().map_err(|e| eyre!("{e:?}"))?;
+    if !builds.contains_key(&unique_id) {
+        return Err(eyre!("Unknown build with unique id: {unique_id}"))?;
+    };
+
+    Ok(RawHtml(include_str!("chunker/chart.html")))
+}
+
+#[get("/chart/<unique_id>/data")]
+fn chart_data_route(unique_id: String) -> rocket_eyre::Result<Json<serde_json::Value>> {
+    let builds = BUILDS.lock().map_err(|e| eyre!("{e:?}"))?;
+    let Some(build) = builds.get(&unique_id) else {
+        return Err(eyre!("Unknown build with unique id: {unique_id}"))?;
+    };
+    let now = Instant::now().duration_since(build.started_at);
+    let width = if build
+        .runners
+        .values()
+        .all(|runner| runner.finished_at.is_some())
+    {
+        build
+            .runners
+            .values()
+            .map(|runner| runner.finished_at.expect("Guaranteed by branch"))
+            .max()
+            .expect("Guaranteed by start_route()")
+    } else {
+        now
+    };
+    let runner_times: Vec<Vec<f64>> = build
+        .runners
+        .values()
+        .map(|runner| runner.times(now))
+        .collect();
+
+    Ok(Json(json!({
+        "width": width.as_secs_f64(),
+        "runnerTimes": runner_times,
+    })))
+}
+
 /// POST `/start?qualified_repo=<user>/<repo>` => `<secret_token>`
 #[post("/start?<unique_id>&<qualified_repo>&<run_id>&<runners>&<total_chunks>")]
 fn start_route(
@@ -121,6 +176,9 @@ fn start_route(
     let mut builds = BUILDS.lock().map_err(|e| eyre!("{e:?}"))?;
     if builds.contains_key(&unique_id) {
         Err(eyre!("Build already started with unique id: {unique_id}"))?;
+    }
+    if runners.is_empty() {
+        Err(eyre!("No runners!"))?;
     }
     let build = builds
         .entry(unique_id.clone())
@@ -201,7 +259,13 @@ async fn main() -> eyre::Result<()> {
         )
         .mount(
             "/",
-            rocket::routes![index_route, start_route, take_chunk_route],
+            rocket::routes![
+                index_route,
+                chart_route,
+                chart_data_route,
+                start_route,
+                take_chunk_route
+            ],
         )
         .launch()
     };
