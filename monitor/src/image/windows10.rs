@@ -1,4 +1,5 @@
 use std::ffi::OsStr;
+use std::fs::remove_file;
 use std::path::Path;
 use std::time::Duration;
 
@@ -9,13 +10,18 @@ use jane_eyre::eyre;
 use jane_eyre::eyre::OptionExt;
 use settings::profile::Profile;
 use tracing::info;
+use tracing::warn;
 
 use crate::data::get_profile_configuration_path;
+use crate::image::create_base_images_dir;
+use crate::image::create_runner_images_dir;
 use crate::image::delete_base_image_file;
 use crate::image::prune_base_image_files;
 use crate::image::undefine_libvirt_guest;
+use crate::policy::runner_images_path;
 use crate::shell::atomic_symlink;
 use crate::shell::log_output_as_info;
+use crate::shell::reflink_or_copy_with_warning;
 use crate::DOTENV;
 use crate::IMAGE_DEPS_DIR;
 
@@ -145,18 +151,34 @@ pub fn register_runner(profile: &Profile, vm_name: &str) -> eyre::Result<String>
     crate::github::register_runner(vm_name, &profile.github_runner_label, r"C:\a")
 }
 
-pub fn create_runner(profile: &Profile, vm_name: &str) -> eyre::Result<()> {
+pub fn create_runner(profile: &Profile, vm_name: &str, runner_id: usize) -> eyre::Result<String> {
     let prefixed_vm_name = format!("{}-{vm_name}", DOTENV.libvirt_prefix);
     let pipe = || |reader| log_output_as_info(reader);
     let base_vm_name = &profile.base_vm_name;
-    spawn_with_output!(virt-clone --auto-clone --reflink -o $base_vm_name -n $prefixed_vm_name 2>&1)?
-        .wait_with_pipe(&mut pipe())?;
-    start_libvirt_guest(&prefixed_vm_name)?;
 
-    Ok(())
+    // Copy images in the monitor, not with `virt-clone --auto-clone --reflink`,
+    // because the latter can’t be parallelised without causing errors.
+    // TODO copy config.iso?
+    let base_images_path = create_base_images_dir(profile)?;
+    let base_image_symlink_path = base_images_path.join(format!("base.img"));
+    let runner_images_path = create_runner_images_dir(runner_id)?;
+    let runner_base_image_path = runner_images_path.join(format!("base{runner_id}.img"));
+    reflink_or_copy_with_warning(&base_image_symlink_path, &runner_base_image_path)?;
+
+    spawn_with_output!(virt-clone -o $base_vm_name -n $prefixed_vm_name --preserve-data -f $runner_base_image_path 2>&1)?
+        .wait_with_pipe(&mut pipe())?;
+
+    Ok(prefixed_vm_name)
 }
 
-pub fn destroy_runner(vm_name: &str) -> eyre::Result<()> {
+pub fn destroy_runner(vm_name: &str, runner_id: usize) -> eyre::Result<()> {
+    // TODO delete config.iso?
+    let runner_images_path = runner_images_path(runner_id);
+    let runner_base_image_path = runner_images_path.join(format!("base.img"));
+    if let Err(error) = remove_file(&runner_base_image_path) {
+        warn!(?runner_base_image_path, ?error, "Failed to delete file");
+    }
+
     let prefixed_vm_name = format!("{}-{vm_name}", DOTENV.libvirt_prefix);
     let pipe = || |reader| log_output_as_info(reader);
     let _ =

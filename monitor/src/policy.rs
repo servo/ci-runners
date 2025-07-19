@@ -5,6 +5,7 @@ use std::{
     net::Ipv4Addr,
     os::unix::fs::symlink,
     path::{Path, PathBuf},
+    thread::{self, JoinHandle},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
@@ -18,10 +19,11 @@ use settings::{
     units::MemorySize,
     DOTENV, TOML,
 };
-use tracing::{debug, info, warn};
+use tracing::{debug, info, info_span, warn};
 
 use crate::{
     data::{get_profile_configuration_path, get_profile_data_path, get_runner_data_path},
+    github::unregister_runner,
     image::{create_runner, destroy_runner, register_runner},
     libvirt::{get_ipv4_address, update_screenshot},
     runner::{Runner, Runners, Status},
@@ -50,6 +52,12 @@ pub struct Override {
 pub struct RunnerChanges {
     pub unregister_and_destroy_runner_ids: Vec<usize>,
     pub create_counts_by_profile_key: BTreeMap<String, usize>,
+}
+impl RunnerChanges {
+    pub fn is_empty(&self) -> bool {
+        self.unregister_and_destroy_runner_ids.is_empty()
+            && self.create_counts_by_profile_key.values().sum::<usize>() == 0
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -225,48 +233,88 @@ impl Policy {
         Ok(result)
     }
 
-    pub fn create_runner(&self, profile: &Profile, id: usize) -> eyre::Result<()> {
+    /// Spawn a thread that registers and creates a runner.
+    ///
+    /// Returns the libvirt guest name, since that can’t be parallelised without causing errors.
+    pub fn register_create_runner(
+        &self,
+        profile: &Profile,
+        id: usize,
+    ) -> eyre::Result<JoinHandle<eyre::Result<String>>> {
         if self.base_image_snapshot(&profile.base_vm_name).is_none() {
             bail!(
                 "Tried to create runner, but profile has no base image snapshot (profile {})",
                 profile.base_vm_name
             );
         };
-        info!(runner_id = id, profile.base_vm_name, "Creating runner");
-        match profile.image_type {
-            ImageType::Rust => {
-                let base_vm_name = &profile.base_vm_name;
-                create_dir(get_runner_data_path(id, None)?)?;
-                let mut runner_toml =
-                    File::create_new(get_runner_data_path(id, Path::new("runner.toml"))?)?;
-                writeln!(runner_toml, r#"image_type = "Rust""#)?;
-                symlink(
-                    get_profile_configuration_path(profile, Path::new("boot-script"))?,
-                    get_runner_data_path(id, Path::new("boot-script"))?,
-                )?;
-                let vm_name = format!("{base_vm_name}.{id}");
-                if !DOTENV.dont_register_runners {
-                    let mut github_api_registration = File::create_new(get_runner_data_path(
-                        id,
-                        Path::new("github-api-registration"),
-                    )?)?;
-                    github_api_registration
-                        .write_all(register_runner(profile, &vm_name)?.as_bytes())?;
-                }
-                create_runner(profile, &vm_name)?;
 
-                Ok(())
+        let profile = profile.clone();
+        let base_vm_name = profile.base_vm_name.clone();
+        let vm_name = format!("{base_vm_name}.{id}");
+
+        Ok(thread::spawn(move || {
+            let _span = info_span!("create_runner_thread", runner_id = id, base_vm_name).entered();
+            info!(runner_id = id, base_vm_name, "Creating runner");
+            match profile.image_type {
+                ImageType::Rust => {
+                    create_dir(get_runner_data_path(id, None)?)?;
+                    let mut runner_toml =
+                        File::create_new(get_runner_data_path(id, Path::new("runner.toml"))?)?;
+                    writeln!(runner_toml, r#"image_type = "Rust""#)?;
+                    symlink(
+                        get_profile_configuration_path(&profile, Path::new("boot-script"))?,
+                        get_runner_data_path(id, Path::new("boot-script"))?,
+                    )?;
+                    if !DOTENV.dont_register_runners {
+                        let github_api_registration = register_runner(&profile, &vm_name)?;
+                        let mut github_api_registration_file = File::create_new(
+                            get_runner_data_path(id, Path::new("github-api-registration"))?,
+                        )?;
+                        github_api_registration_file
+                            .write_all(github_api_registration.as_bytes())?;
+                    }
+
+                    create_runner(&profile, &vm_name, id)
+                }
             }
-        }
+        }))
     }
 
-    pub fn destroy_runner(&self, profile: &Profile, id: usize) -> eyre::Result<()> {
+    /// Spawn a thread that unregisters, stops, and destroys a runner.
+    pub fn unregister_stop_destroy_runner(
+        &self,
+        id: usize,
+    ) -> eyre::Result<JoinHandle<eyre::Result<()>>> {
+        let runner = self
+            .runner(id)
+            .expect("Guaranteed by compute_runner_changes()")
+            .clone();
+        let Some(profile) = self
+            .profile(runner.base_vm_name())
+            .map(|profile| profile.to_owned())
+        else {
+            bail!("Profile");
+        };
         info!(runner_id = id, profile.base_vm_name, "Destroying runner");
+
         match profile.image_type {
             ImageType::Rust => {
                 let vm_name = format!("{}.{id}", profile.base_vm_name);
-                destroy_runner(profile, &vm_name)?;
-                Ok(())
+
+                Ok(thread::spawn(move || {
+                    let _span =
+                        info_span!("destroy_runner_thread", runner_id = id, vm_name).entered();
+                    if let Some(registration) = runner.registration() {
+                        if let Err(error) = unregister_runner(registration.id) {
+                            warn!(?error, "Failed to unregister runner: {error}");
+                        }
+                    }
+                    if let Err(error) = destroy_runner(&profile, &vm_name, id) {
+                        warn!(?error, "Failed to destroy runner: {error}");
+                    }
+
+                    Ok(())
+                }))
             }
         }
     }
@@ -752,14 +800,6 @@ impl Policy {
         runners.reserve_runner(id, unique_id, qualified_repo, run_id)
     }
 
-    pub fn unregister_runner(&self, id: usize) -> eyre::Result<()> {
-        let Some(runners) = self.runners.as_ref() else {
-            bail!("Policy has no Runners!");
-        };
-
-        runners.unregister_runner(id)
-    }
-
     pub fn screenshot_runner(&self, id: usize) -> eyre::Result<Temp> {
         let Some(runners) = self.runners.as_ref() else {
             bail!("Policy has no Runners!");
@@ -803,6 +843,10 @@ impl Policy {
 
 pub fn base_images_path(profile: &Profile) -> PathBuf {
     Path::new("/var/lib/libvirt/images/base").join(&profile.base_vm_name)
+}
+
+pub fn runner_images_path(runner_id: usize) -> PathBuf {
+    Path::new("/var/lib/libvirt/images/runner").join(&format!("{runner_id}"))
 }
 
 pub fn base_image_path<'snap>(

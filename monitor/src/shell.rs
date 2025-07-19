@@ -8,6 +8,7 @@ use std::{
 
 use jane_eyre::eyre::{self, OptionExt};
 use mktemp::Temp;
+use reflink::reflink_or_copy;
 use tracing::{info, trace, warn};
 
 macro_rules! impl_log_output_as {
@@ -78,5 +79,22 @@ pub fn atomic_symlink(original: impl AsRef<Path>, link: impl AsRef<Path>) -> eyr
     let link_temp = Temp::new_path_in(link_parent);
     symlink(original, &link_temp)?;
     rename(&link_temp, link_path)?;
+    Ok(())
+}
+
+pub fn reflink_or_copy_with_warning(
+    original: impl AsRef<Path>,
+    new: impl AsRef<Path>,
+) -> eyre::Result<()> {
+    let original = original.as_ref();
+    let new = new.as_ref();
+    if let Some(written) = reflink_or_copy(original, new)? {
+        warn!(
+            ?original,
+            ?new,
+            "Had to copy {written} bytes manually because reflink copy failed"
+        );
+    }
+
     Ok(())
 }

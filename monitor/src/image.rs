@@ -19,13 +19,12 @@ use bytesize::ByteSize;
 use chrono::{SecondsFormat, Utc};
 use cmd_lib::{run_cmd, spawn_with_output};
 use jane_eyre::eyre::{self, bail, OptionExt};
-use reflink::reflink_or_copy;
 use settings::{profile::Profile, DOTENV, TOML};
-use tracing::{error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::{
-    policy::{base_images_path, Policy},
-    shell::log_output_as_info,
+    policy::{base_images_path, runner_images_path, Policy},
+    shell::{log_output_as_info, reflink_or_copy_with_warning},
 };
 
 #[derive(Debug, Default)]
@@ -284,34 +283,42 @@ pub fn register_runner(profile: &Profile, vm_name: &str) -> eyre::Result<String>
     }
 }
 
-pub fn create_runner(profile: &Profile, vm_name: &str) -> eyre::Result<()> {
+pub fn create_runner(profile: &Profile, vm_name: &str, runner_id: usize) -> eyre::Result<String> {
     match &*profile.configuration_name {
-        "macos13" => macos13::create_runner(profile, vm_name),
-        "ubuntu2204" => ubuntu2204::create_runner(profile, vm_name),
-        "ubuntu2204-rust" => ubuntu2204::create_runner(profile, vm_name),
-        "ubuntu2204-wpt" => ubuntu2204::create_runner(profile, vm_name),
-        "windows10" => windows10::create_runner(profile, vm_name),
+        "macos13" => macos13::create_runner(profile, vm_name, runner_id),
+        "ubuntu2204" => ubuntu2204::create_runner(profile, vm_name, runner_id),
+        "ubuntu2204-rust" => ubuntu2204::create_runner(profile, vm_name, runner_id),
+        "ubuntu2204-wpt" => ubuntu2204::create_runner(profile, vm_name, runner_id),
+        "windows10" => windows10::create_runner(profile, vm_name, runner_id),
         other => todo!("Runner creation not yet implemented: {other}"),
     }
 }
 
-pub fn destroy_runner(profile: &Profile, vm_name: &str) -> eyre::Result<()> {
+pub fn destroy_runner(profile: &Profile, vm_name: &str, runner_id: usize) -> eyre::Result<()> {
     match &*profile.configuration_name {
-        "macos13" => macos13::destroy_runner(vm_name),
-        "ubuntu2204" => ubuntu2204::destroy_runner(vm_name),
-        "ubuntu2204-rust" => ubuntu2204::destroy_runner(vm_name),
-        "ubuntu2204-wpt" => ubuntu2204::destroy_runner(vm_name),
-        "windows10" => windows10::destroy_runner(vm_name),
+        "macos13" => macos13::destroy_runner(vm_name, runner_id),
+        "ubuntu2204" => ubuntu2204::destroy_runner(vm_name, runner_id),
+        "ubuntu2204-rust" => ubuntu2204::destroy_runner(vm_name, runner_id),
+        "ubuntu2204-wpt" => ubuntu2204::destroy_runner(vm_name, runner_id),
+        "windows10" => windows10::destroy_runner(vm_name, runner_id),
         other => todo!("Runner destruction not yet implemented: {other}"),
     }
 }
 
 pub(self) fn create_base_images_dir(profile: &Profile) -> eyre::Result<PathBuf> {
     let base_images_path = base_images_path(profile);
-    info!(?base_images_path, "Creating libvirt images subdirectory");
+    debug!(?base_images_path, "Creating base images subdirectory");
     create_dir_all(&base_images_path)?;
 
     Ok(base_images_path)
+}
+
+pub(self) fn create_runner_images_dir(runner_id: usize) -> eyre::Result<PathBuf> {
+    let runner_images_path = runner_images_path(runner_id);
+    debug!(?runner_images_path, "Creating runner images subdirectory");
+    create_dir_all(&runner_images_path)?;
+
+    Ok(runner_images_path)
 }
 
 pub(self) fn prune_base_image_files(profile: &Profile, prefix: &str) -> eyre::Result<()> {
@@ -394,14 +401,7 @@ pub(self) fn create_disk_image<'icp>(
 
     info!(?base_image_path, "Creating base image file");
     let mut base_image_file = if let Some(from) = initial_contents_path.into() {
-        let to = &base_image_path;
-        if let Some(written) = reflink_or_copy(from, to)? {
-            warn!(
-                ?from,
-                ?to,
-                "Had to copy {written} bytes manually because reflink copy failed"
-            );
-        }
+        reflink_or_copy_with_warning(from, &base_image_path)?;
 
         // Copying out of the nix store yields a file with mode 444 (read only). Make sure the file is writable.
         set_permissions(&base_image_path, PermissionsExt::from_mode(0o644))?;
@@ -474,7 +474,7 @@ impl<'path> CdromImage<'path> {
     }
 }
 pub fn start_libvirt_guest(guest_name: &str) -> eyre::Result<()> {
-    info!("Starting guest");
+    info!(?guest_name, "Starting guest");
     run_cmd!(virsh start -- $guest_name)?;
 
     Ok(())

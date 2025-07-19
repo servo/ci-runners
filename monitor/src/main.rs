@@ -49,10 +49,10 @@ use crate::{
     data::{get_profile_data_path, get_runner_data_path, run_migrations},
     github::{list_registered_runners_for_host, Cache},
     id::IdGen,
-    image::Rebuilds,
+    image::{start_libvirt_guest, Rebuilds},
     libvirt::list_runner_guests,
     policy::{base_image_path, Override, Policy, RunnerCounts},
-    runner::{Runner, Runners, Status},
+    runner::{Runners, Status},
 };
 
 static DASHBOARD: RwLock<Option<Dashboard>> = RwLock::new(None);
@@ -483,45 +483,53 @@ fn monitor_thread() -> eyre::Result<()> {
         policy.update_screenshots();
         policy.update_ipv4_addresses_for_profile_guests();
 
-        let mut unregister_and_destroy = |id, runner: &Runner| {
-            if runner.registration().is_some() {
-                if let Err(error) = policy.unregister_runner(id) {
-                    warn!(?error, "Failed to unregister runner: {error}");
-                }
-            }
-            if let Some(profile) = policy.profile(runner.base_vm_name()) {
-                if let Err(error) = policy.destroy_runner(profile, id) {
-                    warn!(?error, "Failed to destroy runner: {error}");
-                }
-            }
-            registrations_cache.invalidate();
-        };
-
         if DOTENV.destroy_all_non_busy_runners {
             let non_busy_runners = policy
                 .runners()
                 .filter(|(_id, runner)| runner.status() != Status::Busy);
-            for (&id, runner) in non_busy_runners {
-                unregister_and_destroy(id, runner);
+            let mut threads = vec![];
+            for (&id, _runner) in non_busy_runners {
+                threads.push(policy.unregister_stop_destroy_runner(id)?);
+                registrations_cache.invalidate();
+            }
+            for thread in threads {
+                thread
+                    .join()
+                    .map_err(|e| eyre!("Thread panicked: {e:?}"))??;
             }
         } else {
             let changes = policy.compute_runner_changes()?;
-            for runner_id in changes.unregister_and_destroy_runner_ids {
-                let runner = policy
-                    .runner(runner_id)
-                    .expect("Guaranteed by compute_runner_changes()");
-                unregister_and_destroy(runner_id, runner);
-            }
-            for (profile_key, count) in changes.create_counts_by_profile_key {
-                let profile = policy
-                    .profile(&profile_key)
-                    .expect("Guaranteed by compute_runner_changes()");
-                for _ in 0..count {
-                    if let Err(error) = policy.create_runner(profile, id_gen.next()) {
-                        warn!(?error, "Failed to create runner: {error}");
-                    }
+            if !changes.is_empty() {
+                info!(?changes, "Started executing runner changes");
+                let mut threads = vec![];
+                for runner_id in changes.unregister_and_destroy_runner_ids {
+                    threads.push(policy.unregister_stop_destroy_runner(runner_id)?);
                     registrations_cache.invalidate();
                 }
+                for thread in threads {
+                    thread
+                        .join()
+                        .map_err(|e| eyre!("Thread panicked: {e:?}"))??;
+                }
+                let mut threads = vec![];
+                for (profile_key, count) in changes.create_counts_by_profile_key {
+                    let profile = policy
+                        .profile(&profile_key)
+                        .expect("Guaranteed by compute_runner_changes()");
+                    for _ in 0..count {
+                        threads.push(policy.register_create_runner(profile, id_gen.next())?);
+                        registrations_cache.invalidate();
+                    }
+                }
+                for thread in threads {
+                    match thread.join().map_err(|e| eyre!("Thread panicked: {e:?}"))? {
+                        Ok(prefixed_vm_name) => start_libvirt_guest(&prefixed_vm_name)?,
+                        Err(error) => {
+                            warn!(?error, "Failed to create runner: {error}");
+                        }
+                    }
+                }
+                info!("Finished executing runner changes");
             }
         }
 

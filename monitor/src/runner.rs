@@ -19,7 +19,7 @@ use tracing::{error, info, trace, warn};
 
 use crate::{
     data::get_runner_data_path,
-    github::{unregister_runner, ApiRunner},
+    github::ApiRunner,
     libvirt::{get_ipv4_address, libvirt_prefix, take_screenshot, update_screenshot},
     LIB_MONITOR_DIR,
 };
@@ -30,7 +30,7 @@ pub struct Runners {
 }
 
 /// State of a runner and its live resources.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct Runner {
     id: usize,
     created_time: SystemTime,
@@ -41,7 +41,7 @@ pub struct Runner {
     details: RunnerDetails,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize, Clone)]
 pub struct RunnerDetails {
     image_type: ImageType,
 }
@@ -123,20 +123,6 @@ impl Runners {
         self.runners
             .iter()
             .filter(move |(_, runner)| runner.base_vm_name() == key)
-    }
-
-    pub fn unregister_runner(&self, id: usize) -> eyre::Result<()> {
-        let Some(registration) = self
-            .runners
-            .get(&id)
-            .and_then(|runner| runner.registration())
-        else {
-            bail!("Tried to unregister an unregistered runner");
-        };
-        info!(runner_id = id, registration.id, "Unregistering runner");
-        unregister_runner(registration.id)?;
-
-        Ok(())
     }
 
     pub fn reserve_runner(
