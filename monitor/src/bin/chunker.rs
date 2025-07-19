@@ -62,6 +62,7 @@ struct Runner {
     environment: RunnerEnvironment,
     taken_chunks: usize,
     started_at: Vec<Duration>,
+    finished_at: Option<Duration>,
 }
 impl Runner {
     fn new(environment: RunnerEnvironment) -> Self {
@@ -69,6 +70,7 @@ impl Runner {
             environment,
             taken_chunks: 0,
             started_at: vec![],
+            finished_at: None,
         }
     }
 }
@@ -151,24 +153,24 @@ fn take_chunk_route(
         return Err(eyre!("Unknown runner {runner} ({unique_id})"))?;
     };
 
-    if build.taken_chunks >= build.total_chunks * 2 / 3
-        && runner.environment == RunnerEnvironment::GithubHosted
+    // Forbid slow GitHub-hosted runners from taking the last 1/3 of chunks.
+    if build.taken_chunks >= build.total_chunks
+        || (build.taken_chunks >= build.total_chunks * 2 / 3
+            && runner.environment == RunnerEnvironment::GithubHosted)
     {
-        // Forbid slow GitHub-hosted runners from taking the last 1/3 of chunks.
         let response = None;
+        runner
+            .finished_at
+            .get_or_insert_with(|| Instant::now().duration_since(build.started_at));
         info!(?unique_id, ?response);
         Ok(Json(response))
-    } else if build.taken_chunks < build.total_chunks {
+    } else {
         let response = Some(build.taken_chunks);
         build.taken_chunks += 1;
         runner.taken_chunks += 1;
         runner
             .started_at
             .push(Instant::now().duration_since(build.started_at));
-        info!(?unique_id, ?response);
-        Ok(Json(response))
-    } else {
-        let response = None;
         info!(?unique_id, ?response);
         Ok(Json(response))
     }
