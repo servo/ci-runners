@@ -1,4 +1,7 @@
-use std::{fmt::Debug, time::Instant};
+use std::{
+    fmt::Debug,
+    time::{Duration, Instant},
+};
 
 use cmd_lib::{run_cmd, run_fun};
 use jane_eyre::eyre::{self, Context};
@@ -42,6 +45,7 @@ impl ApiRunner {
 #[derive(Debug, Default)]
 pub struct Cache<Response> {
     inner: Option<CacheData<Response>>,
+    forced_expiry: Option<Instant>,
 }
 
 #[derive(Debug)]
@@ -53,13 +57,17 @@ struct CacheData<Response> {
 impl<Response: Clone + Debug> Cache<Response> {
     pub fn get(&mut self, miss: impl FnOnce() -> eyre::Result<Response>) -> eyre::Result<Response> {
         if let Some(cached) = &mut self.inner {
-            let age = Instant::now().duration_since(cached.cached_at);
-            if age < DOTENV.api_cache_timeout {
-                trace!(?age, ?cached.response, "Cache hit");
-                return Ok(cached.response.clone());
-            } else {
+            let now = Instant::now();
+            let age = now.duration_since(cached.cached_at);
+            if age >= DOTENV.api_cache_timeout {
                 trace!(?age, "Cache expired");
                 self.invalidate();
+            } else if self.forced_expiry.is_some_and(|e| now >= e) {
+                trace!(?self.forced_expiry, ?now, "Cache reached forced expiry");
+                self.invalidate();
+            } else {
+                trace!(?age, ?cached.response, "Cache hit");
+                return Ok(cached.response.clone());
             }
         }
 
@@ -75,6 +83,14 @@ impl<Response: Clone + Debug> Cache<Response> {
 
     pub fn invalidate(&mut self) {
         self.inner.take();
+        self.forced_expiry.take();
+    }
+
+    pub fn invalidate_in(&mut self, duration: Duration) {
+        let forced_expiry = Instant::now() + duration;
+        if self.forced_expiry.is_none_or(|e| forced_expiry < e) {
+            self.forced_expiry = Some(forced_expiry);
+        }
     }
 }
 

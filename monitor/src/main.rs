@@ -621,12 +621,16 @@ fn monitor_thread() -> eyre::Result<()> {
                     // the IPv4 address, so let’s update the IPv4 addresses before continuing.
                     policy.update_ipv4_addresses_for_runner_guests()?;
 
+                    let result = policy
+                        .github_jitconfig(remote_addr)
+                        .map(|result| result.map(|ip| ip.to_owned()));
+                    if result.as_ref().map_or(false, |result| result.is_some()) {
+                        // TODO make this configurable?
+                        registrations_cache.invalidate_in(Duration::from_secs(10));
+                    }
+
                     response_tx
-                        .send(
-                            policy
-                                .github_jitconfig(remote_addr)
-                                .map(|result| result.map(|ip| ip.to_owned())),
-                        )
+                        .send(result)
                         .expect("Failed to send Response to API thread");
                 }
                 Request::BootScript {
