@@ -207,9 +207,11 @@ impl Policy {
         // Excess healthy runners should be destroyed if they are idle.
         // Compute this in a separate step, so we can take into account how many destroys we’ve already proposed.
         let excess_idle_runners = self.profiles().flat_map(|(key, profile)| {
-            self.idle_runners_for_profile(profile).take(
-                self.excess_healthy_runner_count(profile) - proposed_healthy_destroy_counts[&**key],
-            )
+            let excess_idle_count = self
+                .excess_healthy_runner_count(profile)
+                .saturating_sub(proposed_healthy_destroy_counts[&**key]);
+            self.idle_runners_for_profile(profile)
+                .take(excess_idle_count)
         });
         for (&id, _runner) in excess_idle_runners {
             result.unregister_and_destroy_runner_ids.push(id);
@@ -973,6 +975,14 @@ mod test {
                 reserved_since: Some(epoch_duration_now()),
             }
         }
+        fn done_or_unregistered(profile_key: &'static str) -> Self {
+            Self {
+                profile_key,
+                status: Status::DoneOrUnregistered,
+                created_time: system_time_minus_seconds(9001),
+                reserved_since: Some(epoch_duration_now()),
+            }
+        }
     }
     fn runners(fake_runners: Vec<FakeRunner>) -> Runners {
         let mut next_runner_id = 0;
@@ -1314,6 +1324,64 @@ mod test {
                     ("wpt".to_owned(), 0),
                 ]
                 .into(),
+            },
+        );
+
+        // Excess idle logic must not cause integer overflow.
+        let mut fake_runners = vec![
+            FakeRunner::idle("linux"),                 // [0]
+            FakeRunner::idle("linux"),                 // [1]
+            FakeRunner::idle("linux"),                 // [2]
+            FakeRunner::idle("linux"),                 // [3]
+            FakeRunner::idle("linux"),                 // [4]
+            FakeRunner::idle("windows"),               // [5]
+            FakeRunner::idle("windows"),               // [6]
+            FakeRunner::idle("windows"),               // [7]
+            FakeRunner::done_or_unregistered("macos"), // [8]
+            FakeRunner::done_or_unregistered("macos"), // [9]
+        ];
+        policy.set_runners(runners(fake_runners.clone()));
+        assert_eq!(
+            policy.compute_runner_changes()?,
+            RunnerChanges {
+                unregister_and_destroy_runner_ids: vec![8, 9],
+                create_counts_by_profile_key: [].into(),
+            },
+        );
+        fake_runners.push(FakeRunner::idle("macos")); // [10]
+        policy.set_runners(runners(fake_runners.clone()));
+        assert_eq!(
+            policy.compute_runner_changes()?,
+            RunnerChanges {
+                unregister_and_destroy_runner_ids: vec![8, 9],
+                create_counts_by_profile_key: [].into(),
+            },
+        );
+        fake_runners.push(FakeRunner::idle("macos")); // [11]
+        policy.set_runners(runners(fake_runners.clone()));
+        assert_eq!(
+            policy.compute_runner_changes()?,
+            RunnerChanges {
+                unregister_and_destroy_runner_ids: vec![8, 9],
+                create_counts_by_profile_key: [].into(),
+            },
+        );
+        fake_runners.push(FakeRunner::idle("macos")); // [12]
+        policy.set_runners(runners(fake_runners.clone()));
+        assert_eq!(
+            policy.compute_runner_changes()?,
+            RunnerChanges {
+                unregister_and_destroy_runner_ids: vec![8, 9],
+                create_counts_by_profile_key: [].into(),
+            },
+        );
+        fake_runners.push(FakeRunner::idle("macos")); // [13]
+        policy.set_runners(runners(fake_runners.clone()));
+        assert_eq!(
+            policy.compute_runner_changes()?,
+            RunnerChanges {
+                unregister_and_destroy_runner_ids: vec![8, 9, 10],
+                create_counts_by_profile_key: [].into(),
             },
         );
 
