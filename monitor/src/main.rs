@@ -522,11 +522,13 @@ fn monitor_thread() -> eyre::Result<()> {
                     }
                 }
                 for thread in threads {
-                    match thread.join().map_err(|e| eyre!("Thread panicked: {e:?}"))? {
-                        Ok(prefixed_vm_name) => start_libvirt_guest(&prefixed_vm_name)?,
-                        Err(error) => {
-                            warn!(?error, "Failed to create runner: {error}");
-                        }
+                    if let Err(error) = thread
+                        .join()
+                        .map_err(|e| eyre!("Thread panicked: {e:?}"))
+                        .and_then(|inner_result| inner_result)
+                        .and_then(|prefixed_vm_name| start_libvirt_guest(&prefixed_vm_name))
+                    {
+                        warn!(?error, "Failed to create runner: {error}");
                     }
                 }
                 info!("Finished executing runner changes");
