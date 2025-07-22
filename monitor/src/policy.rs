@@ -217,9 +217,31 @@ impl Policy {
             result.unregister_and_destroy_runner_ids.push(id);
         }
 
-        let profile_wanted_counts = self
+        // Adjust for critical runners, regardless of whether they fit the new policy.
+        let mut scenario = self
             .profiles()
-            .map(|(key, profile)| (key, self.wanted_runner_count(profile)));
+            .map(|(key, profile)| {
+                (
+                    key.to_owned(),
+                    self.target_runner_count(profile)
+                        .max(self.critical_runner_count(profile)),
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+        let mut profile_target_counts = self
+            .profiles()
+            .map(|(key, profile)| (key.to_owned(), self.target_runner_count(profile)))
+            .collect::<BTreeMap<_, _>>();
+        let mut profile_wanted_counts = self
+            .profiles()
+            .map(|(key, profile)| (key.to_owned(), self.wanted_runner_count(profile)))
+            .collect::<BTreeMap<_, _>>();
+        self.adjust_runner_counts_for_resource_limits(
+            &mut scenario,
+            &mut profile_target_counts,
+            &mut profile_wanted_counts,
+        );
+
         for (profile_key, wanted_count) in profile_wanted_counts {
             result
                 .create_counts_by_profile_key
@@ -622,13 +644,41 @@ impl Policy {
                 *count += *extra_count;
             }
         }
-
-        // Starting with the ideal scenario, try to adjust the scenario until it validates.
         let mut adjusted_override_counts = profile_override_counts;
-        'validate: while self
-            .validate_resource_requirements(dbg!(&scenario))
-            .is_err()
-        {
+        self.adjust_runner_counts_for_resource_limits(
+            &mut scenario,
+            &mut adjusted_override_counts,
+            &mut profile_extra_counts,
+        );
+
+        // Fail if the requested override had to be adjusted so far that it became meaningless.
+        if profile_extra_counts.values().sum::<usize>() == 0 {
+            bail!("Requested override had to be adjusted so far that it became meaningless");
+        }
+
+        self.current_override = Some(Override {
+            profile_override_counts: adjusted_override_counts,
+            profile_target_counts: scenario,
+            actual_runner_ids_by_profile_key: BTreeMap::default(),
+        });
+
+        Ok(self
+            .current_override
+            .as_ref()
+            .expect("Guaranteed by assignment"))
+    }
+
+    /// - `scenario` is the proposed ideal scenario, including `adjusted_counts` and critical runners
+    /// - `adjusted_counts` are the proposed runner counts after we create `extra_counts`
+    /// - `extra_counts` are the proposed create counts that will achieve `adjusted_counts`
+    fn adjust_runner_counts_for_resource_limits(
+        &self,
+        scenario: &mut BTreeMap<String, usize>,
+        adjusted_counts: &mut BTreeMap<String, usize>,
+        profile_extra_counts: &mut BTreeMap<String, usize>,
+    ) {
+        // Starting with the given scenario, try to adjust the scenario until it validates.
+        'validate: while self.validate_resource_requirements(&scenario).is_err() {
             // Try profiles in descending count order, to avoid starving niche runners.
             let candidate_profile_keys = scenario
                 .clone()
@@ -639,7 +689,7 @@ impl Policy {
                 .collect::<Vec<_>>();
             // First try decrementing a profile that was not requested.
             for profile_key in candidate_profile_keys.iter() {
-                if !adjusted_override_counts.contains_key(profile_key) {
+                if !adjusted_counts.contains_key(profile_key) {
                     let profile = self
                         .profile(profile_key)
                         .expect("Guaranteed by initialiser");
@@ -655,7 +705,7 @@ impl Policy {
             }
             // If none of those profiles could be decremented, try decrementing a profile that was requested.
             for profile_key in candidate_profile_keys.iter() {
-                if adjusted_override_counts.contains_key(profile_key) {
+                if adjusted_counts.contains_key(profile_key) {
                     let profile = self
                         .profile(profile_key)
                         .expect("Guaranteed by initialiser");
@@ -664,8 +714,7 @@ impl Policy {
                         .expect("Guaranteed by candidate_profile_keys");
                     // Only try decrementing profiles that have non-critical runners to spare.
                     if *count > self.critical_runner_count(profile) {
-                        if let Some(override_count) = adjusted_override_counts.get_mut(profile_key)
-                        {
+                        if let Some(override_count) = adjusted_counts.get_mut(profile_key) {
                             let extra_count = profile_extra_counts
                                 .get_mut(profile_key)
                                 .expect("Guaranteed by initialiser");
@@ -683,23 +732,7 @@ impl Policy {
             break;
         }
 
-        // Fail if the requested override had to be adjusted so far that it became meaningless.
-        if profile_extra_counts.values().sum::<usize>() == 0 {
-            bail!("Requested override had to be adjusted so far that it became meaningless");
-        }
-
-        info!(adjusted_override_counts = ?adjusted_override_counts, extra_counts = ?profile_extra_counts, ?scenario, "Found solution for override request");
-
-        self.current_override = Some(Override {
-            profile_override_counts: adjusted_override_counts,
-            profile_target_counts: scenario,
-            actual_runner_ids_by_profile_key: BTreeMap::default(),
-        });
-
-        Ok(self
-            .current_override
-            .as_ref()
-            .expect("Guaranteed by assignment"))
+        info!(?scenario, adjusted_counts = ?adjusted_counts, extra_counts = ?profile_extra_counts, "Best possible proposal");
     }
 
     pub fn cancel_override(&mut self) -> eyre::Result<Option<Override>> {
@@ -1382,6 +1415,48 @@ mod test {
             RunnerChanges {
                 unregister_and_destroy_runner_ids: vec![8, 9, 10],
                 create_counts_by_profile_key: [].into(),
+            },
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_compute_runner_changes_dynamic() -> eyre::Result<()> {
+        let mut policy = Policy::new(
+            [
+                ("linux".to_owned(), profile("linux", 5, 8, "0B")),
+                ("windows".to_owned(), profile("windows", 4, 8, "0B")),
+                ("macos".to_owned(), profile("macos", 3, 8, "0B")),
+                ("wpt".to_owned(), profile("wpt", 0, 24, "0B")),
+            ]
+            .into(),
+        )?;
+        let fresh = system_time_minus_seconds(0);
+        set_base_image_mtime_for_test("/var/lib/libvirt/images/base/linux/base.img@", fresh);
+        set_base_image_mtime_for_test("/var/lib/libvirt/images/base/macos/base.img@", fresh);
+        set_base_image_mtime_for_test("/var/lib/libvirt/images/base/windows/base.img@", fresh);
+        set_base_image_mtime_for_test("/var/lib/libvirt/images/base/wpt/base.img@", fresh);
+        policy.set_base_image_snapshot("linux", "")?;
+        policy.set_base_image_snapshot("macos", "")?;
+        policy.set_base_image_snapshot("windows", "")?;
+        policy.set_base_image_snapshot("wpt", "")?;
+
+        // Proposed create counts should be adjusted for critical runners, regardless of whether
+        // those runners fit the current policy.
+        let fake_runners = vec![FakeRunner::busy("wpt"), FakeRunner::reserved("wpt")];
+        policy.set_runners(runners(fake_runners.clone()));
+        assert_eq!(
+            policy.compute_runner_changes()?,
+            RunnerChanges {
+                unregister_and_destroy_runner_ids: vec![],
+                create_counts_by_profile_key: [
+                    ("linux".to_owned(), 2),
+                    ("windows".to_owned(), 2),
+                    ("macos".to_owned(), 2),
+                    ("wpt".to_owned(), 0),
+                ]
+                .into(),
             },
         );
 
