@@ -15,6 +15,12 @@ use log::{debug, error, info, warn};
 static RUNNER_ID: AtomicU64 = AtomicU64::new(0);
 static EXITING: AtomicU32 = AtomicU32::new(0);
 const MAX_SPAWN_RETRIES: u32 = 10;
+/// The final builder name will be {BUILDER_NAME}.{RUNNER_SUFFIX_ENV}.{RUNNER_ID}, same for RUNNER
+const BUILDER_NAME: &str = "dresden-hos-builder";
+const RUNNER_NAME: &str = "dresden-hos-runner";
+const RUNNER_SUFFIX_ENV: &str = "RUNNER_SUFFIX";
+/// How long the loop will sleep.
+const LOOP_SLEEP: u64 = 30;
 
 #[derive(Parser, Debug)]
 #[clap(version)]
@@ -45,8 +51,9 @@ impl RunnerConfig {
         RunnerConfig {
             servo_ci_scope: servo_ci_scope.to_string(),
             name: format!(
-                "dresden-hos-builder.{}.{}",
-                std::env::var("RUNNER_SUFFIX").unwrap_or_default(),
+                "{}.{}.{}",
+                BUILDER_NAME,
+                std::env::var(RUNNER_SUFFIX_ENV).unwrap_or_default(),
                 RUNNER_ID.fetch_add(1, Ordering::Relaxed),
             ),
             runner_group_id: 1,
@@ -88,8 +95,9 @@ impl RunnerConfig {
         Ok(RunnerConfig {
             servo_ci_scope: servo_ci_scope.to_string(),
             name: format!(
-                "dresden-hos-runner.{}.{}",
-                std::env::var("RUNNER_SUFFIX").unwrap_or_default(),
+                "{}.{}.{}",
+                RUNNER_NAME,
+                std::env::var(RUNNER_SUFFIX_ENV).unwrap_or_default(),
                 RUNNER_ID.fetch_add(1, Ordering::Relaxed)
             ),
             runner_group_id: 1,
@@ -152,7 +160,7 @@ fn call_github_runner_api(
             cmd.arg("--raw-field").arg(format!("labels[]={label}"));
         }
         cmd.arg("--raw-field")
-            // Todo: perhaps have a count here? Or add information if it has a device or not
+            // Todo: perhaps add information if it has a device or not
             .arg(format!("name={}", config.name))
             .arg("--raw-field")
             .arg(format!("work_folder={}", config.work_folder))
@@ -242,8 +250,18 @@ fn kill_offline_runners(servo_ci_scope: &str) -> Result<(), SpawnRunnerError> {
     let filtered_response = runner_response
         .runners
         .iter()
-        .filter(|runner| runner.name.contains("dresden-hos"))
-        .filter(|runner| runner.status.contains("offline"));
+        .filter(|runner| runner.status.contains("offline"))
+        .filter(|runner| {
+            runner.name.contains(&format!(
+                "{}.{}",
+                RUNNER_NAME,
+                std::env::var(RUNNER_SUFFIX_ENV).unwrap_or_default()
+            )) || runner.name.contains(&format!(
+                "{}.{}",
+                BUILDER_NAME,
+                std::env::var(RUNNER_SUFFIX_ENV).unwrap_or_default()
+            ))
+        });
 
     for i in filtered_response {
         info!(
@@ -297,14 +315,15 @@ fn main() -> anyhow::Result<()> {
     let mut running_hos_runners = vec![];
     // Todo: implement something to reserve devices for the duration of the docker run child process.
     const MAX_HOS_RUNNERS: usize = 1;
-    let mut retries = 0;
+    let mut retries_builder = 0;
+    let mut retries_runner = 0;
 
     loop {
         let exiting = EXITING.load(Ordering::Relaxed);
         if running_hos_builders.len() < args.concurrent_builders.into() && exiting == 0 {
             match spawn_runner(&RunnerConfig::new_hos_builder(&servo_ci_scope)) {
                 Ok(child) => {
-                    retries = 0;
+                    retries_builder = 0;
                     running_hos_builders.push(child)
                 }
                 Err(SpawnRunnerError::GhApiError(_, message))
@@ -312,18 +331,18 @@ fn main() -> anyhow::Result<()> {
                 {
                     // Might happen if containers were not killed properly after a forced exit.
                     info!("Runner name already taken - Will retry with new name later.");
-                    check_and_inc_retries(&mut retries);
+                    check_and_inc_retries(&mut retries_builder);
                 }
                 Err(e) => {
                     error!("Failed to spawn JIT runner: {e:?}");
-                    check_and_inc_retries(&mut retries);
+                    check_and_inc_retries(&mut retries_builder);
                 }
             };
         }
         if running_hos_runners.len() < MAX_HOS_RUNNERS && exiting == 0 {
             match RunnerConfig::new_hos_runner(&servo_ci_scope).and_then(|cfg| spawn_runner(&cfg)) {
                 Ok(child) => {
-                    retries = 0;
+                    retries_runner = 0;
                     running_hos_runners.push(child)
                 }
                 Err(SpawnRunnerError::GhApiError(_, message))
@@ -331,11 +350,11 @@ fn main() -> anyhow::Result<()> {
                 {
                     // Might happen if containers were not killed properly after a forced exit.
                     info!("Runner name already taken - Will retry with new name later.");
-                    check_and_inc_retries(&mut retries);
+                    check_and_inc_retries(&mut retries_runner);
                 }
                 Err(e) => {
                     error!("Failed to spawn JIT runner with HOS device: {e:?}");
-                    check_and_inc_retries(&mut retries);
+                    check_and_inc_retries(&mut retries_runner);
                 }
             };
         }
@@ -392,7 +411,7 @@ fn main() -> anyhow::Result<()> {
             thread::sleep(Duration::from_millis(500));
         }
 
-        thread::sleep(Duration::from_secs(5));
+        thread::sleep(Duration::from_secs(LOOP_SLEEP));
         // Check if some still running images are listed as offline from github api point of view
         if let Err(e) = kill_offline_runners(&servo_ci_scope) {
             error!("Killing offline runners failed with {e:?}");
