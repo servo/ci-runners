@@ -88,8 +88,8 @@ To get a GITHUB_TOKEN for the monitor service in production:
 
 - [Create](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) a [fine-grained personal access token](https://github.com/settings/personal-access-tokens/new)
     - Token name: `servo ci monitor`
-    - Expiration: **90 days**
     - Resource owner: **servo**
+    - Expiration: **90 days**
     - Repository access: **Public Repositories (read-only)**
     - Organization permissions > **Self-hosted runners** > Access: **Read and write**
 
@@ -97,8 +97,8 @@ To get a GITHUB_TOKEN for testing the monitor service:
 
 - [Create](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) a [fine-grained personal access token](https://github.com/settings/personal-access-tokens/new)
     - Token name: `servo ci monitor test`
-    - Expiration: **7 days**
     - Resource owner: your GitHub account
+    - Expiration: **7 days**
     - Repository access > **Only select repositories** > your clone of servo/servo
     - Repository permissions > **Administration** > Access: **Read and write** (unfortunately there is no separate permission for repository self-hosted runners)
 
