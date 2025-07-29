@@ -46,9 +46,6 @@ in stdenv.mkDerivation rec {
   };
   sourceRoot = "/build/source/monitor";
 
-  # don't forget to update this hash when Cargo.lock or ${version} changes!
-  cargoHash = "sha256-cSQLIwhgkfihKOLzg9LD/1GTkNSyBJaDDTdfu5IzvdI=";
-
   nativeBuildInputs = [
     makeWrapper
   ];
