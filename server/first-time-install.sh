@@ -26,7 +26,10 @@ for disk_dev; do
         zpool get -Ho value name | while read zpool_name; do
             if zpool list -vHLP "$zpool_name" | fgrep -q $'\t'"$partition_dev"$'\t'; then
                 zpool list -vHLP "$zpool_name"
+                set +x
                 >&2 echo "fatal: disk has active zpool"
+                >&2 echo 'if you are retrying the install because it failed for nix reasons, consider rerunning that part only:'
+                >&2 echo "$ ./install-or-reinstall.sh $hostname /mnt/$hostname"
                 exit 1
             fi
         done

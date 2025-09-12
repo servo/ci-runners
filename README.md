@@ -13,44 +13,16 @@ This repo contains:
     - `monitor` is the service
     - `.env.example` contains the settings
 
-Current SSH host keys
----------------------
+Maintenance guide
+-----------------
+
+Current SSH host keys:
 
 - ci0.servo.org = `SHA256:aoy+JW6hlkTwQDqdPZFY6/gDf1faOQGH5Zwft75Odrc` (ED25519)
 - ci1.servo.org = `SHA256:ri52Ae31OABqL/xCss42cJd0n1qqhxDD9HvbOm59y8o` (ED25519)
 - ci2.servo.org = `SHA256:qyetP4wIOHrzngj1SIpyEnAHJNttW+Rd1CzvJaf0x6M` (ED25519)
-
-Setting up a server on Hetzner
-------------------------------
-
-Overview of the server scripts:
-
-- `server/build-nixos-installer-kexec.sh`
-  <br>From any existing NixOS system, build a NixOS installer kexec image.
-- `server/start-nixos-installer.sh`
-  <br>From the Hetzner rescue system, build and run the NixOS installer.
-- `server/first-time-install.sh <hostname> <disk> [disk ...]`
-  <br>From the NixOS installer image, wipe the given disks and install NixOS.
-- `server/install-or-reinstall.sh <hostname> <path/to/mnt>`
-  <br>From the NixOS installer image, install or reinstall NixOS to the given root filesystem mount, without wiping any disks. Won’t run correctly on the deployed server.
-
-Start the [rescue system](https://docs.hetzner.com/robot/dedicated-server/troubleshooting/hetzner-rescue-system/), then run the following:
-
-```
-$ git clone https://github.com/servo/ci-runners.git
-$ cd ci-runners/server
-$ apt install -y zsh
-$ ./start-nixos-installer.sh
-```
-
-Reconnect over SSH (use `ssh -4` this time), then run the following:
-
-```
-$ git clone https://github.com/servo/ci-runners.git
-$ cd ci-runners/server
-$ ./first-time-install.sh ci0 /dev/nvme{0,1}n1
-$ reboot
-```
+- ci3.servo.org = `SHA256:4grnt9EVzUhnRm7GR5wR1vwEMXkMHx+XCYkns6WfA9s` (ED25519)
+- ci4.servo.org = `SHA256:Yc1TdE2UDyG2wUUE0uGHoWwbbvUkb1i850Yye9BC0EI` (ED25519)
 
 To deploy an updated config to any of the servers:
 
@@ -59,6 +31,8 @@ $ cd server/nixos
 $ ./deploy -s ci0.servo.org ci0
 $ ./deploy -s ci1.servo.org ci1
 $ ./deploy -s ci2.servo.org ci2
+$ ./deploy -s ci3.servo.org ci3
+$ ./deploy -s ci4.servo.org ci4
 ```
 
 To deploy, read monitor config, write monitor config, or run a command on one or more servers:
@@ -81,6 +55,41 @@ $ ./do logs <host>
 $ ./do htop <host>
 ```
 
+Setting up a server on Hetzner
+------------------------------
+
+Overview of the server scripts:
+
+- `server/build-nixos-installer-kexec.sh`
+  <br>From any existing NixOS system, build a NixOS installer kexec image.
+- `server/start-nixos-installer.sh`
+  <br>From the Hetzner rescue system, build and run the NixOS installer.
+- `server/first-time-install.sh <hostname> <disk> [disk ...]`
+  <br>From the NixOS installer image, wipe the given disks and install NixOS.
+- `server/install-or-reinstall.sh <hostname> <path/to/mnt>`
+  <br>From the NixOS installer image, install or reinstall NixOS to the given root filesystem mount, without wiping any disks. Won’t run correctly on the deployed server.
+
+Start the [rescue system](https://docs.hetzner.com/robot/dedicated-server/troubleshooting/hetzner-rescue-system/), then connect over SSH (use `ssh -oUserKnownHostsFile=/dev/null`) and run the following:
+
+```
+$ git clone https://github.com/servo/ci-runners.git
+$ cd ci-runners/server
+$ apt update
+$ apt install -y zsh
+$ ./start-nixos-installer.sh
+```
+
+When you see `+ kexec -e`, kill your SSH session by pressing **Enter**, `~`, `.`, then reconnect over SSH (use `ssh -4 -oUserKnownHostsFile=/dev/null` this time) and run the following:
+
+```
+$ git clone https://github.com/servo/ci-runners.git
+$ cd ci-runners/server
+$ ./first-time-install.sh ci0 /dev/nvme{0,1}n1
+$ reboot
+```
+
+Now you can [set up the monitor service](#setting-up-the-monitor-service). Note that rebooting may not be enough to terminate the Hetzner rescue system. If the rescue system is still active, try **Reset** > **Execute an automatic hardware reset** in the Hetzner console.
+
 Setting up the monitor service
 ------------------------------
 
@@ -102,11 +111,10 @@ To get a GITHUB_TOKEN for testing the monitor service:
     - Repository access > **Only select repositories** > your clone of servo/servo
     - Repository permissions > **Administration** > Access: **Read and write** (unfortunately there is no separate permission for repository self-hosted runners)
 
-To set up the monitor service, run the following:
+To set up the monitor service, connect over SSH (`mosh` recommended) and run the following:
 
 ```
 $ zfs create tank/base
-$ zfs create tank/ci
 $ git clone https://github.com/servo/ci-runners.git ~/ci-runners
 $ cd ~/ci-runners
 $ mkdir /var/lib/libvirt/images

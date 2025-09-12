@@ -6,6 +6,7 @@
   hostName,
   hostId,  # Generate with: LC_ALL=C < /dev/urandom tr -dC 0-9A-F | head -c 8
   ipv6Address,
+  hugepages,
   hasIntermittentTracker ? false,
   monitor,
 }:
@@ -89,7 +90,7 @@
   # Don’t touch the NVRAM boot menu, in case we’re installing on a test machine.
   boot.loader.efi.canTouchEfiVariables = false;
 
-  boot.kernelParams = ["default_hugepagesz=1G" "hugepagesz=1G" "hugepages=96"];
+  boot.kernelParams = ["default_hugepagesz=1G" "hugepagesz=1G" "hugepages=${toString hugepages}"];
 
   environment.systemPackages = with pkgs; [
     cdrkit  # for genisoimage

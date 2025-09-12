@@ -22,6 +22,7 @@
         hostName = "ci0";
         hostId = "04AA04E2";
         ipv6Address = "2a01:4f9:3071:3063::2";
+        hugepages = 96;
         hasIntermittentTracker = true;
         monitor = self.packages.x86_64-linux.monitor;
       }) ];
@@ -32,6 +33,7 @@
         hostName = "ci1";
         hostId = "47264830";
         ipv6Address = "2a01:4f9:3100:1d2b::2";
+        hugepages = 96;
         monitor = self.packages.x86_64-linux.monitor;
       }) ];
     };
@@ -41,6 +43,27 @@
         hostName = "ci2";
         hostId = "A2BB6C74";
         ipv6Address = "2a01:4f9:3100:1963::2";
+        hugepages = 96;
+        monitor = self.packages.x86_64-linux.monitor;
+      }) ];
+    };
+    nixosConfigurations.ci3 = unstable.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [ (import server/nixos/configuration.nix {
+        hostName = "ci3";
+        hostId = "51A83C6A";
+        ipv6Address = "2a01:4f9:6a:555e::2";
+        hugepages = 24;
+        monitor = self.packages.x86_64-linux.monitor;
+      }) ];
+    };
+    nixosConfigurations.ci4 = unstable.lib.nixosSystem {
+      system = "x86_64-linux";
+      modules = [ (import server/nixos/configuration.nix {
+        hostName = "ci4";
+        hostId = "E76BDFD4";
+        ipv6Address = "2a01:4f9:6a:4d27::2";
+        hugepages = 24;
         monitor = self.packages.x86_64-linux.monitor;
       }) ];
     };
