@@ -94,7 +94,8 @@
   boot.kernelParams = [
     "default_hugepagesz=1G" "hugepagesz=1G" "hugepages=${toString hugepages}"
 
-    # For benchmarking: disable scheduling interrupts on half of the CPUs.
+    # For benchmarking: isolate half of the CPUs from all processes and scheduling interrupts,
+    # other than threads assigned by libvirt <vcpupin>.
     # <https://wiki.archlinux.org/index.php?title=PCI_passthrough_via_OVMF&oldid=845768#With_isolcpus_kernel_parameter>
     # <https://www.kernel.org/doc/html/latest/timers/no_hz.html>
     (lib.mkIf isBenchmarkingMachine "isolcpus=4-7")
@@ -211,8 +212,8 @@
     perf-analysis-tools = pkgs.fetchFromGitHub {
       owner = "servo";
       repo = "perf-analysis-tools";
-      rev = "9fb9ac600387717b6d14cc3392dae88096684d85";
-      hash = "sha256-7rbvvpK33/cZIy1+ijdTxuUPr6yQsWKiBO1+5aqNPX0=";
+      rev = "d55694051ba381cc96f7f8fb2a4d6ebc03db947f";
+      hash = "sha256-mROaUYqcOa+XePl4CzM/zM/mE21ejM2UhyQSYc8emc4=";
     };
 
     intermittent-tracker = workingDir: {
@@ -236,6 +237,7 @@
     };
   in {
     # For benchmarking: disable CPU frequency boost, offline SMT siblings, etc.
+    # Process affinity will be isolated externally via `isolcpus`.
     isolate-cpu = lib.mkIf isBenchmarkingMachine {
       # Start on boot.
       wantedBy = ["multi-user.target"];
@@ -245,8 +247,7 @@
 
       path = ["/run/current-system/sw"];
       script = ''
-        # Wrap the invocation in `sh -c '... $$'`, so the cpuset ends up being empty.
-        sh -c '${perf-analysis-tools}/isolate-cpu-for-shell.sh $$ 4 5 6 7'
+        ${perf-analysis-tools}/isolate-cpu-for-hypervisor.sh 4 5 6 7
       '';
 
       serviceConfig = {
