@@ -25,8 +25,8 @@ in linkFarm "image-deps" {
     hash = "sha256-nox/7ZcNexnCJIc9vd7TnASAr3KmjAlAlrOzapujHE8=";
   };
   "macos13/uv-installer.sh" = fetchurl {
-    url = "https://github.com/astral-sh/uv/releases/download/0.5.18/uv-installer.sh";
-    hash = "sha256-OIsilxrJCGTOSxKiCQFK6ZsWCIqAoQf6scAfDJ5QdR0=";
+    url = "https://github.com/astral-sh/uv/releases/download/0.8.17/uv-installer.sh";
+    hash = "sha256-A7FPajPSs8FaghFb8z/TiwleE4PPm8I1r6MwOu2Axjs=";
   };
   "macos13/install-xcode-clt.sh" = fetchurl {
     url = "https://raw.githubusercontent.com/actions/runner-images/3d5f09a90fd475a3531b0ef57325aa7e27b24595/images/macos/scripts/build/install-xcode-clt.sh";
@@ -49,8 +49,8 @@ in linkFarm "image-deps" {
     hash = "sha256-nHSvm0NSu8ma7Mc1O0e8380bKg9tFa9UqZ9UoMFKHeg=";
   };
   "ubuntu2204/uv-installer.sh" = fetchurl {
-    url = "https://github.com/astral-sh/uv/releases/download/0.6.9/uv-installer.sh";
-    hash = "sha256-8SiMx5h8jgmBMeGJXhi7XiMgIUJOczJgnsPe0KlQl5k=";
+    url = "https://github.com/astral-sh/uv/releases/download/0.8.17/uv-installer.sh";
+    hash = "sha256-A7FPajPSs8FaghFb8z/TiwleE4PPm8I1r6MwOu2Axjs=";
   };
 
   "windows10/virtio-win-0.1.240.iso" = fetchurl {
@@ -69,8 +69,8 @@ in linkFarm "image-deps" {
     hash = "sha256-2N7eUAVWS0CLpQMXEIt2XtnDxRA0KlmPn9QmgcvgZIs=";
   };
   "windows10/uv-installer.ps1" = fetchurl {
-    url = "https://github.com/astral-sh/uv/releases/download/0.6.10/uv-installer.ps1";
-    hash = "sha256-lWFEWHhKeJj7ot4XBKmGqTCosc+PZRLyjndUblFyaeE=";
+    url = "https://github.com/astral-sh/uv/releases/download/0.8.17/uv-installer.ps1";
+    hash = "sha256-FrrE7pz/5C64U9X8q/5EMYwisRATgLEc51thr5qS4wI=";
   };
   "windows10/ndp48-x86-x64-allos-enu.exe" = fetchurl {
     url = "https://download.visualstudio.microsoft.com/download/pr/2d6bb6b2-226a-4baa-bdec-798822606ff1/8494001c276a4b96804cde7829c04d7f/ndp48-x86-x64-allos-enu.exe";
