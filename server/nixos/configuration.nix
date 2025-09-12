@@ -7,6 +7,7 @@
   hostId,  # Generate with: LC_ALL=C < /dev/urandom tr -dC 0-9A-F | head -c 8
   ipv6Address,
   hugepages,
+  isBenchmarkingMachine ? false,
   hasIntermittentTracker ? false,
   monitor,
 }:
@@ -90,7 +91,15 @@
   # Don’t touch the NVRAM boot menu, in case we’re installing on a test machine.
   boot.loader.efi.canTouchEfiVariables = false;
 
-  boot.kernelParams = ["default_hugepagesz=1G" "hugepagesz=1G" "hugepages=${toString hugepages}"];
+  boot.kernelParams = [
+    "default_hugepagesz=1G" "hugepagesz=1G" "hugepages=${toString hugepages}"
+
+    # For benchmarking: disable scheduling interrupts on half of the CPUs.
+    # <https://wiki.archlinux.org/index.php?title=PCI_passthrough_via_OVMF&oldid=845768#With_isolcpus_kernel_parameter>
+    # <https://www.kernel.org/doc/html/latest/timers/no_hz.html>
+    (lib.mkIf isBenchmarkingMachine "isolcpus=4-7")
+    (lib.mkIf isBenchmarkingMachine "nohz_full=4-7")
+  ];
 
   environment.systemPackages = with pkgs; [
     cdrkit  # for genisoimage
@@ -199,6 +208,13 @@
   };
 
   systemd.services = let
+    perf-analysis-tools = pkgs.fetchFromGitHub {
+      owner = "servo";
+      repo = "perf-analysis-tools";
+      rev = "9fb9ac600387717b6d14cc3392dae88096684d85";
+      hash = "sha256-7rbvvpK33/cZIy1+ijdTxuUPr6yQsWKiBO1+5aqNPX0=";
+    };
+
     intermittent-tracker = workingDir: {
       # Wait for networking
       wants = ["network-online.target"];
@@ -219,6 +235,25 @@
       };
     };
   in {
+    # For benchmarking: disable CPU frequency boost, offline SMT siblings, etc.
+    isolate-cpu = lib.mkIf isBenchmarkingMachine {
+      # Start on boot.
+      wantedBy = ["multi-user.target"];
+
+      # Block libvirtd until started.
+      before = ["libvirtd.service"];
+
+      path = ["/run/current-system/sw"];
+      script = ''
+        # Wrap the invocation in `sh -c '... $$'`, so the cpuset ends up being empty.
+        sh -c '${perf-analysis-tools}/isolate-cpu-for-shell.sh $$ 4 5 6 7'
+      '';
+
+      serviceConfig = {
+        Type = "oneshot";
+      };
+    };
+
     # $ git clone https://github.com/servo/intermittent-tracker.git <staging|prod>
     # $ cd <staging|prod>
     # $ uv venv

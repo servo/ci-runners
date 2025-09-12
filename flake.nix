@@ -54,6 +54,7 @@
         hostId = "51A83C6A";
         ipv6Address = "2a01:4f9:6a:555e::2";
         hugepages = 24;
+        isBenchmarkingMachine = true;
         monitor = self.packages.x86_64-linux.monitor;
       }) ];
     };
@@ -64,6 +65,7 @@
         hostId = "E76BDFD4";
         ipv6Address = "2a01:4f9:6a:4d27::2";
         hugepages = 24;
+        isBenchmarkingMachine = true;
         monitor = self.packages.x86_64-linux.monitor;
       }) ];
     };
