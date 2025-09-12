@@ -189,6 +189,13 @@ fn rebuild_with_rust(
             ByteSize::gib(90),
             Duration::from_secs(2000),
         ),
+        "ubuntu2204-bench" => ubuntu2204::rebuild(
+            &base_images_path,
+            &profile,
+            snapshot_name,
+            ByteSize::gib(90),
+            Duration::from_secs(1000),
+        ),
         "ubuntu2204-rust" => ubuntu2204::rebuild(
             &base_images_path,
             &profile,
@@ -232,6 +239,9 @@ fn rebuild_with_rust(
                 "ubuntu2204" => {
                     ubuntu2204::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
                 }
+                "ubuntu2204-bench" => {
+                    ubuntu2204::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
+                }
                 "ubuntu2204-rust" => {
                     ubuntu2204::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
                 }
@@ -254,6 +264,7 @@ pub fn prune_images(profile: &Profile) -> eyre::Result<()> {
     match &*profile.configuration_name {
         "macos13" => macos13::prune_images(profile),
         "ubuntu2204" => ubuntu2204::prune_images(profile),
+        "ubuntu2204-bench" => ubuntu2204::prune_images(profile),
         "ubuntu2204-rust" => ubuntu2204::prune_images(profile),
         "ubuntu2204-wpt" => ubuntu2204::prune_images(profile),
         "windows10" => windows10::prune_images(profile),
@@ -265,6 +276,7 @@ pub fn delete_image(profile: &Profile, snapshot_name: &str) {
     match &*profile.configuration_name {
         "macos13" => macos13::delete_image(profile, snapshot_name),
         "ubuntu2204" => ubuntu2204::delete_image(profile, snapshot_name),
+        "ubuntu2204-bench" => ubuntu2204::delete_image(profile, snapshot_name),
         "ubuntu2204-rust" => ubuntu2204::delete_image(profile, snapshot_name),
         "ubuntu2204-wpt" => ubuntu2204::delete_image(profile, snapshot_name),
         "windows10" => windows10::delete_image(profile, snapshot_name),
@@ -276,6 +288,7 @@ pub fn register_runner(profile: &Profile, vm_name: &str) -> eyre::Result<String>
     match &*profile.configuration_name {
         "macos13" => macos13::register_runner(profile, vm_name),
         "ubuntu2204" => ubuntu2204::register_runner(profile, vm_name),
+        "ubuntu2204-bench" => ubuntu2204::register_runner(profile, vm_name),
         "ubuntu2204-rust" => ubuntu2204::register_runner(profile, vm_name),
         "ubuntu2204-wpt" => ubuntu2204::register_runner(profile, vm_name),
         "windows10" => windows10::register_runner(profile, vm_name),
@@ -287,6 +300,7 @@ pub fn create_runner(profile: &Profile, vm_name: &str, runner_id: usize) -> eyre
     match &*profile.configuration_name {
         "macos13" => macos13::create_runner(profile, vm_name, runner_id),
         "ubuntu2204" => ubuntu2204::create_runner(profile, vm_name, runner_id),
+        "ubuntu2204-bench" => ubuntu2204::create_runner(profile, vm_name, runner_id),
         "ubuntu2204-rust" => ubuntu2204::create_runner(profile, vm_name, runner_id),
         "ubuntu2204-wpt" => ubuntu2204::create_runner(profile, vm_name, runner_id),
         "windows10" => windows10::create_runner(profile, vm_name, runner_id),
@@ -298,6 +312,7 @@ pub fn destroy_runner(profile: &Profile, vm_name: &str, runner_id: usize) -> eyr
     match &*profile.configuration_name {
         "macos13" => macos13::destroy_runner(vm_name, runner_id),
         "ubuntu2204" => ubuntu2204::destroy_runner(vm_name, runner_id),
+        "ubuntu2204-bench" => ubuntu2204::destroy_runner(vm_name, runner_id),
         "ubuntu2204-rust" => ubuntu2204::destroy_runner(vm_name, runner_id),
         "ubuntu2204-wpt" => ubuntu2204::destroy_runner(vm_name, runner_id),
         "windows10" => windows10::destroy_runner(vm_name, runner_id),
