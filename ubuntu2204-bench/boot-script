@@ -1,1 +1,113 @@
-../ubuntu2204/boot-script
+#!/bin/sh
+set -eux
+
+actions_runner_version=2.326.0
+
+download() {
+    curl -fsSLO "http://192.168.100.1:8000/image-deps/ubuntu2204/$1"
+}
+
+apt_install() {
+    # Install distro packages, but only if one or more are not already installed.
+    # Update the package lists first, to avoid failures when rebaking old images.
+    if ! dpkg -s "$@" > /dev/null 2>&1; then
+        apt update
+        # DEBIAN_FRONTEND needed to avoid hang when installing tshark
+        DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+    fi
+}
+
+bake_servo_repo() (
+    # Note the parentheses around this block, so we only cd for this function
+    cd /a/servo/servo
+
+    # Fix the remote url, since it’s still set to our cache
+    git remote set-url origin https://github.com/servo/servo.git
+
+    # Install the Rust toolchain, for checkouts without servo#35795
+    rustup show active-toolchain || rustup toolchain install
+
+    # DEBIAN_FRONTEND needed to avoid hang when installing tshark
+    DEBIAN_FRONTEND=noninteractive ./mach bootstrap --force
+)
+
+install_github_actions_runner() {
+    if ! [ -e actions-runner-linux-x64-$actions_runner_version.tar.gz ]; then
+        download actions-runner-linux-x64-$actions_runner_version.tar.gz
+        rm -Rf actions-runner
+        mkdir -p actions-runner
+        ( cd actions-runner; tar xf ../actions-runner-linux-x64-$actions_runner_version.tar.gz )
+    fi
+}
+
+reheat_servo_repo() (
+    # Note the parentheses around this block, so we only cd for this function
+    cd /a/servo/servo
+
+    # Freshen git’s understanding of the working tree.
+    git status
+)
+
+start_github_actions_runner() {
+    export RUNNER_ALLOW_RUNASROOT=1
+    curl -fsS --max-time 5 --retry 99 --retry-all-errors http://192.168.100.1:8000/github-jitconfig | jq -er . > jitconfig
+    actions-runner/run.sh --jitconfig $(cat jitconfig)
+}
+
+mkdir -p /ci
+cd /ci
+
+# ~/.cargo/env requires HOME to be set
+export HOME=/root
+
+# Ensure uv is on PATH
+export PATH=$HOME/.local/bin:$PATH
+
+if ! [ -e image-built ]; then
+    set -- git curl python3-pip python3-venv  # Bootstrap tools
+    set -- "$@" libssl-dev  # taplo-cli -> openssl-sys -> openssl.pc
+    set -- "$@" xvfb  # linux.yml -> xvfb-run
+    set -- "$@" python-is-python3  # Install Python, for checkouts without servo#34504
+    set -- "$@" fonts-noto-color-emoji  # FIXME: 2 tests require this <https://github.com/servo/servo/issues/35030>
+    set -- "$@" fonts-noto-cjk  # FIXME: 3 tests require this <https://github.com/servo/servo/pull/34770#issuecomment-2647805573>
+    set -- "$@" jq  # Used by start_github_actions_runner()
+    apt_install "$@"
+
+    # FIXME: 17 tests require this
+    # <https://github.com/servo/servo/issues/35029>
+    sudo apt purge -y fonts-droid-fallback
+
+    # Install rustup and the latest Rust
+    if ! [ -e ~/.rustup ]; then
+        download rustup-init
+        chmod +x rustup-init
+        ./rustup-init -y --quiet
+        mkdir -p ~/.cargo
+        curl -fsSLo ~/.cargo/config.toml http://192.168.100.1:8000/image-deps/cargo-config.toml
+    fi
+
+    # Install uv
+    if ! [ -e ~/.local/bin/uv ]; then
+        download uv-installer.sh
+        chmod +x uv-installer.sh
+        ./uv-installer.sh
+    fi
+fi
+
+# Set up Cargo
+. ~/.cargo/env
+
+if ! [ -e image-built ]; then
+    # Clone and bake the Servo repo
+    mkdir -p /a/servo
+    git clone http://192.168.100.1:8000/cache/servo/.git /a/servo/servo
+    bake_servo_repo
+
+    install_github_actions_runner
+    touch image-built
+    poweroff
+    exit  # `poweroff` does not exit
+else
+    reheat_servo_repo
+    start_github_actions_runner
+fi
