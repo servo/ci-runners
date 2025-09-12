@@ -11,7 +11,19 @@
   <memoryBacking>
     <hugepages/>
   </memoryBacking>
-  <vcpu placement='static'>16</vcpu>
+  <vcpu placement='static'>8</vcpu>
+  <cputune>
+    <!-- Four CPUs for non-benchmarking work, on non-isolated CPUs -->
+    <vcpupin vcpu='0' cpuset='0,8'/>
+    <vcpupin vcpu='1' cpuset='1,9'/>
+    <vcpupin vcpu='2' cpuset='2,10'/>
+    <vcpupin vcpu='3' cpuset='3,11'/>
+    <!-- Four CPUs for benchmarking work, on isolated CPUs -->
+    <vcpupin vcpu='4' cpuset='4'/>
+    <vcpupin vcpu='5' cpuset='5'/>
+    <vcpupin vcpu='6' cpuset='6'/>
+    <vcpupin vcpu='7' cpuset='7'/>
+  </cputune>
   <os>
     <type arch='x86_64' machine='pc-q35-8.1'>hvm</type>
   </os>
@@ -20,7 +32,9 @@
     <apic/>
     <vmport state='off'/>
   </features>
-  <cpu mode='host-passthrough' check='none' migratable='on'/>
+  <cpu mode='host-passthrough' check='none' migratable='on'>
+    <topology sockets='1' cores='8' threads='1'/>
+  </cpu>
   <clock offset='utc'>
     <timer name='rtc' tickpolicy='catchup'/>
     <timer name='pit' tickpolicy='delay'/>
