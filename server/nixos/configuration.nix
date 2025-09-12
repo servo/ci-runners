@@ -98,8 +98,8 @@
     # other than threads assigned by libvirt <vcpupin>.
     # <https://wiki.archlinux.org/index.php?title=PCI_passthrough_via_OVMF&oldid=845768#With_isolcpus_kernel_parameter>
     # <https://www.kernel.org/doc/html/latest/timers/no_hz.html>
-    (lib.mkIf isBenchmarkingMachine "isolcpus=4-7")
-    (lib.mkIf isBenchmarkingMachine "nohz_full=4-7")
+    (lib.mkIf isBenchmarkingMachine "isolcpus=4-7,12-15")
+    (lib.mkIf isBenchmarkingMachine "nohz_full=4-7,12-15")
   ];
 
   environment.systemPackages = with pkgs; [
