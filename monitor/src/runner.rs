@@ -345,10 +345,12 @@ impl Runner {
     }
 
     fn profile_name_from_registration(&self) -> Option<&str> {
+        let prefix = format!("{}-", TOML.libvirt_runner_guest_prefix());
         self.registration
             .iter()
             .flat_map(|registration| registration.name.rsplit_once('@'))
-            .flat_map(|(rest, _host)| rest.rsplit_once('.'))
+            .flat_map(|(name, _host)| name.strip_prefix(&prefix))
+            .flat_map(|name| name.rsplit_once('.'))
             .map(|(base, _id)| base)
             .next()
     }

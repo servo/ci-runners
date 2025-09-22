@@ -283,42 +283,46 @@ pub fn delete_image(profile: &Profile, snapshot_name: &str) {
     }
 }
 
-pub fn register_runner(profile: &Profile, runner_name: &str) -> eyre::Result<String> {
+pub fn register_runner(profile: &Profile, runner_guest_name: &str) -> eyre::Result<String> {
     match &*profile.configuration_name {
-        "macos13" => macos13::register_runner(profile, runner_name),
-        "ubuntu2204" => ubuntu2204::register_runner(profile, runner_name),
-        "ubuntu2204-bench" => ubuntu2204::register_runner(profile, runner_name),
-        "ubuntu2204-rust" => ubuntu2204::register_runner(profile, runner_name),
-        "ubuntu2204-wpt" => ubuntu2204::register_runner(profile, runner_name),
-        "windows10" => windows10::register_runner(profile, runner_name),
+        "macos13" => macos13::register_runner(profile, runner_guest_name),
+        "ubuntu2204" => ubuntu2204::register_runner(profile, runner_guest_name),
+        "ubuntu2204-bench" => ubuntu2204::register_runner(profile, runner_guest_name),
+        "ubuntu2204-rust" => ubuntu2204::register_runner(profile, runner_guest_name),
+        "ubuntu2204-wpt" => ubuntu2204::register_runner(profile, runner_guest_name),
+        "windows10" => windows10::register_runner(profile, runner_guest_name),
         other => todo!("Runner registration not yet implemented: {other}"),
     }
 }
 
 pub fn create_runner(
     profile: &Profile,
-    runner_name: &str,
+    runner_guest_name: &str,
     runner_id: usize,
 ) -> eyre::Result<String> {
     match &*profile.configuration_name {
-        "macos13" => macos13::create_runner(profile, runner_name, runner_id),
-        "ubuntu2204" => ubuntu2204::create_runner(profile, runner_name, runner_id),
-        "ubuntu2204-bench" => ubuntu2204::create_runner(profile, runner_name, runner_id),
-        "ubuntu2204-rust" => ubuntu2204::create_runner(profile, runner_name, runner_id),
-        "ubuntu2204-wpt" => ubuntu2204::create_runner(profile, runner_name, runner_id),
-        "windows10" => windows10::create_runner(profile, runner_name, runner_id),
+        "macos13" => macos13::create_runner(profile, runner_guest_name, runner_id),
+        "ubuntu2204" => ubuntu2204::create_runner(profile, runner_guest_name, runner_id),
+        "ubuntu2204-bench" => ubuntu2204::create_runner(profile, runner_guest_name, runner_id),
+        "ubuntu2204-rust" => ubuntu2204::create_runner(profile, runner_guest_name, runner_id),
+        "ubuntu2204-wpt" => ubuntu2204::create_runner(profile, runner_guest_name, runner_id),
+        "windows10" => windows10::create_runner(profile, runner_guest_name, runner_id),
         other => todo!("Runner creation not yet implemented: {other}"),
     }
 }
 
-pub fn destroy_runner(profile: &Profile, runner_name: &str, runner_id: usize) -> eyre::Result<()> {
+pub fn destroy_runner(
+    profile: &Profile,
+    runner_guest_name: &str,
+    runner_id: usize,
+) -> eyre::Result<()> {
     match &*profile.configuration_name {
-        "macos13" => macos13::destroy_runner(runner_name, runner_id),
-        "ubuntu2204" => ubuntu2204::destroy_runner(runner_name, runner_id),
-        "ubuntu2204-bench" => ubuntu2204::destroy_runner(runner_name, runner_id),
-        "ubuntu2204-rust" => ubuntu2204::destroy_runner(runner_name, runner_id),
-        "ubuntu2204-wpt" => ubuntu2204::destroy_runner(runner_name, runner_id),
-        "windows10" => windows10::destroy_runner(runner_name, runner_id),
+        "macos13" => macos13::destroy_runner(runner_guest_name, runner_id),
+        "ubuntu2204" => ubuntu2204::destroy_runner(runner_guest_name, runner_id),
+        "ubuntu2204-bench" => ubuntu2204::destroy_runner(runner_guest_name, runner_id),
+        "ubuntu2204-rust" => ubuntu2204::destroy_runner(runner_guest_name, runner_id),
+        "ubuntu2204-wpt" => ubuntu2204::destroy_runner(runner_guest_name, runner_id),
+        "windows10" => windows10::destroy_runner(runner_guest_name, runner_id),
         other => todo!("Runner destruction not yet implemented: {other}"),
     }
 }

@@ -112,12 +112,12 @@ pub fn list_registered_runners_for_host() -> eyre::Result<Vec<ApiRunner>> {
     Ok(result.collect())
 }
 
-pub fn register_runner(name: &str, label: &str, work_folder: &str) -> eyre::Result<String> {
+pub fn register_runner(runner_name: &str, label: &str, work_folder: &str) -> eyre::Result<String> {
     let github_api_suffix = &DOTENV.github_api_suffix;
     let github_api_scope = &DOTENV.github_api_scope;
     let result = run_fun!(gh api --method POST -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
     "$github_api_scope/actions/runners/generate-jitconfig"
-    -f "name=$name@$github_api_suffix" -F "runner_group_id=1" -f "work_folder=$work_folder"
+    -f "name=$runner_name@$github_api_suffix" -F "runner_group_id=1" -f "work_folder=$work_folder"
     -f "labels[]=self-hosted" -f "labels[]=X64" -f "labels[]=$label")?;
 
     Ok(result)

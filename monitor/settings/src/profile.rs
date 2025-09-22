@@ -25,8 +25,12 @@ impl Profile {
         format!("{}", self.profile_name)
     }
 
-    // FIXME: replace all usage with prefixed name, it’s confusing
-    pub fn runner_name(&self, id: usize) -> String {
-        format!("{}.{}", self.profile_name, id)
+    pub fn runner_guest_name(&self, id: usize) -> String {
+        format!(
+            "{}-{}.{}",
+            TOML.libvirt_runner_guest_prefix(),
+            self.profile_name,
+            id
+        )
     }
 }

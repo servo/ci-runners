@@ -526,7 +526,7 @@ fn monitor_thread() -> eyre::Result<()> {
                         .join()
                         .map_err(|e| eyre!("Thread panicked: {e:?}"))
                         .and_then(|inner_result| inner_result)
-                        .and_then(|prefixed_vm_name| start_libvirt_guest(&prefixed_vm_name))
+                        .and_then(|runner_guest_name| start_libvirt_guest(&runner_guest_name))
                     {
                         warn!(?error, "Failed to create runner: {error}");
                     }

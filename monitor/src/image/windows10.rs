@@ -148,16 +148,15 @@ pub(super) fn delete_image(profile: &Profile, snapshot_name: &str) {
     delete_base_image_file(profile, &format!("base.img@{snapshot_name}"));
 }
 
-pub fn register_runner(profile: &Profile, runner_name: &str) -> eyre::Result<String> {
-    crate::github::register_runner(runner_name, &profile.github_runner_label, r"C:\a")
+pub fn register_runner(profile: &Profile, runner_guest_name: &str) -> eyre::Result<String> {
+    crate::github::register_runner(runner_guest_name, &profile.github_runner_label, r"C:\a")
 }
 
 pub fn create_runner(
     profile: &Profile,
-    runner_name: &str,
+    runner_guest_name: &str,
     runner_id: usize,
 ) -> eyre::Result<String> {
-    let prefixed_vm_name = format!("{}-{runner_name}", TOML.libvirt_runner_guest_prefix());
     let pipe = || |reader| log_output_as_info(reader);
     let profile_guest_name = &profile.profile_guest_name();
 
@@ -170,13 +169,13 @@ pub fn create_runner(
     let runner_base_image_path = runner_images_path.join(format!("base{runner_id}.img"));
     reflink_or_copy_with_warning(&base_image_symlink_path, &runner_base_image_path)?;
 
-    spawn_with_output!(virt-clone -o $profile_guest_name -n $prefixed_vm_name --preserve-data -f $runner_base_image_path 2>&1)?
+    spawn_with_output!(virt-clone -o $profile_guest_name -n $runner_guest_name --preserve-data -f $runner_base_image_path 2>&1)?
         .wait_with_pipe(&mut pipe())?;
 
-    Ok(prefixed_vm_name)
+    Ok(runner_guest_name.to_owned())
 }
 
-pub fn destroy_runner(runner_name: &str, runner_id: usize) -> eyre::Result<()> {
+pub fn destroy_runner(runner_guest_name: &str, runner_id: usize) -> eyre::Result<()> {
     // TODO delete config.iso?
     let runner_images_path = runner_images_path(runner_id);
     let runner_base_image_path = runner_images_path.join(format!("base.img"));
@@ -184,11 +183,10 @@ pub fn destroy_runner(runner_name: &str, runner_id: usize) -> eyre::Result<()> {
         warn!(?runner_base_image_path, ?error, "Failed to delete file");
     }
 
-    let prefixed_vm_name = format!("{}-{runner_name}", TOML.libvirt_runner_guest_prefix());
     let pipe = || |reader| log_output_as_info(reader);
     let _ =
-        spawn_with_output!(virsh destroy -- $prefixed_vm_name 2>&1)?.wait_with_pipe(&mut pipe());
-    let _ = spawn_with_output!(virsh undefine --nvram --storage sda -- $prefixed_vm_name 2>&1)?
+        spawn_with_output!(virsh destroy -- $runner_guest_name 2>&1)?.wait_with_pipe(&mut pipe());
+    let _ = spawn_with_output!(virsh undefine --nvram --storage sda -- $runner_guest_name 2>&1)?
         .wait_with_pipe(&mut pipe());
 
     Ok(())

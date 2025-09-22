@@ -274,7 +274,7 @@ impl Policy {
 
         let profile = profile.clone();
         let profile_name = profile.profile_name.clone();
-        let runner_name = profile.runner_name(id);
+        let runner_guest_name = profile.runner_guest_name(id);
 
         Ok(thread::spawn(move || {
             let _span = info_span!("create_runner_thread", runner_id = id, profile_name).entered();
@@ -290,7 +290,8 @@ impl Policy {
                         get_runner_data_path(id, Path::new("boot-script"))?,
                     )?;
                     if !DOTENV.dont_register_runners {
-                        let github_api_registration = register_runner(&profile, &runner_name)?;
+                        let github_api_registration =
+                            register_runner(&profile, &runner_guest_name)?;
                         let mut github_api_registration_file = File::create_new(
                             get_runner_data_path(id, Path::new("github-api-registration"))?,
                         )?;
@@ -298,7 +299,7 @@ impl Policy {
                             .write_all(github_api_registration.as_bytes())?;
                     }
 
-                    create_runner(&profile, &runner_name, id)
+                    create_runner(&profile, &runner_guest_name, id)
                 }
             }
         }))
@@ -323,17 +324,18 @@ impl Policy {
 
         match profile.image_type {
             ImageType::Rust => {
-                let vm_name = format!("{}.{id}", profile.profile_name);
+                let runner_guest_name = profile.runner_guest_name(id);
 
                 Ok(thread::spawn(move || {
                     let _span =
-                        info_span!("destroy_runner_thread", runner_id = id, vm_name).entered();
+                        info_span!("destroy_runner_thread", runner_id = id, runner_guest_name)
+                            .entered();
                     if let Some(registration) = runner.registration() {
                         if let Err(error) = unregister_runner(registration.id) {
                             warn!(?error, "Failed to unregister runner: {error}");
                         }
                     }
-                    if let Err(error) = destroy_runner(&profile, &vm_name, id) {
+                    if let Err(error) = destroy_runner(&profile, &runner_guest_name, id) {
                         warn!(?error, "Failed to destroy runner: {error}");
                     }
 
@@ -1021,7 +1023,12 @@ mod test {
         let mut next_runner_id = 0;
         let mut make_runner_id_and_guest_name = |profile_key: &str| -> (usize, String) {
             let id = next_runner_id;
-            let name = format!("{}.{}", profile_key, id,);
+            let name = format!(
+                "{}-{}.{}",
+                TOML.libvirt_runner_guest_prefix(),
+                profile_key,
+                id
+            );
             next_runner_id += 1;
             (id, name)
         };
@@ -1042,20 +1049,12 @@ mod test {
             set_runner_created_time_for_test(runner_id, fake.created_time);
             match fake.status {
                 Status::Invalid => registrations.push(make_registration(&guest_name)),
-                Status::DoneOrUnregistered => guest_names.push(format!(
-                    "{}-{}",
-                    TOML.libvirt_runner_guest_prefix(),
-                    guest_name
-                )),
+                Status::DoneOrUnregistered => guest_names.push(guest_name),
                 Status::Busy => {
                     let mut api_runner = make_registration(&guest_name);
                     api_runner.busy = true;
                     registrations.push(api_runner);
-                    guest_names.push(format!(
-                        "{}-{}",
-                        TOML.libvirt_runner_guest_prefix(),
-                        guest_name
-                    ));
+                    guest_names.push(guest_name);
                 }
                 Status::Reserved => {
                     let mut api_runner = make_registration(&guest_name);
@@ -1069,29 +1068,17 @@ mod test {
                         });
                     }
                     registrations.push(api_runner);
-                    guest_names.push(format!(
-                        "{}-{}",
-                        TOML.libvirt_runner_guest_prefix(),
-                        guest_name
-                    ));
+                    guest_names.push(guest_name);
                 }
                 Status::Idle => {
                     let mut api_runner = make_registration(&guest_name);
                     api_runner.status = "online".to_owned();
                     registrations.push(api_runner);
-                    guest_names.push(format!(
-                        "{}-{}",
-                        TOML.libvirt_runner_guest_prefix(),
-                        guest_name
-                    ));
+                    guest_names.push(guest_name);
                 }
                 Status::StartedOrCrashed => {
                     registrations.push(make_registration(&guest_name));
-                    guest_names.push(format!(
-                        "{}-{}",
-                        TOML.libvirt_runner_guest_prefix(),
-                        guest_name
-                    ));
+                    guest_names.push(guest_name);
                 }
             }
         }
