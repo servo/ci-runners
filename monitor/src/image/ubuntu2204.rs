@@ -39,7 +39,7 @@ pub(super) fn rebuild(
     wait_duration: Duration,
 ) -> eyre::Result<()> {
     let base_images_path = base_images_path.as_ref();
-    let profile_guest_name = &profile.profile_name; // FIXME: decouple
+    let profile_guest_name = &profile.profile_guest_name();
     let profile_configuration_path = get_profile_configuration_path(&profile, None)?;
     let config_iso_symlink_path = base_images_path.join(format!("config.iso"));
     let config_iso_filename = format!("config.iso@{snapshot_name}");
@@ -88,7 +88,7 @@ pub(super) fn redefine_base_guest_with_symlinks(
         .to_str()
         .ok_or_eyre("Unsupported path")?;
     let base_image_symlink_path = base_images_path.join(format!("base.img"));
-    undefine_libvirt_guest(&profile.profile_name)?; // FIXME: decouple
+    undefine_libvirt_guest(&profile.profile_guest_name())?;
     define_base_guest(
         profile,
         &base_image_symlink_path,
@@ -103,9 +103,10 @@ fn define_base_guest(
     base_image_path: &dyn AsRef<OsStr>,
     cdrom_images: &[CdromImage],
 ) -> eyre::Result<()> {
-    let profile_guest_name = &profile.profile_name; // FIXME: decouple
+    let profile_guest_name = &profile.profile_guest_name();
     let guest_xml_path = get_profile_configuration_path(&profile, Path::new("guest.xml"))?;
     define_libvirt_guest(
+        &profile.profile_name,
         profile_guest_name,
         guest_xml_path,
         &[&"-f", &base_image_path],
@@ -127,14 +128,18 @@ pub(super) fn delete_image(profile: &Profile, snapshot_name: &str) {
     delete_base_image_file(profile, &format!("base.img@{snapshot_name}"));
 }
 
-pub fn register_runner(profile: &Profile, vm_name: &str) -> eyre::Result<String> {
-    crate::github::register_runner(vm_name, &profile.github_runner_label, "/a")
+pub fn register_runner(profile: &Profile, runner_name: &str) -> eyre::Result<String> {
+    crate::github::register_runner(runner_name, &profile.github_runner_label, "/a")
 }
 
-pub fn create_runner(profile: &Profile, vm_name: &str, runner_id: usize) -> eyre::Result<String> {
-    let prefixed_vm_name = format!("{}-{vm_name}", TOML.libvirt_runner_guest_prefix());
+pub fn create_runner(
+    profile: &Profile,
+    runner_name: &str,
+    runner_id: usize,
+) -> eyre::Result<String> {
+    let prefixed_vm_name = format!("{}-{runner_name}", TOML.libvirt_runner_guest_prefix());
     let pipe = || |reader| log_output_as_info(reader);
-    let profile_guest_name = &profile.profile_name; // FIXME: decouple
+    let profile_guest_name = &profile.profile_guest_name();
 
     // Copy images in the monitor, not with `virt-clone --auto-clone --reflink`,
     // because the latter can’t be parallelised without causing errors.
@@ -151,7 +156,7 @@ pub fn create_runner(profile: &Profile, vm_name: &str, runner_id: usize) -> eyre
     Ok(prefixed_vm_name)
 }
 
-pub fn destroy_runner(vm_name: &str, runner_id: usize) -> eyre::Result<()> {
+pub fn destroy_runner(runner_name: &str, runner_id: usize) -> eyre::Result<()> {
     // TODO delete config.iso?
     let runner_images_path = runner_images_path(runner_id);
     let runner_base_image_path = runner_images_path.join(format!("base.img"));
@@ -159,7 +164,7 @@ pub fn destroy_runner(vm_name: &str, runner_id: usize) -> eyre::Result<()> {
         warn!(?runner_base_image_path, ?error, "Failed to delete file");
     }
 
-    let prefixed_vm_name = format!("{}-{vm_name}", TOML.libvirt_runner_guest_prefix());
+    let prefixed_vm_name = format!("{}-{runner_name}", TOML.libvirt_runner_guest_prefix());
     let pipe = || |reader| log_output_as_info(reader);
     let _ =
         spawn_with_output!(virsh destroy -- $prefixed_vm_name 2>&1)?.wait_with_pipe(&mut pipe());

@@ -37,7 +37,7 @@ pub(super) fn rebuild(
     wait_duration: Duration,
 ) -> eyre::Result<()> {
     let base_images_path = base_images_path.as_ref();
-    let profile_guest_name = &profile.profile_name; // FIXME: decouple
+    let profile_guest_name = &profile.profile_guest_name();
 
     let base_image_symlink_path = base_images_path.join(format!("base.img"));
     let base_image_path = create_disk_image(
@@ -72,7 +72,7 @@ pub(super) fn redefine_base_guest_with_symlinks(
 ) -> Result<(), eyre::Error> {
     let base_images_path = base_images_path.as_ref();
     let base_image_symlink_path = base_images_path.join(format!("base.img"));
-    undefine_libvirt_guest(&profile.profile_name)?; // FIXME: decouple
+    undefine_libvirt_guest(&profile.profile_guest_name())?;
     define_base_guest(profile, &base_image_symlink_path, &[])?;
 
     Ok(())
@@ -83,7 +83,7 @@ fn define_base_guest(
     base_image_path: &dyn AsRef<OsStr>,
     cdrom_images: &[CdromImage],
 ) -> eyre::Result<()> {
-    let profile_guest_name = &profile.profile_name; // FIXME: decouple
+    let profile_guest_name = &profile.profile_guest_name();
     let base_image_path = base_image_path
         .as_ref()
         .to_str()
@@ -105,12 +105,16 @@ pub(super) fn delete_image(profile: &Profile, snapshot_name: &str) {
     delete_base_image_file(profile, &format!("base.img@{snapshot_name}"));
 }
 
-pub fn register_runner(profile: &Profile, vm_name: &str) -> eyre::Result<String> {
-    crate::github::register_runner(vm_name, &profile.github_runner_label, "/Users/servo/a")
+pub fn register_runner(profile: &Profile, runner_name: &str) -> eyre::Result<String> {
+    crate::github::register_runner(runner_name, &profile.github_runner_label, "/Users/servo/a")
 }
 
-pub fn create_runner(profile: &Profile, vm_name: &str, runner_id: usize) -> eyre::Result<String> {
-    let prefixed_vm_name = format!("{}-{vm_name}", TOML.libvirt_runner_guest_prefix());
+pub fn create_runner(
+    profile: &Profile,
+    runner_name: &str,
+    runner_id: usize,
+) -> eyre::Result<String> {
+    let prefixed_vm_name = format!("{}-{runner_name}", TOML.libvirt_runner_guest_prefix());
     let pipe = || |reader| log_output_as_info(reader);
     let profile_guest_name = &profile.profile_name;
 
@@ -124,26 +128,26 @@ pub fn create_runner(profile: &Profile, vm_name: &str, runner_id: usize) -> eyre
 
     let ovmf_vars_base_path =
         format!("/var/lib/libvirt/images/OSX-KVM/OVMF_VARS.{profile_guest_name}.clean.fd");
-    let ovmf_vars_path = format!("/var/lib/libvirt/images/OSX-KVM/OVMF_VARS.{vm_name}.fd");
+    let ovmf_vars_path = format!("/var/lib/libvirt/images/OSX-KVM/OVMF_VARS.{runner_name}.fd");
     copy(ovmf_vars_base_path, ovmf_vars_path)?;
 
-    spawn_with_output!(virt-clone -o $profile_guest_name -n $prefixed_vm_name --nvram /var/lib/libvirt/images/OSX-KVM/OVMF_VARS.$vm_name.fd --preserve-data --skip-copy sda -f $runner_base_image_path --skip-copy sdc 2>&1)?.wait_with_pipe(&mut pipe())?;
+    spawn_with_output!(virt-clone -o $profile_guest_name -n $prefixed_vm_name --nvram /var/lib/libvirt/images/OSX-KVM/OVMF_VARS.$runner_name.fd --preserve-data --skip-copy sda -f $runner_base_image_path --skip-copy sdc 2>&1)?.wait_with_pipe(&mut pipe())?;
 
     Ok(prefixed_vm_name)
 }
 
-pub fn destroy_runner(vm_name: &str, runner_id: usize) -> eyre::Result<()> {
+pub fn destroy_runner(runner_name: &str, runner_id: usize) -> eyre::Result<()> {
     let runner_images_path = runner_images_path(runner_id);
     let runner_base_image_path = runner_images_path.join(format!("base.img"));
     if let Err(error) = remove_file(&runner_base_image_path) {
         warn!(?runner_base_image_path, ?error, "Failed to delete file");
     }
-    let ovmf_vars_path = format!("/var/lib/libvirt/images/OSX-KVM/OVMF_VARS.{vm_name}.fd");
+    let ovmf_vars_path = format!("/var/lib/libvirt/images/OSX-KVM/OVMF_VARS.{runner_name}.fd");
     if let Err(error) = remove_file(&ovmf_vars_path) {
         warn!(?ovmf_vars_path, ?error, "Failed to delete file");
     }
 
-    let prefixed_vm_name = format!("{}-{vm_name}", TOML.libvirt_runner_guest_prefix());
+    let prefixed_vm_name = format!("{}-{runner_name}", TOML.libvirt_runner_guest_prefix());
     let pipe = || |reader| log_output_as_info(reader);
     let _ =
         spawn_with_output!(virsh destroy -- $prefixed_vm_name 2>&1)?.wait_with_pipe(&mut pipe());

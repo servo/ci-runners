@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::units::MemorySize;
+use crate::{TOML, units::MemorySize};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Profile {
@@ -18,4 +18,15 @@ pub struct Profile {
 pub enum ImageType {
     #[default]
     Rust,
+}
+
+impl Profile {
+    pub fn profile_guest_name(&self) -> String {
+        format!("{}", self.profile_name)
+    }
+
+    // FIXME: replace all usage with prefixed name, it’s confusing
+    pub fn runner_name(&self, id: usize) -> String {
+        format!("{}.{}", self.profile_name, id)
+    }
 }

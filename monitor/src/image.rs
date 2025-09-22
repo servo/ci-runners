@@ -171,8 +171,7 @@ fn rebuild_with_rust(
     info!(?snapshot_name, "Starting image rebuild");
 
     let base_images_path = create_base_images_dir(&profile)?;
-    let profile_guest_name = &profile.profile_name; // FIXME: decouple
-    undefine_libvirt_guest(profile_guest_name)?;
+    undefine_libvirt_guest(&profile.profile_guest_name())?;
 
     match match match &*profile.configuration_name {
         "macos13" => macos13::rebuild(
@@ -284,38 +283,42 @@ pub fn delete_image(profile: &Profile, snapshot_name: &str) {
     }
 }
 
-pub fn register_runner(profile: &Profile, vm_name: &str) -> eyre::Result<String> {
+pub fn register_runner(profile: &Profile, runner_name: &str) -> eyre::Result<String> {
     match &*profile.configuration_name {
-        "macos13" => macos13::register_runner(profile, vm_name),
-        "ubuntu2204" => ubuntu2204::register_runner(profile, vm_name),
-        "ubuntu2204-bench" => ubuntu2204::register_runner(profile, vm_name),
-        "ubuntu2204-rust" => ubuntu2204::register_runner(profile, vm_name),
-        "ubuntu2204-wpt" => ubuntu2204::register_runner(profile, vm_name),
-        "windows10" => windows10::register_runner(profile, vm_name),
+        "macos13" => macos13::register_runner(profile, runner_name),
+        "ubuntu2204" => ubuntu2204::register_runner(profile, runner_name),
+        "ubuntu2204-bench" => ubuntu2204::register_runner(profile, runner_name),
+        "ubuntu2204-rust" => ubuntu2204::register_runner(profile, runner_name),
+        "ubuntu2204-wpt" => ubuntu2204::register_runner(profile, runner_name),
+        "windows10" => windows10::register_runner(profile, runner_name),
         other => todo!("Runner registration not yet implemented: {other}"),
     }
 }
 
-pub fn create_runner(profile: &Profile, vm_name: &str, runner_id: usize) -> eyre::Result<String> {
+pub fn create_runner(
+    profile: &Profile,
+    runner_name: &str,
+    runner_id: usize,
+) -> eyre::Result<String> {
     match &*profile.configuration_name {
-        "macos13" => macos13::create_runner(profile, vm_name, runner_id),
-        "ubuntu2204" => ubuntu2204::create_runner(profile, vm_name, runner_id),
-        "ubuntu2204-bench" => ubuntu2204::create_runner(profile, vm_name, runner_id),
-        "ubuntu2204-rust" => ubuntu2204::create_runner(profile, vm_name, runner_id),
-        "ubuntu2204-wpt" => ubuntu2204::create_runner(profile, vm_name, runner_id),
-        "windows10" => windows10::create_runner(profile, vm_name, runner_id),
+        "macos13" => macos13::create_runner(profile, runner_name, runner_id),
+        "ubuntu2204" => ubuntu2204::create_runner(profile, runner_name, runner_id),
+        "ubuntu2204-bench" => ubuntu2204::create_runner(profile, runner_name, runner_id),
+        "ubuntu2204-rust" => ubuntu2204::create_runner(profile, runner_name, runner_id),
+        "ubuntu2204-wpt" => ubuntu2204::create_runner(profile, runner_name, runner_id),
+        "windows10" => windows10::create_runner(profile, runner_name, runner_id),
         other => todo!("Runner creation not yet implemented: {other}"),
     }
 }
 
-pub fn destroy_runner(profile: &Profile, vm_name: &str, runner_id: usize) -> eyre::Result<()> {
+pub fn destroy_runner(profile: &Profile, runner_name: &str, runner_id: usize) -> eyre::Result<()> {
     match &*profile.configuration_name {
-        "macos13" => macos13::destroy_runner(vm_name, runner_id),
-        "ubuntu2204" => ubuntu2204::destroy_runner(vm_name, runner_id),
-        "ubuntu2204-bench" => ubuntu2204::destroy_runner(vm_name, runner_id),
-        "ubuntu2204-rust" => ubuntu2204::destroy_runner(vm_name, runner_id),
-        "ubuntu2204-wpt" => ubuntu2204::destroy_runner(vm_name, runner_id),
-        "windows10" => windows10::destroy_runner(vm_name, runner_id),
+        "macos13" => macos13::destroy_runner(runner_name, runner_id),
+        "ubuntu2204" => ubuntu2204::destroy_runner(runner_name, runner_id),
+        "ubuntu2204-bench" => ubuntu2204::destroy_runner(runner_name, runner_id),
+        "ubuntu2204-rust" => ubuntu2204::destroy_runner(runner_name, runner_id),
+        "ubuntu2204-wpt" => ubuntu2204::destroy_runner(runner_name, runner_id),
+        "windows10" => windows10::destroy_runner(runner_name, runner_id),
         other => todo!("Runner destruction not yet implemented: {other}"),
     }
 }
@@ -442,6 +445,7 @@ pub(self) fn create_disk_image<'icp>(
 }
 
 pub(self) fn define_libvirt_guest(
+    profile_name: &str,
     guest_name: &str,
     guest_xml_path: impl AsRef<Path>,
     args: &[&dyn AsRef<OsStr>],
@@ -451,9 +455,9 @@ pub(self) fn define_libvirt_guest(
     let guest_xml_path = guest_xml_path.as_ref();
     let args = args.iter().map(|x| x.as_ref()).collect::<Vec<_>>();
     run_cmd!(virsh define -- $guest_xml_path)?;
-    run_cmd!(virt-clone --preserve-data --check path_in_use=off -o $guest_name.init -n $guest_name $[args])?;
+    run_cmd!(virt-clone --preserve-data --check path_in_use=off -o $profile_name.init -n $guest_name $[args])?;
     libvirt_change_media(guest_name, cdrom_images)?;
-    run_cmd!(virsh undefine -- $guest_name.init)?;
+    run_cmd!(virsh undefine -- $profile_name.init)?;
 
     Ok(())
 }

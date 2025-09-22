@@ -274,7 +274,7 @@ impl Policy {
 
         let profile = profile.clone();
         let profile_name = profile.profile_name.clone();
-        let vm_name = format!("{profile_name}.{id}"); // FIXME: decouple
+        let runner_name = profile.runner_name(id);
 
         Ok(thread::spawn(move || {
             let _span = info_span!("create_runner_thread", runner_id = id, profile_name).entered();
@@ -290,7 +290,7 @@ impl Policy {
                         get_runner_data_path(id, Path::new("boot-script"))?,
                     )?;
                     if !DOTENV.dont_register_runners {
-                        let github_api_registration = register_runner(&profile, &vm_name)?;
+                        let github_api_registration = register_runner(&profile, &runner_name)?;
                         let mut github_api_registration_file = File::create_new(
                             get_runner_data_path(id, Path::new("github-api-registration"))?,
                         )?;
@@ -298,7 +298,7 @@ impl Policy {
                             .write_all(github_api_registration.as_bytes())?;
                     }
 
-                    create_runner(&profile, &vm_name, id)
+                    create_runner(&profile, &runner_name, id)
                 }
             }
         }))
@@ -506,7 +506,7 @@ impl Policy {
 
     pub fn update_ipv4_addresses_for_profile_guests(&mut self) {
         for (key, profile) in self.profiles.iter() {
-            let ipv4_address = get_ipv4_address(&profile.profile_name); // FIXME: decouple
+            let ipv4_address = get_ipv4_address(&profile.profile_guest_name());
             let entry = self.ipv4_addresses.entry(key.clone()).or_default();
             if ipv4_address != *entry {
                 info!(
@@ -586,7 +586,7 @@ impl Policy {
 
     fn try_update_screenshot(&self, profile: &Profile) -> eyre::Result<()> {
         let output_dir = get_profile_data_path(&profile.profile_name, None)?;
-        update_screenshot(&profile.profile_name, &output_dir)?; // FIXME: decouple
+        update_screenshot(&profile.profile_guest_name(), &output_dir)?;
 
         Ok(())
     }
