@@ -32,7 +32,6 @@
       ../../ubuntu2204-rust
       ../../ubuntu2204-wpt
       ../../windows10
-      ../../common.sh
       ../../reserve-runner.sh
     ]
   );
@@ -84,7 +83,6 @@ in stdenv.mkDerivation rec {
     cp -R ubuntu2204-rust $out/lib/monitor
     cp -R ubuntu2204-wpt $out/lib/monitor
     cp -R windows10 $out/lib/monitor
-    cp -R common.sh $out/lib/monitor
     cp -R reserve-runner.sh $out/lib/monitor
   '';
 

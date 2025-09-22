@@ -1,7 +1,5 @@
 #!/usr/bin/env zsh
 # usage: reserve-runner.sh <github_runner_id> <unique_id> <reserved_by>
-script_dir=${0:a:h}
-. "$script_dir/common.sh"
 github_runner_id=$1; shift
 unique_id=$1; shift
 reserved_by=$1; shift
