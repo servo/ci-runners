@@ -21,8 +21,8 @@ in linkFarm "image-deps" {
     hash = "sha256-5LH57GE4YSMiR+DLY2HJuxqGUl1ijs1Ln+rcnvngwig=";
   };
   "macos13/actions-runner-osx-x64-2.326.0.tar.gz" = fetchurl {
-    url = "https://github.com/actions/runner/releases/download/v2.326.0/actions-runner-osx-x64-2.326.0.tar.gz";
-    hash = "sha256-nox/7ZcNexnCJIc9vd7TnASAr3KmjAlAlrOzapujHE8=";
+    url = "https://github.com/actions/runner/releases/download/v2.328.0/actions-runner-osx-x64-2.328.0.tar.gz";
+    hash = "sha256-kMMtxvKShVM5VjFI84WdxdQC8jfs31cBDIQd88jRLMg=";
   };
   "macos13/uv-installer.sh" = fetchurl {
     url = "https://github.com/astral-sh/uv/releases/download/0.8.17/uv-installer.sh";
@@ -45,8 +45,8 @@ in linkFarm "image-deps" {
     hash = "sha256-ozOfsATD0LuYYroLzgAYYf5cvenBDRZZHrPznubNPn8=";
   };
   "ubuntu2204/actions-runner-linux-x64-2.326.0.tar.gz" = fetchurl {
-    url = "https://github.com/actions/runner/releases/download/v2.326.0/actions-runner-linux-x64-2.326.0.tar.gz";
-    hash = "sha256-nHSvm0NSu8ma7Mc1O0e8380bKg9tFa9UqZ9UoMFKHeg=";
+    url = "https://github.com/actions/runner/releases/download/v2.328.0/actions-runner-linux-x64-2.328.0.tar.gz";
+    hash = "sha256-AQZvrTook+Y+bKiArjofrVv5Mp1g537hXyuXwUjDzU4=";
   };
   "ubuntu2204/uv-installer.sh" = fetchurl {
     url = "https://github.com/astral-sh/uv/releases/download/0.8.17/uv-installer.sh";
@@ -82,15 +82,15 @@ in linkFarm "image-deps" {
   };
   "windows10/vs_community.exe" = fetchurl {
     url = "https://aka.ms/vs/17/release/vs_community.exe";
-    hash = "sha256-TAQlmCe1/P8ySp6J/2oNIf5p1cBa8ssXaWeX3rx7rzs=";
+    hash = "sha256-MV9hfmY2Rg+pMNhspUn7ur1Zj6QdAU1cXS2va4ZnuSA=";
   };
   "windows10/rustup-init.exe" = fetchurl {
     url = "https://static.rust-lang.org/rustup/archive/1.28.1/x86_64-pc-windows-msvc/rustup-init.exe";
     hash = "sha256-e4MDmhuTBbDFDyOy4vAzGbjXhZsoEG5JuoLAbYEonfY=";
   };
   "windows10/actions-runner-win-x64-2.326.0.zip" = fetchurl {
-    url = "https://github.com/actions/runner/releases/download/v2.326.0/actions-runner-win-x64-2.326.0.zip";
-    hash = "sha256-U51IgV+OzaaQN1UCXVtXj5GaMmkrcx2FqaJEGf5NvZ4=";
+    url = "https://github.com/actions/runner/releases/download/v2.328.0/actions-runner-win-x64-2.328.0.zip";
+    hash = "sha256-pzrhkriyt4Lh2QwIkjAwkwsLlu05T+VkE6BzzG9pSHc=";
   };
   "windows10/Git-2.45.1-64-bit.exe" = fetchurl {
     url = "https://github.com/git-for-windows/git/releases/download/v2.45.1.windows.1/Git-2.45.1-64-bit.exe";
