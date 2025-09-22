@@ -15,16 +15,16 @@ available_1g_hugepages = 96
 available_normal_memory = "16G"
 
 [profiles.servo-windows10]
+profile_name = "servo-windows10"
 configuration_name = "windows10"
-base_vm_name = "servo-windows10"
 github_runner_label = "self-hosted-image:windows10"
 target_count = 1
 requires_1g_hugepages = 24
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
 
 [profiles.servo-macos13]
+profile_name = "servo-macos13"
 configuration_name = "macos13"
-base_vm_name = "servo-macos13"
 github_runner_label = "self-hosted-image:macos13"
 target_count = 1
 image_type = "Rust"
@@ -32,8 +32,8 @@ requires_1g_hugepages = 24
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
 
 [profiles.servo-ubuntu2204]
+profile_name = "servo-ubuntu2204"
 configuration_name = "ubuntu2204"
-base_vm_name = "servo-ubuntu2204"
 github_runner_label = "self-hosted-image:ubuntu2204"
 target_count = 1
 image_type = "Rust"
@@ -41,8 +41,8 @@ requires_1g_hugepages = 24
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
 
 [profiles.servo-ubuntu2204-bench]
+profile_name = "servo-ubuntu2204-bench"
 configuration_name = "ubuntu2204-bench"
-base_vm_name = "servo-ubuntu2204-bench"
 github_runner_label = "self-hosted-image:ubuntu2204-bench"
 target_count = 1
 image_type = "Rust"
@@ -50,8 +50,8 @@ requires_1g_hugepages = 24
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
 
 [profiles.servo-ubuntu2204-wpt]
+profile_name = "servo-ubuntu2204-wpt"
 configuration_name = "ubuntu2204-wpt"
-base_vm_name = "servo-ubuntu2204-wpt"
 github_runner_label = "self-hosted-image:ubuntu2204-wpt"
 target_count = 1
 image_type = "Rust"
@@ -59,8 +59,8 @@ requires_1g_hugepages = 24
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
 
 [profiles.servo-ubuntu2204-rust]
+profile_name = "servo-ubuntu2204-rust"
 configuration_name = "ubuntu2204-rust"
-base_vm_name = "servo-ubuntu2204-rust"
 github_runner_label = "self-hosted-image:ubuntu2204-rust"
 target_count = 0
 image_type = "Rust"

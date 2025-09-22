@@ -122,7 +122,7 @@ impl Runners {
     pub fn by_profile<'s>(&'s self, key: &'s str) -> impl Iterator<Item = (&'s usize, &'s Runner)> {
         self.runners
             .iter()
-            .filter(move |(_, runner)| runner.base_vm_name() == key)
+            .filter(move |(_, runner)| runner.profile_name() == key)
     }
 
     pub fn reserve_runner(
@@ -279,7 +279,7 @@ impl Runner {
         info!(
             "[{}] profile {}, ipv4 {}, status {:?}, age {}, jitconfig {}, reserved for {}",
             self.id,
-            self.base_vm_name(),
+            self.profile_name(),
             fmt_option_display(self.ipv4_address),
             self.status(),
             fmt_option_debug(self.age().ok()),
@@ -338,13 +338,13 @@ impl Runner {
         return Status::StartedOrCrashed;
     }
 
-    pub fn base_vm_name(&self) -> &str {
-        self.base_vm_name_from_registration()
-            .or_else(|| self.base_vm_name_from_guest_name())
+    pub fn profile_name(&self) -> &str {
+        self.profile_name_from_registration()
+            .or_else(|| self.profile_name_from_guest_name())
             .expect("Bug in list_runner_guests() or the call to Runners::new()")
     }
 
-    fn base_vm_name_from_registration(&self) -> Option<&str> {
+    fn profile_name_from_registration(&self) -> Option<&str> {
         self.registration
             .iter()
             .flat_map(|registration| registration.name.rsplit_once('@'))
@@ -353,7 +353,7 @@ impl Runner {
             .next()
     }
 
-    fn base_vm_name_from_guest_name(&self) -> Option<&str> {
+    fn profile_name_from_guest_name(&self) -> Option<&str> {
         let prefix = format!("{}-", TOML.libvirt_runner_guest_prefix());
         self.guest_name
             .iter()

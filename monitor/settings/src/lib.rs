@@ -242,8 +242,8 @@ impl Toml {
 
         for (key, profile) in self.profiles.iter() {
             assert_eq!(
-                *key, profile.base_vm_name,
-                "Runner::base_vm_name relies on Toml.profiles key (profile name) and base_vm_name being equal"
+                *key, profile.profile_name,
+                "Runner::profile_name relies on Toml.profiles key (profile name) and profile_name being equal"
             );
         }
 

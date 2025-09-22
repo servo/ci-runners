@@ -171,8 +171,8 @@ fn rebuild_with_rust(
     info!(?snapshot_name, "Starting image rebuild");
 
     let base_images_path = create_base_images_dir(&profile)?;
-    let base_vm_name = &profile.base_vm_name;
-    undefine_libvirt_guest(base_vm_name)?;
+    let profile_guest_name = &profile.profile_name; // FIXME: decouple
+    undefine_libvirt_guest(profile_guest_name)?;
 
     match match match &*profile.configuration_name {
         "macos13" => macos13::rebuild(
@@ -442,7 +442,7 @@ pub(self) fn create_disk_image<'icp>(
 }
 
 pub(self) fn define_libvirt_guest(
-    base_vm_name: &str,
+    guest_name: &str,
     guest_xml_path: impl AsRef<Path>,
     args: &[&dyn AsRef<OsStr>],
     cdrom_images: &[CdromImage],
@@ -451,29 +451,29 @@ pub(self) fn define_libvirt_guest(
     let guest_xml_path = guest_xml_path.as_ref();
     let args = args.iter().map(|x| x.as_ref()).collect::<Vec<_>>();
     run_cmd!(virsh define -- $guest_xml_path)?;
-    run_cmd!(virt-clone --preserve-data --check path_in_use=off -o $base_vm_name.init -n $base_vm_name $[args])?;
-    libvirt_change_media(base_vm_name, cdrom_images)?;
-    run_cmd!(virsh undefine -- $base_vm_name.init)?;
+    run_cmd!(virt-clone --preserve-data --check path_in_use=off -o $guest_name.init -n $guest_name $[args])?;
+    libvirt_change_media(guest_name, cdrom_images)?;
+    run_cmd!(virsh undefine -- $guest_name.init)?;
 
     Ok(())
 }
 
 pub(self) fn libvirt_change_media(
-    base_vm_name: &str,
+    guest_name: &str,
     cdrom_images: &[CdromImage],
 ) -> eyre::Result<()> {
     for CdromImage { target_dev, path } in cdrom_images {
-        run_cmd!(virsh change-media -- $base_vm_name $target_dev $path)?;
+        run_cmd!(virsh change-media -- $guest_name $target_dev $path)?;
     }
 
     Ok(())
 }
 
-pub(self) fn undefine_libvirt_guest(base_vm_name: &str) -> eyre::Result<()> {
-    if run_cmd!(virsh domstate -- $base_vm_name).is_ok() {
+pub(self) fn undefine_libvirt_guest(guest_name: &str) -> eyre::Result<()> {
+    if run_cmd!(virsh domstate -- $guest_name).is_ok() {
         // FIXME make this idempotent in a less noisy way?
-        let _ = run_cmd!(virsh destroy -- $base_vm_name);
-        run_cmd!(virsh undefine --nvram -- $base_vm_name)?;
+        let _ = run_cmd!(virsh destroy -- $guest_name);
+        run_cmd!(virsh undefine --nvram -- $guest_name)?;
     }
 
     Ok(())
@@ -495,10 +495,10 @@ pub fn start_libvirt_guest(guest_name: &str) -> eyre::Result<()> {
     Ok(())
 }
 
-pub(self) fn wait_for_guest(base_vm_name: &str, timeout: Duration) -> eyre::Result<()> {
+pub(self) fn wait_for_guest(guest_name: &str, timeout: Duration) -> eyre::Result<()> {
     let timeout = timeout.as_secs();
     info!("Waiting for guest to shut down (max {timeout} seconds)"); // normally ~37 seconds
-    if !run_cmd!(time virsh event --timeout $timeout -- $base_vm_name lifecycle).is_ok() {
+    if !run_cmd!(time virsh event --timeout $timeout -- $guest_name lifecycle).is_ok() {
         bail!("`virsh event` failed or timed out!");
     }
 

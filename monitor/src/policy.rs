@@ -200,7 +200,7 @@ impl Policy {
         {
             result.unregister_and_destroy_runner_ids.push(id);
             *proposed_healthy_destroy_counts
-                .get_mut(runner.base_vm_name())
+                .get_mut(runner.profile_name())
                 .expect("Guaranteed by initialiser") += 1;
         }
 
@@ -265,20 +265,20 @@ impl Policy {
         profile: &Profile,
         id: usize,
     ) -> eyre::Result<JoinHandle<eyre::Result<String>>> {
-        if self.base_image_snapshot(&profile.base_vm_name).is_none() {
+        if self.base_image_snapshot(&profile.profile_name).is_none() {
             bail!(
                 "Tried to create runner, but profile has no base image snapshot (profile {})",
-                profile.base_vm_name
+                profile.profile_name
             );
         };
 
         let profile = profile.clone();
-        let base_vm_name = profile.base_vm_name.clone();
-        let vm_name = format!("{base_vm_name}.{id}");
+        let profile_name = profile.profile_name.clone();
+        let vm_name = format!("{profile_name}.{id}"); // FIXME: decouple
 
         Ok(thread::spawn(move || {
-            let _span = info_span!("create_runner_thread", runner_id = id, base_vm_name).entered();
-            info!(runner_id = id, base_vm_name, "Creating runner");
+            let _span = info_span!("create_runner_thread", runner_id = id, profile_name).entered();
+            info!(runner_id = id, profile_name, "Creating runner");
             match profile.image_type {
                 ImageType::Rust => {
                     create_dir(get_runner_data_path(id, None)?)?;
@@ -314,16 +314,16 @@ impl Policy {
             .expect("Guaranteed by compute_runner_changes()")
             .clone();
         let Some(profile) = self
-            .profile(runner.base_vm_name())
+            .profile(runner.profile_name())
             .map(|profile| profile.to_owned())
         else {
             bail!("Profile");
         };
-        info!(runner_id = id, profile.base_vm_name, "Destroying runner");
+        info!(runner_id = id, profile.profile_name, "Destroying runner");
 
         match profile.image_type {
             ImageType::Rust => {
-                let vm_name = format!("{}.{id}", profile.base_vm_name);
+                let vm_name = format!("{}.{id}", profile.profile_name);
 
                 Ok(thread::spawn(move || {
                     let _span =
@@ -369,7 +369,7 @@ impl Policy {
         if let Some(current_override) = self.current_override.as_ref() {
             if let Some(target_count) = current_override
                 .profile_target_counts
-                .get(&profile.base_vm_name)
+                .get(&profile.profile_name)
             {
                 *target_count
             } else {
@@ -463,7 +463,7 @@ impl Policy {
     }
 
     pub fn image_age(&self, profile: &Profile) -> eyre::Result<Option<Duration>> {
-        let Some(base_image_snapshot) = self.base_image_snapshot(&profile.base_vm_name) else {
+        let Some(base_image_snapshot) = self.base_image_snapshot(&profile.profile_name) else {
             return Ok(None);
         };
         let now = SystemTime::now()
@@ -479,7 +479,7 @@ impl Policy {
                     Ok(result) => result,
                     Err(error) => {
                         debug!(
-                            profile.base_vm_name,
+                            profile.profile_name,
                             ?base_image_path,
                             ?error,
                             "Failed to calculate image age"
@@ -506,7 +506,7 @@ impl Policy {
 
     pub fn update_ipv4_addresses_for_profile_guests(&mut self) {
         for (key, profile) in self.profiles.iter() {
-            let ipv4_address = get_ipv4_address(&profile.base_vm_name);
+            let ipv4_address = get_ipv4_address(&profile.profile_name); // FIXME: decouple
             let entry = self.ipv4_addresses.entry(key.clone()).or_default();
             if ipv4_address != *entry {
                 info!(
@@ -549,7 +549,7 @@ impl Policy {
         &'s self,
         profile: &'p Profile,
     ) -> impl Iterator<Item = (&'s usize, &'s Runner)> {
-        self.runners_for_profile_key(&profile.base_vm_name)
+        self.runners_for_profile_key(&profile.profile_name)
     }
 
     pub fn runners_for_profile_key<'s, 'p: 's>(
@@ -576,7 +576,7 @@ impl Policy {
         for (_key, profile) in self.profiles() {
             if let Err(error) = self.try_update_screenshot(profile) {
                 debug!(
-                    profile.base_vm_name,
+                    profile.profile_name,
                     ?error,
                     "Failed to update screenshot for profile guest"
                 );
@@ -585,8 +585,8 @@ impl Policy {
     }
 
     fn try_update_screenshot(&self, profile: &Profile) -> eyre::Result<()> {
-        let output_dir = get_profile_data_path(&profile.base_vm_name, None)?;
-        update_screenshot(&profile.base_vm_name, &output_dir)?;
+        let output_dir = get_profile_data_path(&profile.profile_name, None)?;
+        update_screenshot(&profile.profile_name, &output_dir)?; // FIXME: decouple
 
         Ok(())
     }
@@ -869,7 +869,7 @@ impl Policy {
 }
 
 pub fn base_images_path(profile: &Profile) -> PathBuf {
-    Path::new("/var/lib/libvirt/images/base").join(&profile.base_vm_name)
+    Path::new("/var/lib/libvirt/images/base").join(&profile.profile_name)
 }
 
 pub fn runner_images_path(runner_id: usize) -> PathBuf {
@@ -908,7 +908,7 @@ cfg_if! {
                 Ok(result) => result,
                 Err(error) => {
                     debug!(
-                        profile.base_vm_name,
+                        profile.profile_name,
                         ?base_image_path,
                         ?error,
                         "Failed to get file metadata"
@@ -966,8 +966,8 @@ mod test {
         requires_normal_memory: &'static str,
     ) -> Profile {
         Profile {
+            profile_name: key.to_owned(),
             configuration_name: key.to_owned(),
-            base_vm_name: key.to_owned(),
             github_runner_label: key.to_owned(),
             target_count,
             image_type: settings::profile::ImageType::Rust,

@@ -560,7 +560,7 @@ fn monitor_thread() -> eyre::Result<()> {
                     let matching_runners = policy
                         .runners()
                         .filter(|(_, runner)| {
-                            runner.status() == Status::Idle && runner.base_vm_name() == profile
+                            runner.status() == Status::Idle && runner.profile_name() == profile
                         })
                         .take(count)
                         .collect::<Vec<_>>();

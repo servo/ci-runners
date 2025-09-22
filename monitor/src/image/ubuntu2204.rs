@@ -39,7 +39,7 @@ pub(super) fn rebuild(
     wait_duration: Duration,
 ) -> eyre::Result<()> {
     let base_images_path = base_images_path.as_ref();
-    let base_vm_name = &profile.base_vm_name;
+    let profile_guest_name = &profile.profile_name; // FIXME: decouple
     let profile_configuration_path = get_profile_configuration_path(&profile, None)?;
     let config_iso_symlink_path = base_images_path.join(format!("config.iso"));
     let config_iso_filename = format!("config.iso@{snapshot_name}");
@@ -64,8 +64,8 @@ pub(super) fn rebuild(
         &base_image_path,
         &[CdromImage::new("sda", config_iso_path)],
     )?;
-    start_libvirt_guest(base_vm_name)?;
-    wait_for_guest(base_vm_name, wait_duration)?;
+    start_libvirt_guest(profile_guest_name)?;
+    wait_for_guest(profile_guest_name, wait_duration)?;
 
     let base_image_filename = Path::new(
         base_image_path
@@ -88,7 +88,7 @@ pub(super) fn redefine_base_guest_with_symlinks(
         .to_str()
         .ok_or_eyre("Unsupported path")?;
     let base_image_symlink_path = base_images_path.join(format!("base.img"));
-    undefine_libvirt_guest(&profile.base_vm_name)?;
+    undefine_libvirt_guest(&profile.profile_name)?; // FIXME: decouple
     define_base_guest(
         profile,
         &base_image_symlink_path,
@@ -103,10 +103,10 @@ fn define_base_guest(
     base_image_path: &dyn AsRef<OsStr>,
     cdrom_images: &[CdromImage],
 ) -> eyre::Result<()> {
-    let base_vm_name = &profile.base_vm_name;
+    let profile_guest_name = &profile.profile_name; // FIXME: decouple
     let guest_xml_path = get_profile_configuration_path(&profile, Path::new("guest.xml"))?;
     define_libvirt_guest(
-        base_vm_name,
+        profile_guest_name,
         guest_xml_path,
         &[&"-f", &base_image_path],
         cdrom_images,
@@ -134,7 +134,7 @@ pub fn register_runner(profile: &Profile, vm_name: &str) -> eyre::Result<String>
 pub fn create_runner(profile: &Profile, vm_name: &str, runner_id: usize) -> eyre::Result<String> {
     let prefixed_vm_name = format!("{}-{vm_name}", TOML.libvirt_runner_guest_prefix());
     let pipe = || |reader| log_output_as_info(reader);
-    let base_vm_name = &profile.base_vm_name;
+    let profile_guest_name = &profile.profile_name; // FIXME: decouple
 
     // Copy images in the monitor, not with `virt-clone --auto-clone --reflink`,
     // because the latter can’t be parallelised without causing errors.
@@ -145,7 +145,7 @@ pub fn create_runner(profile: &Profile, vm_name: &str, runner_id: usize) -> eyre
     let runner_base_image_path = runner_images_path.join(format!("base.img"));
     reflink_or_copy_with_warning(&base_image_symlink_path, &runner_base_image_path)?;
 
-    spawn_with_output!(virt-clone -o $base_vm_name -n $prefixed_vm_name --preserve-data -f $runner_base_image_path 2>&1)?
+    spawn_with_output!(virt-clone -o $profile_guest_name -n $prefixed_vm_name --preserve-data -f $runner_base_image_path 2>&1)?
         .wait_with_pipe(&mut pipe())?;
 
     Ok(prefixed_vm_name)

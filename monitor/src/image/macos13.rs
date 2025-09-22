@@ -37,7 +37,7 @@ pub(super) fn rebuild(
     wait_duration: Duration,
 ) -> eyre::Result<()> {
     let base_images_path = base_images_path.as_ref();
-    let base_vm_name = &profile.base_vm_name;
+    let profile_guest_name = &profile.profile_name; // FIXME: decouple
 
     let base_image_symlink_path = base_images_path.join(format!("base.img"));
     let base_image_path = create_disk_image(
@@ -49,11 +49,12 @@ pub(super) fn rebuild(
 
     define_base_guest(profile, &base_image_path, &[])?;
     let ovmf_vars_clean_path =
-        format!("/var/lib/libvirt/images/OSX-KVM/OVMF_VARS.{base_vm_name}.clean.fd");
-    let ovmf_vars_path = format!("/var/lib/libvirt/images/OSX-KVM/OVMF_VARS.{base_vm_name}.fd");
+        format!("/var/lib/libvirt/images/OSX-KVM/OVMF_VARS.{profile_guest_name}.clean.fd");
+    let ovmf_vars_path =
+        format!("/var/lib/libvirt/images/OSX-KVM/OVMF_VARS.{profile_guest_name}.fd");
     copy(ovmf_vars_clean_path, ovmf_vars_path)?;
-    start_libvirt_guest(base_vm_name)?;
-    wait_for_guest(base_vm_name, wait_duration)?;
+    start_libvirt_guest(profile_guest_name)?;
+    wait_for_guest(profile_guest_name, wait_duration)?;
 
     let base_image_filename = Path::new(
         base_image_path
@@ -71,7 +72,7 @@ pub(super) fn redefine_base_guest_with_symlinks(
 ) -> Result<(), eyre::Error> {
     let base_images_path = base_images_path.as_ref();
     let base_image_symlink_path = base_images_path.join(format!("base.img"));
-    undefine_libvirt_guest(&profile.base_vm_name)?;
+    undefine_libvirt_guest(&profile.profile_name)?; // FIXME: decouple
     define_base_guest(profile, &base_image_symlink_path, &[])?;
 
     Ok(())
@@ -82,14 +83,14 @@ fn define_base_guest(
     base_image_path: &dyn AsRef<OsStr>,
     cdrom_images: &[CdromImage],
 ) -> eyre::Result<()> {
-    let base_vm_name = &profile.base_vm_name;
+    let profile_guest_name = &profile.profile_name; // FIXME: decouple
     let base_image_path = base_image_path
         .as_ref()
         .to_str()
         .ok_or_eyre("Unsupported path")?;
     // Clone the hand-made clean guest, since we can’t yet automate the macOS install
-    run_cmd!(virt-clone --preserve-data --check path_in_use=off -o $base_vm_name.clean -n $base_vm_name --nvram /var/lib/libvirt/images/OSX-KVM/OVMF_VARS.$base_vm_name.fd --skip-copy sda -f $base_image_path --skip-copy sdc)?;
-    libvirt_change_media(base_vm_name, cdrom_images)?;
+    run_cmd!(virt-clone --preserve-data --check path_in_use=off -o $profile_guest_name.clean -n $profile_guest_name --nvram /var/lib/libvirt/images/OSX-KVM/OVMF_VARS.$profile_guest_name.fd --skip-copy sda -f $base_image_path --skip-copy sdc)?;
+    libvirt_change_media(profile_guest_name, cdrom_images)?;
 
     Ok(())
 }
@@ -111,7 +112,7 @@ pub fn register_runner(profile: &Profile, vm_name: &str) -> eyre::Result<String>
 pub fn create_runner(profile: &Profile, vm_name: &str, runner_id: usize) -> eyre::Result<String> {
     let prefixed_vm_name = format!("{}-{vm_name}", TOML.libvirt_runner_guest_prefix());
     let pipe = || |reader| log_output_as_info(reader);
-    let base_vm_name = &profile.base_vm_name;
+    let profile_guest_name = &profile.profile_name;
 
     // Copy images in the monitor, not with `virt-clone --auto-clone --reflink`,
     // because the latter can’t be parallelised without causing errors.
@@ -122,11 +123,11 @@ pub fn create_runner(profile: &Profile, vm_name: &str, runner_id: usize) -> eyre
     reflink_or_copy_with_warning(&base_image_symlink_path, &runner_base_image_path)?;
 
     let ovmf_vars_base_path =
-        format!("/var/lib/libvirt/images/OSX-KVM/OVMF_VARS.{base_vm_name}.clean.fd");
+        format!("/var/lib/libvirt/images/OSX-KVM/OVMF_VARS.{profile_guest_name}.clean.fd");
     let ovmf_vars_path = format!("/var/lib/libvirt/images/OSX-KVM/OVMF_VARS.{vm_name}.fd");
     copy(ovmf_vars_base_path, ovmf_vars_path)?;
 
-    spawn_with_output!(virt-clone -o $base_vm_name -n $prefixed_vm_name --nvram /var/lib/libvirt/images/OSX-KVM/OVMF_VARS.$vm_name.fd --preserve-data --skip-copy sda -f $runner_base_image_path --skip-copy sdc 2>&1)?.wait_with_pipe(&mut pipe())?;
+    spawn_with_output!(virt-clone -o $profile_guest_name -n $prefixed_vm_name --nvram /var/lib/libvirt/images/OSX-KVM/OVMF_VARS.$vm_name.fd --preserve-data --skip-copy sda -f $runner_base_image_path --skip-copy sdc 2>&1)?.wait_with_pipe(&mut pipe())?;
 
     Ok(prefixed_vm_name)
 }
