@@ -69,7 +69,6 @@ pub struct Dotenv {
     pub dont_register_runners: bool,
     pub dont_create_runners: bool,
     pub main_repo_path: String,
-    // SERVO_CI_DOT_CARGO_PATH not used
 }
 
 #[derive(Deserialize)]
