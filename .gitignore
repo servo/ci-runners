@@ -1,6 +1,12 @@
-/cache/
+/.env
+
+# Running monitor with `cd monitor; cargo run`
 /monitor/data/
 /monitor/target/
 /monitor/monitor.toml
-/.env
+
+# Running monitor with `nix develop -c sudo monitor`
+/data/
+/monitor.toml
+
 /docker/docker_jit_monitor/target/
