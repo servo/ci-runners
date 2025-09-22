@@ -7,13 +7,14 @@ use std::{
 
 use cmd_lib::{run_fun, spawn_with_output};
 use jane_eyre::eyre;
+use settings::TOML;
 use tracing::debug;
 
-use crate::{shell::log_output_as_trace, DOTENV};
+use crate::shell::log_output_as_trace;
 
 pub fn list_runner_guests() -> eyre::Result<Vec<String>> {
     // Output is not filtered by prefix, so we must filter it ourselves.
-    let prefix = libvirt_prefix();
+    let prefix = format!("{}-", TOML.libvirt_runner_guest_prefix());
     let result = run_fun!(virsh list --name --all)?;
     let result = result
         .split_terminator('\n')
@@ -21,10 +22,6 @@ pub fn list_runner_guests() -> eyre::Result<Vec<String>> {
         .map(str::to_owned);
 
     Ok(result.collect())
-}
-
-pub fn libvirt_prefix() -> String {
-    format!("{}-", DOTENV.libvirt_prefix)
 }
 
 pub fn update_screenshot(guest_name: &str, output_dir: &Path) -> Result<(), eyre::Error> {

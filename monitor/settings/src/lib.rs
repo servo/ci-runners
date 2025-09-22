@@ -57,7 +57,6 @@ pub struct Dotenv {
     pub monitor_api_token_authorization_value: String,
     pub github_api_scope: String,
     pub github_api_suffix: String,
-    pub libvirt_prefix: String,
     pub monitor_data_path: Option<String>,
     pub monitor_poll_interval: Duration,
     pub api_cache_timeout: Duration,
@@ -76,6 +75,7 @@ pub struct Toml {
     pub external_base_url: String,
     base_image_max_age: u64,
     dont_update_cached_servo_repo: Option<bool>,
+    libvirt_runner_guest_prefix: Option<String>,
     pub available_1g_hugepages: usize,
     pub available_normal_memory: MemorySize,
     profiles: BTreeMap<String, Profile>,
@@ -90,7 +90,6 @@ impl Dotenv {
             ),
             github_api_scope: env_string("SERVO_CI_GITHUB_API_SCOPE"),
             github_api_suffix: env_string("SERVO_CI_GITHUB_API_SUFFIX"),
-            libvirt_prefix: env_string("SERVO_CI_LIBVIRT_PREFIX"),
             monitor_data_path: env_option_string("SERVO_CI_MONITOR_DATA_PATH"),
             monitor_poll_interval: env_duration_secs("SERVO_CI_MONITOR_POLL_INTERVAL"),
             api_cache_timeout: env_duration_secs("SERVO_CI_API_CACHE_TIMEOUT"),
@@ -111,7 +110,6 @@ impl Dotenv {
     fn load_for_tests() -> Self {
         let mut github_api_scope = None;
         let mut github_api_suffix = None;
-        let mut libvirt_prefix = None;
         let mut monitor_data_path = None;
         let mut monitor_poll_interval = None;
         let mut api_cache_timeout = None;
@@ -141,7 +139,6 @@ impl Dotenv {
                 "SERVO_CI_MONITOR_API_TOKEN" => { /* do nothing (see below) */ }
                 "SERVO_CI_GITHUB_API_SCOPE" => github_api_scope = Some(value),
                 "SERVO_CI_GITHUB_API_SUFFIX" => github_api_suffix = Some(value),
-                "SERVO_CI_LIBVIRT_PREFIX" => libvirt_prefix = Some(value),
                 "SERVO_CI_MONITOR_DATA_PATH" => monitor_data_path = Some(value),
                 "SERVO_CI_MONITOR_POLL_INTERVAL" => monitor_poll_interval = Some(value),
                 "SERVO_CI_API_CACHE_TIMEOUT" => api_cache_timeout = Some(value),
@@ -168,7 +165,6 @@ impl Dotenv {
             ),
             github_api_scope: mandatory_string("SERVO_CI_GITHUB_API_SCOPE", github_api_scope),
             github_api_suffix: mandatory_string("SERVO_CI_GITHUB_API_SUFFIX", github_api_suffix),
-            libvirt_prefix: mandatory_string("SERVO_CI_LIBVIRT_PREFIX", libvirt_prefix),
             monitor_data_path,
             monitor_poll_interval: parse_duration_secs(
                 "SERVO_CI_MONITOR_POLL_INTERVAL",
@@ -260,6 +256,12 @@ impl Toml {
 
     pub fn dont_update_cached_servo_repo(&self) -> bool {
         self.dont_update_cached_servo_repo.unwrap_or(false)
+    }
+
+    pub fn libvirt_runner_guest_prefix(&self) -> &str {
+        self.libvirt_runner_guest_prefix
+            .as_deref()
+            .unwrap_or("ci-runner")
     }
 
     pub fn initial_profiles(&self) -> BTreeMap<String, Profile> {

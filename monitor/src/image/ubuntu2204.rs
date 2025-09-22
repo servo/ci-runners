@@ -9,6 +9,7 @@ use cmd_lib::spawn_with_output;
 use jane_eyre::eyre;
 use jane_eyre::eyre::OptionExt;
 use settings::profile::Profile;
+use settings::TOML;
 use tracing::info;
 use tracing::warn;
 
@@ -22,7 +23,6 @@ use crate::policy::runner_images_path;
 use crate::shell::atomic_symlink;
 use crate::shell::log_output_as_info;
 use crate::shell::reflink_or_copy_with_warning;
-use crate::DOTENV;
 use crate::IMAGE_DEPS_DIR;
 
 use super::create_disk_image;
@@ -132,7 +132,7 @@ pub fn register_runner(profile: &Profile, vm_name: &str) -> eyre::Result<String>
 }
 
 pub fn create_runner(profile: &Profile, vm_name: &str, runner_id: usize) -> eyre::Result<String> {
-    let prefixed_vm_name = format!("{}-{vm_name}", DOTENV.libvirt_prefix);
+    let prefixed_vm_name = format!("{}-{vm_name}", TOML.libvirt_runner_guest_prefix());
     let pipe = || |reader| log_output_as_info(reader);
     let base_vm_name = &profile.base_vm_name;
 
@@ -159,7 +159,7 @@ pub fn destroy_runner(vm_name: &str, runner_id: usize) -> eyre::Result<()> {
         warn!(?runner_base_image_path, ?error, "Failed to delete file");
     }
 
-    let prefixed_vm_name = format!("{}-{vm_name}", DOTENV.libvirt_prefix);
+    let prefixed_vm_name = format!("{}-{vm_name}", TOML.libvirt_runner_guest_prefix());
     let pipe = || |reader| log_output_as_info(reader);
     let _ =
         spawn_with_output!(virsh destroy -- $prefixed_vm_name 2>&1)?.wait_with_pipe(&mut pipe());

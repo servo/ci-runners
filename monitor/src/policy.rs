@@ -949,7 +949,7 @@ mod test {
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     use jane_eyre::eyre;
-    use settings::{profile::Profile, DOTENV};
+    use settings::{profile::Profile, DOTENV, TOML};
 
     use crate::{
         github::{ApiRunner, ApiRunnerLabel},
@@ -1042,14 +1042,20 @@ mod test {
             set_runner_created_time_for_test(runner_id, fake.created_time);
             match fake.status {
                 Status::Invalid => registrations.push(make_registration(&guest_name)),
-                Status::DoneOrUnregistered => {
-                    guest_names.push(format!("{}-{}", DOTENV.libvirt_prefix, guest_name))
-                }
+                Status::DoneOrUnregistered => guest_names.push(format!(
+                    "{}-{}",
+                    TOML.libvirt_runner_guest_prefix(),
+                    guest_name
+                )),
                 Status::Busy => {
                     let mut api_runner = make_registration(&guest_name);
                     api_runner.busy = true;
                     registrations.push(api_runner);
-                    guest_names.push(format!("{}-{}", DOTENV.libvirt_prefix, guest_name));
+                    guest_names.push(format!(
+                        "{}-{}",
+                        TOML.libvirt_runner_guest_prefix(),
+                        guest_name
+                    ));
                 }
                 Status::Reserved => {
                     let mut api_runner = make_registration(&guest_name);
@@ -1063,17 +1069,29 @@ mod test {
                         });
                     }
                     registrations.push(api_runner);
-                    guest_names.push(format!("{}-{}", DOTENV.libvirt_prefix, guest_name));
+                    guest_names.push(format!(
+                        "{}-{}",
+                        TOML.libvirt_runner_guest_prefix(),
+                        guest_name
+                    ));
                 }
                 Status::Idle => {
                     let mut api_runner = make_registration(&guest_name);
                     api_runner.status = "online".to_owned();
                     registrations.push(api_runner);
-                    guest_names.push(format!("{}-{}", DOTENV.libvirt_prefix, guest_name));
+                    guest_names.push(format!(
+                        "{}-{}",
+                        TOML.libvirt_runner_guest_prefix(),
+                        guest_name
+                    ));
                 }
                 Status::StartedOrCrashed => {
                     registrations.push(make_registration(&guest_name));
-                    guest_names.push(format!("{}-{}", DOTENV.libvirt_prefix, guest_name));
+                    guest_names.push(format!(
+                        "{}-{}",
+                        TOML.libvirt_runner_guest_prefix(),
+                        guest_name
+                    ));
                 }
             }
         }

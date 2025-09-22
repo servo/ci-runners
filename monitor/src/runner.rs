@@ -14,13 +14,13 @@ use itertools::Itertools;
 use jane_eyre::eyre::{self, bail};
 use mktemp::Temp;
 use serde::{Deserialize, Serialize};
-use settings::profile::ImageType;
+use settings::{profile::ImageType, TOML};
 use tracing::{error, info, trace, warn};
 
 use crate::{
     data::get_runner_data_path,
     github::ApiRunner,
-    libvirt::{get_ipv4_address, libvirt_prefix, take_screenshot, update_screenshot},
+    libvirt::{get_ipv4_address, take_screenshot, update_screenshot},
     LIB_MONITOR_DIR,
 };
 
@@ -354,7 +354,7 @@ impl Runner {
     }
 
     fn base_vm_name_from_guest_name(&self) -> Option<&str> {
-        let prefix = libvirt_prefix();
+        let prefix = format!("{}-", TOML.libvirt_runner_guest_prefix());
         self.guest_name
             .iter()
             .flat_map(|name| name.strip_prefix(&prefix))

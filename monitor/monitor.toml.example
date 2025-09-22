@@ -7,6 +7,9 @@ base_image_max_age = 86400
 # Uncomment to skip cached Servo repo updates.
 # dont_update_cached_servo_repo = true
 
+# Create libvirt guests for runners as “ci-runner-<profile_name>.0”. Namespace must not be used by anything else!
+# libvirt_runner_guest_prefix = "ci-runner"
+
 # How much memory is available for our runners.
 available_1g_hugepages = 96
 available_normal_memory = "16G"
