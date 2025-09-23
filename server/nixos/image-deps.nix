@@ -20,7 +20,7 @@ in linkFarm "image-deps" {
     url = "https://static.rust-lang.org/rustup/archive/1.28.1/x86_64-apple-darwin/rustup-init";
     hash = "sha256-5LH57GE4YSMiR+DLY2HJuxqGUl1ijs1Ln+rcnvngwig=";
   };
-  "macos13/actions-runner-osx-x64-2.326.0.tar.gz" = fetchurl {
+  "macos13/actions-runner-osx-x64.tar.gz" = fetchurl {
     url = "https://github.com/actions/runner/releases/download/v2.328.0/actions-runner-osx-x64-2.328.0.tar.gz";
     hash = "sha256-kMMtxvKShVM5VjFI84WdxdQC8jfs31cBDIQd88jRLMg=";
   };
@@ -44,7 +44,7 @@ in linkFarm "image-deps" {
     url = "https://static.rust-lang.org/rustup/archive/1.28.1/x86_64-unknown-linux-gnu/rustup-init";
     hash = "sha256-ozOfsATD0LuYYroLzgAYYf5cvenBDRZZHrPznubNPn8=";
   };
-  "ubuntu2204/actions-runner-linux-x64-2.326.0.tar.gz" = fetchurl {
+  "ubuntu2204/actions-runner-linux-x64.tar.gz" = fetchurl {
     url = "https://github.com/actions/runner/releases/download/v2.328.0/actions-runner-linux-x64-2.328.0.tar.gz";
     hash = "sha256-AQZvrTook+Y+bKiArjofrVv5Mp1g537hXyuXwUjDzU4=";
   };
@@ -88,7 +88,7 @@ in linkFarm "image-deps" {
     url = "https://static.rust-lang.org/rustup/archive/1.28.1/x86_64-pc-windows-msvc/rustup-init.exe";
     hash = "sha256-e4MDmhuTBbDFDyOy4vAzGbjXhZsoEG5JuoLAbYEonfY=";
   };
-  "windows10/actions-runner-win-x64-2.326.0.zip" = fetchurl {
+  "windows10/actions-runner-win-x64.zip" = fetchurl {
     url = "https://github.com/actions/runner/releases/download/v2.328.0/actions-runner-win-x64-2.328.0.zip";
     hash = "sha256-pzrhkriyt4Lh2QwIkjAwkwsLlu05T+VkE6BzzG9pSHc=";
   };
