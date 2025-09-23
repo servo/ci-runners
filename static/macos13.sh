@@ -33,15 +33,18 @@ echo 'servo  ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/servo
     mv -v org.servo.ci.plist /Library/LaunchAgents
 )
 
-# Disable the Terminal.app session restore feature to avoid sketchy “command not found” errors
+# Disable the Terminal.app session restore feature to avoid sketchy “command not found” errors.
+# The if condition will fail on macOS 15, which thankfully doesn’t seem to have this “feature”.
 # - Method based on <https://apple.stackexchange.com/a/347045>
 # - Another possible method (2018) <https://superuser.com/a/1303096>
 # - Another method that doesn’t seem to work (2020) <https://superuser.com/a/1610999>
 # - More about the errors <https://apple.stackexchange.com/q/465930>
 # - More about the feature <https://apple.stackexchange.com/q/278372>
 # - Possibly related feature <https://superuser.com/q/1293690>
-find /Users/servo/Library/Saved\ Application\ State/com.apple.Terminal.savedState -depth +0 -delete || mkdir /Users/servo/Library/Saved\ Application\ State/com.apple.Terminal.savedState
-chflags uchg /Users/servo/Library/Saved\ Application\ State/com.apple.Terminal.savedState
+if find /Users/servo/Library/Saved\ Application\ State/com.apple.Terminal.savedState -depth +0 -delete \
+    || mkdir /Users/servo/Library/Saved\ Application\ State/com.apple.Terminal.savedState; then
+    chflags uchg /Users/servo/Library/Saved\ Application\ State/com.apple.Terminal.savedState
+fi
 
 # Shut down the clean image guest
 shutdown -h now
