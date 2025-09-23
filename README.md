@@ -224,4 +224,13 @@ To prepare a server for macOS 13/14/15 guests, build a clean image, replacing â€
 - When the guest shuts down, take another snapshot: `zfs snapshot tank/base/servo-macos13.clean@automated`
 - Copy the clean image to a file: `dd status=progress iflag=fullblock bs=1M if=/dev/zvol/tank/base/servo-macos13.clean of=/var/lib/libvirt/images/servo-macos13.clean.img`
 
+Remote deployment tip. If youâ€™ve deployed the clean image, but now the base image rebuilds are getting stuck at the macOS installer menu, your NVRAM may not be set to boot from the correct disk. You can work around this by nulling out the BaseSystem.dmg disk in the clean guest config:
+
+- Edit the clean guest: `virsh edit servo-macos13.clean`
+- Find the `<disk>` block containing `sdc` and `BaseSystem`
+- Change `<disk type="file" ...>` to `<disk type="block" ...>`
+- Change `<source file="..."/>` to `<source dev="/dev/null"/>`
+- Save and quit (nano): Ctrl+X, Y, Enter
+- Restart the monitor: `systemctl restart monitor`
+
 Building the base vm image is handled automatically by the monitor.
