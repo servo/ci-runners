@@ -25,13 +25,8 @@
   sources = fs.intersection (fs.gitTracked ../..) (
     fs.unions [
       ../../monitor
+      ../../profiles
       ../../shared
-      ../../macos13
-      ../../ubuntu2204
-      ../../ubuntu2204-bench
-      ../../ubuntu2204-rust
-      ../../ubuntu2204-wpt
-      ../../windows10
       ../../reserve-runner.sh
     ]
   );
@@ -76,13 +71,8 @@ in stdenv.mkDerivation rec {
     ln -s ${monitorCrate}/bin/chunker $out/bin/chunker
     cd ..  # cd back out of sourceRoot
     mkdir -p $out/lib/monitor
+    cp -R profiles $out/lib/monitor
     cp -R shared $out/lib/monitor
-    cp -R macos13 $out/lib/monitor
-    cp -R ubuntu2204 $out/lib/monitor
-    cp -R ubuntu2204-bench $out/lib/monitor
-    cp -R ubuntu2204-rust $out/lib/monitor
-    cp -R ubuntu2204-wpt $out/lib/monitor
-    cp -R windows10 $out/lib/monitor
     cp -R reserve-runner.sh $out/lib/monitor
   '';
 

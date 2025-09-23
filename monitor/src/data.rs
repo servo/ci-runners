@@ -36,6 +36,7 @@ pub fn get_profile_configuration_path<'p>(
     path: impl Into<Option<&'p Path>>,
 ) -> eyre::Result<PathBuf> {
     let profile_data = Path::new(&*LIB_MONITOR_DIR)
+        .join("profiles")
         .join(&profile.configuration_name)
         .canonicalize()?;
     let result = match path.into() {
