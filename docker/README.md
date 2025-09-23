@@ -48,3 +48,21 @@ Enable linger by `loginctl enable-linger <USER>` for your user.
 Start the service with `systemctl --user start servo_ci`. You will find logs in `journalctl`.
 You can enable it to start at boot by running `systemctl --user enable servo_ci`.
 
+### Setup email notifications on monitor failure
+
+In the rare case that the runner fails and intervention is required, it can be very useful to receive
+email notifications. The guide below uses `ssmtp` so that we can send authenticated emails. Using just
+`mail` can work to, but increases the risk of mails being filtered out by a spam filter, depending on
+the whole setup.
+
+- Install `ssmtp`: `apt-get install ssmtp mailutils`
+- Configure `/etc/ssmtp/ssmtp.conf` so that it can send emails via the CI email account.
+- Copy `docker_jit_monitor/etc/servo_ci_runner_send_mail.sh` to `$CI_USER/.local/bin/servo_ci_runner_send_mail.sh`
+- Copy `docker_jit_monitor/etc/notify-email@.service` to `~/.config/systemd/user`
+- Test the email configuration by running `systemctl start --user notify-email@servo_ci.service`
+- Edit the `Unit` section of `servo_ci.service to contain:
+  ```
+  [Unit]
+  Description=Run the servo_ci runner
+  OnFailure=notify-email@%i.service
+  ```
