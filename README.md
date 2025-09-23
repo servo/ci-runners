@@ -165,6 +165,7 @@ To prepare a server for macOS 13/14/15 guests, build a clean image, replacing â€
     - Type `/<key>Timeout<`, press **Enter**, type `j0f>wcw5`, press **Escape**, type `:x`, press **Enter**
     - `rm OpenCore.qcow2`
     - `./opencore-image-ng.sh --cfg config.plist --img OpenCore.qcow2`
+    - `cp /var/lib/libvirt/images/OSX-KVM/OpenCore/OpenCore{,.macos13}.qcow2`
 - Create zvol and libvirt guest with random UUID and MAC address
     - `zfs create -V 90G tank/base/servo-macos13.clean`
     - `virsh define profiles/servo-macos13/guest.xml`
