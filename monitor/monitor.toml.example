@@ -25,7 +25,6 @@ requires_normal_memory = "1G"  # Arbitrary non-zero guess
 profile_name = "servo-macos13"
 github_runner_label = "self-hosted-image:macos13"
 target_count = 1
-image_type = "Rust"
 requires_1g_hugepages = 24
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
 
@@ -33,7 +32,6 @@ requires_normal_memory = "1G"  # Arbitrary non-zero guess
 profile_name = "servo-ubuntu2204"
 github_runner_label = "self-hosted-image:ubuntu2204"
 target_count = 1
-image_type = "Rust"
 requires_1g_hugepages = 24
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
 
@@ -41,7 +39,6 @@ requires_normal_memory = "1G"  # Arbitrary non-zero guess
 profile_name = "servo-ubuntu2204-bench"
 github_runner_label = "self-hosted-image:ubuntu2204-bench"
 target_count = 1
-image_type = "Rust"
 requires_1g_hugepages = 24
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
 
@@ -49,7 +46,6 @@ requires_normal_memory = "1G"  # Arbitrary non-zero guess
 profile_name = "servo-ubuntu2204-wpt"
 github_runner_label = "self-hosted-image:ubuntu2204-wpt"
 target_count = 1
-image_type = "Rust"
 requires_1g_hugepages = 24
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
 
@@ -57,6 +53,5 @@ requires_normal_memory = "1G"  # Arbitrary non-zero guess
 profile_name = "servo-ubuntu2204-rust"
 github_runner_label = "self-hosted-image:ubuntu2204-rust"
 target_count = 0
-image_type = "Rust"
 requires_1g_hugepages = 12
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
