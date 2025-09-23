@@ -43,7 +43,9 @@ pub fn take_screenshot(guest_name: &str, output_path: &Path) -> Result<(), eyre:
 }
 
 pub fn get_ipv4_address(guest_name: &str) -> Option<Ipv4Addr> {
-    virsh_domifaddr(guest_name, "lease").or_else(|| virsh_domifaddr(guest_name, "arp"))
+    virsh_domifaddr(guest_name, "lease")
+        .or_else(|| virsh_domifaddr(guest_name, "arp"))
+        .or_else(|| virsh_domifaddr(guest_name, "agent"))
 }
 
 fn virsh_domifaddr(guest_name: &str, source: &str) -> Option<Ipv4Addr> {
@@ -58,11 +60,17 @@ fn virsh_domifaddr(guest_name: &str, source: &str) -> Option<Ipv4Addr> {
 }
 
 fn parse_virsh_domifaddr_output(output: &str) -> Option<Ipv4Addr> {
-    let first_row = output.lines().nth(2)?;
-    let address_with_subnet = first_row.split_ascii_whitespace().nth(3)?;
-    let (address, _subnet) = address_with_subnet.split_once('/')?;
+    for row in output.lines().skip(2) {
+        let address_with_subnet = row.split_ascii_whitespace().nth(3)?;
+        let (address, _subnet) = address_with_subnet.split_once('/')?;
+        if address.starts_with("192.168.100.") {
+            if let Ok(result) = address.parse::<Ipv4Addr>() {
+                return Some(result);
+            }
+        }
+    }
 
-    address.parse::<Ipv4Addr>().ok()
+    None
 }
 
 #[test]
@@ -85,5 +93,21 @@ fn test_parse_virsh_domifaddr_output() {
  vnet91     52:54:00:95:5e:68    ipv4         192.168.100.189/0"
         ),
         Some(Ipv4Addr::from_str("192.168.100.189").expect("Guaranteed by argument"))
+    );
+    // `--source agent` case
+    assert_eq!(
+        parse_virsh_domifaddr_output(
+            r" Name       MAC address          Protocol     Address
+-------------------------------------------------------------------------------
+ lo0        0:0:0:0:0:0          ipv4         127.0.0.1/8
+ -          -                    ipv6         ::1/128
+ -          -                    ipv6         fe80::1/64
+ en0        52:54:0:9b:ba:6e     ipv6         fe80::143b:6173:696:e384/64
+ -          -                    ipv4         192.168.100.133/24
+ utun0      0:0:0:0:0:0          ipv6         fe80::6acf:786a:a5db:69d1/64
+ utun1      0:0:0:0:0:0          ipv6         fe80::f380:1b3c:4f93:2de0/64
+ utun2      0:0:0:0:0:0          ipv6         fe80::ce81:b1c:bd2c:69e/64"
+        ),
+        Some(Ipv4Addr::from_str("192.168.100.133").expect("Guaranteed by argument"))
     );
 }
