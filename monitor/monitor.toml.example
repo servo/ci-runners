@@ -28,6 +28,20 @@ target_count = 1
 requires_1g_hugepages = 24
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
 
+[profiles.servo-macos14]
+profile_name = "servo-macos14"
+github_runner_label = "self-hosted-image:macos14"
+target_count = 1
+requires_1g_hugepages = 24
+requires_normal_memory = "1G"  # Arbitrary non-zero guess
+
+[profiles.servo-macos15]
+profile_name = "servo-macos15"
+github_runner_label = "self-hosted-image:macos15"
+target_count = 1
+requires_1g_hugepages = 24
+requires_normal_memory = "1G"  # Arbitrary non-zero guess
+
 [profiles.servo-ubuntu2204]
 profile_name = "servo-ubuntu2204"
 github_runner_label = "self-hosted-image:ubuntu2204"

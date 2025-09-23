@@ -40,11 +40,12 @@ pub(super) fn rebuild(
     let profile_guest_name = &profile.profile_guest_name();
 
     let base_image_symlink_path = base_images_path.join(format!("base.img"));
+    let initial_contents_path = format!("/var/lib/libvirt/images/{profile_guest_name}.clean.img");
     let base_image_path = create_disk_image(
         base_images_path,
         snapshot_name,
         base_image_size,
-        Path::new("/var/lib/libvirt/images/servo-macos13.clean.img"),
+        Path::new(&initial_contents_path),
     )?;
 
     define_base_guest(profile, &base_image_path, &[])?;

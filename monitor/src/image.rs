@@ -181,6 +181,20 @@ fn rebuild_with_rust(
             ByteSize::gib(90),
             Duration::from_secs(2000),
         ),
+        "servo-macos14" => macos13::rebuild(
+            &base_images_path,
+            &profile,
+            snapshot_name,
+            ByteSize::gib(90),
+            Duration::from_secs(2000),
+        ),
+        "servo-macos15" => macos13::rebuild(
+            &base_images_path,
+            &profile,
+            snapshot_name,
+            ByteSize::gib(90),
+            Duration::from_secs(2000),
+        ),
         "servo-ubuntu2204" => ubuntu2204::rebuild(
             &base_images_path,
             &profile,
@@ -235,6 +249,12 @@ fn rebuild_with_rust(
                 "servo-macos13" => {
                     macos13::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
                 }
+                "servo-macos14" => {
+                    macos13::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
+                }
+                "servo-macos15" => {
+                    macos13::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
+                }
                 "servo-ubuntu2204" => {
                     ubuntu2204::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
                 }
@@ -262,6 +282,8 @@ fn rebuild_with_rust(
 pub fn prune_images(profile: &Profile) -> eyre::Result<()> {
     match &*profile.profile_name {
         "servo-macos13" => macos13::prune_images(profile),
+        "servo-macos14" => macos13::prune_images(profile),
+        "servo-macos15" => macos13::prune_images(profile),
         "servo-ubuntu2204" => ubuntu2204::prune_images(profile),
         "servo-ubuntu2204-bench" => ubuntu2204::prune_images(profile),
         "servo-ubuntu2204-rust" => ubuntu2204::prune_images(profile),
@@ -274,6 +296,8 @@ pub fn prune_images(profile: &Profile) -> eyre::Result<()> {
 pub fn delete_image(profile: &Profile, snapshot_name: &str) {
     match &*profile.profile_name {
         "servo-macos13" => macos13::delete_image(profile, snapshot_name),
+        "servo-macos14" => macos13::delete_image(profile, snapshot_name),
+        "servo-macos15" => macos13::delete_image(profile, snapshot_name),
         "servo-ubuntu2204" => ubuntu2204::delete_image(profile, snapshot_name),
         "servo-ubuntu2204-bench" => ubuntu2204::delete_image(profile, snapshot_name),
         "servo-ubuntu2204-rust" => ubuntu2204::delete_image(profile, snapshot_name),
@@ -286,6 +310,8 @@ pub fn delete_image(profile: &Profile, snapshot_name: &str) {
 pub fn register_runner(profile: &Profile, runner_guest_name: &str) -> eyre::Result<String> {
     match &*profile.profile_name {
         "servo-macos13" => macos13::register_runner(profile, runner_guest_name),
+        "servo-macos14" => macos13::register_runner(profile, runner_guest_name),
+        "servo-macos15" => macos13::register_runner(profile, runner_guest_name),
         "servo-ubuntu2204" => ubuntu2204::register_runner(profile, runner_guest_name),
         "servo-ubuntu2204-bench" => ubuntu2204::register_runner(profile, runner_guest_name),
         "servo-ubuntu2204-rust" => ubuntu2204::register_runner(profile, runner_guest_name),
@@ -302,6 +328,8 @@ pub fn create_runner(
 ) -> eyre::Result<String> {
     match &*profile.profile_name {
         "servo-macos13" => macos13::create_runner(profile, runner_guest_name, runner_id),
+        "servo-macos14" => macos13::create_runner(profile, runner_guest_name, runner_id),
+        "servo-macos15" => macos13::create_runner(profile, runner_guest_name, runner_id),
         "servo-ubuntu2204" => ubuntu2204::create_runner(profile, runner_guest_name, runner_id),
         "servo-ubuntu2204-bench" => {
             ubuntu2204::create_runner(profile, runner_guest_name, runner_id)
@@ -320,6 +348,8 @@ pub fn destroy_runner(
 ) -> eyre::Result<()> {
     match &*profile.profile_name {
         "servo-macos13" => macos13::destroy_runner(runner_guest_name, runner_id),
+        "servo-macos14" => macos13::destroy_runner(runner_guest_name, runner_id),
+        "servo-macos15" => macos13::destroy_runner(runner_guest_name, runner_id),
         "servo-ubuntu2204" => ubuntu2204::destroy_runner(runner_guest_name, runner_id),
         "servo-ubuntu2204-bench" => ubuntu2204::destroy_runner(runner_guest_name, runner_id),
         "servo-ubuntu2204-rust" => ubuntu2204::destroy_runner(runner_guest_name, runner_id),
