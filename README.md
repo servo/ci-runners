@@ -6,12 +6,14 @@ This repo contains:
 - Server config and install scripts
     - `server/nixos` is the NixOS config
 - Templates for CI runner images
-    - `windows10/*` is for **Windows 10** runners
-    - `ubuntu2204/*` is for **Ubuntu 22.04** runners
-    - `macos13/*` is for **macOS 13** runners
+    - `profiles/servo-windows10/*` is for **Windows 10** runners
+    - `profiles/servo-ubuntu2204/*` is for **Ubuntu 22.04** runners
+    - `profiles/servo-macos13/*` is for **macOS 13** runners
+    - `profiles/servo-macos14/*` is for **macOS 14** runners
+    - `profiles/servo-macos15/*` is for **macOS 15** runners
 - A service that automates runner management
     - `monitor` is the service
-    - `.env.example` contains the settings
+    - `.env.example` and `monitor.toml.example` contain the settings
 
 Maintenance guide
 -----------------
@@ -146,16 +148,17 @@ Runners created from this image preinstall all dependencies (including those spe
 
 Building the base vm image is handled automatically by the monitor.
 
-macOS 13 runner
----------------
+macOS 13/14/15 runner
+---------------------
 
 Runners created from this image preinstall all dependencies (including those specified in the main repo, like mach bootstrap deps), preload the main repo, and prebuild Servo in the release profile.
 
-To prepare a server for macOS 13 guests, build a clean image:
+To prepare a server for macOS 13/14/15 guests, build a clean image, replacing “13” with the macOS version as needed:
 
 - Clone the OSX-KVM repo: `git clone --recursive https://github.com/kholia/OSX-KVM.git /var/lib/libvirt/images/OSX-KVM`
-- Download the BaseSystem.dmg for macOS Ventura: `( cd /var/lib/libvirt/images/OSX-KVM; ./fetch-macOS-v2.py )`
-- Convert it to BaseSystem.img: `dmg2img -i /var/lib/libvirt/images/OSX-KVM/BaseSystem.{dmg,img}`
+- Download the BaseSystem.dmg: `( cd /var/lib/libvirt/images/OSX-KVM; ./fetch-macOS-v2.py )`
+- Rename it to reflect the macOS version: `mv /var/lib/libvirt/images/OSX-KVM/BaseSystem{,.macos13}.dmg`
+- Convert that .dmg to .img: `dmg2img -i /var/lib/libvirt/images/OSX-KVM/BaseSystem.macos13.{dmg,img}`
 - Reduce the OpenCore `Timeout` setting:
     - `cd /var/lib/libvirt/images/OSX-KVM/OpenCore`
     - `vim config.plist`
@@ -164,7 +167,7 @@ To prepare a server for macOS 13 guests, build a clean image:
     - `./opencore-image-ng.sh --cfg config.plist --img OpenCore.qcow2`
 - Create zvol and libvirt guest with random UUID and MAC address
     - `zfs create -V 90G tank/base/servo-macos13.clean`
-    - `virsh define macos13/guest.xml`
+    - `virsh define profiles/servo-macos13/guest.xml`
     - `virt-clone --preserve-data --check path_in_use=off -o servo-macos13.init -n servo-macos13.clean --nvram /var/lib/libvirt/images/OSX-KVM/OVMF_VARS.servo-macos13.clean.fd --skip-copy sda -f /dev/zvol/tank/base/servo-macos13.clean --skip-copy sdc`
     - `cp /var/lib/libvirt/images/OSX-KVM/{OVMF_VARS-1920x1080.fd,OVMF_VARS.servo-macos13.clean.fd}`
     - `virsh undefine --keep-nvram servo-macos13.init`
@@ -176,7 +179,9 @@ To prepare a server for macOS 13 guests, build a clean image:
     - Choose the **QEMU HARDDISK Media** listed as **Uninitialized**
     - Click **Erase**, click **Erase**, then click **Done**
     - Press **Cmd**+**Q** to quit Disk Utility
-    - Choose **Reinstall macOS Ventura**
+    - macOS 13: Choose **Reinstall macOS Ventura**
+    - macOS 14: Choose **Reinstall macOS Sonoma**
+    - macOS 15: Choose **Reinstall macOS Sequoia**
     - When asked to select a disk, choose **Untitled**
     - Shut down the guest when you see **Select Your Country or Region**: `virsh shutdown servo-macos13.clean`
 - Take a snapshot: `zfs snapshot tank/base/servo-macos13.clean@fresh-install`
@@ -188,8 +193,11 @@ To prepare a server for macOS 13 guests, build a clean image:
     - If latency is high, **Accessibility** > **Vision** then:
         - \> **Reduce Transparency** = Reduce Transparency
         - \> **Reduce Motion** = Reduce Motion
-    - **Migration Assistant** = Not Now
-    - **Sign In with Your Apple ID** = Set Up Later
+    - TODO: macOS 15: do we need to uncheck the box for allowing password reset via Apple ID?
+    - macOS 13/14: **Migration Assistant** = Not Now
+    - macOS 15: **Transfer Your Data to This Mac** = Set up as new
+    - macOS 13/14: **Sign In with Your Apple ID** = Set Up Later
+    - macOS 15: **Sign In to Your Apple Account** = Set Up Later
     - **Full name** = `servo`
     - **Account name** = `servo`
     - **Password** = `servo2024!`
@@ -197,14 +205,18 @@ To prepare a server for macOS 13 guests, build a clean image:
     - **Select Your Time Zone** > **Closest City:** = UTC - United Kingdom
     - Uncheck **Share Mac Analytics with Apple**
     - **Screen Time** = Set Up Later
+    - macOS 15: **Update Mac Automatically** = Only Download Automatically
+        - TODO: can we prevent the download too?
     - Quit the **Keyboard Setup Assistant**
     - If latency is high:
         - Press **Cmd**+**Space**, type `full keyboard access`, turn it on, then press **Cmd**+**Q**
+        - On macOS 15, this may make some steps *harder* to do with keyboard navigation for some reason
     - Once installed, shut down the guest: `virsh shutdown servo-macos13.clean`
 - When the guest shuts down, take another snapshot: `zfs snapshot tank/base/servo-macos13.clean@oobe`
 - Start the base guest: `virsh start servo-macos13.clean`
 - Log in with the password above
 - Press **Cmd**+**Space**, type `full disk access`, press **Enter**
+    - On macOS 14/15, you may have to explicitly select **Allow applications to access all user files**
 - Click the plus, type the password above, type `/System/Applications/Utilities/Terminal.app`, press **Enter** twice, press **Cmd**+**Q**
 - Press **Cmd**+**Space**, type `terminal`, press **Enter**
 - Type `curl https://ci0.servo.org/static/macos13.sh | sudo sh`, press **Enter**, type the password above, press **Enter**

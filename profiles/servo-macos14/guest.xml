@@ -35,8 +35,8 @@
 	give the clock a tsc timer for kvm to pass to the guest.
 	See comments on the <kvm> and <clock> attributes.
 -->
-  <name>servo-macos13.init</name>
-  <uuid>281ecffa-204e-4528-9ccf-12948f4cb78f</uuid>
+  <name>servo-macos14.init</name>
+  <uuid>8b87553b-45a0-4ad9-a0ab-7e83a2651c6f</uuid>
   <memory unit="KiB">25165824</memory>
   <currentMemory unit="KiB">25165824</currentMemory>
   <memoryBacking>
@@ -82,7 +82,7 @@
     </disk>
     <disk type="file" device="disk">
       <driver name="qemu" type="raw" cache="writeback"/>
-      <source file="/var/lib/libvirt/images/OSX-KVM/BaseSystem.macos13.img"/>
+      <source file="/var/lib/libvirt/images/OSX-KVM/BaseSystem.macos14.img"/>
       <target dev="sdc" bus="sata"/>
       <boot order="3"/>
       <address type="drive" controller="0" bus="0" target="0" unit="2"/>
@@ -208,7 +208,7 @@
     <qemu:arg value='-device'/>
     <qemu:arg value='usb-kbd'/>
     <qemu:arg value='-cpu'/>
-    <qemu:arg value='Penryn,kvm=on,vendor=GenuineIntel,+invtsc,vmware-cpuid-freq=on,+ssse3,+sse4.2,+popcnt,+avx,+aes,+xsave,+xsaveopt,check'/>
+    <qemu:arg value='Haswell-noTSX,kvm=on,vendor=GenuineIntel,+invtsc,vmware-cpuid-freq=on,+ssse3,+sse4.2,+popcnt,+avx,+aes,+xsave,+xsaveopt,check'/>
     <!-- <qemu:arg value='Penryn,vendor=GenuineIntel,+hypervisor,+invtsc,kvm=on,+fma,+avx,+avx2,+aes,+ssse3,+sse4_2,+popcnt,+sse4a,+bmi1,+bmi2'/> -->
     <!-- If you wanna use cpu host-passthrough mode, uncomments below-->
     <!-- <qemu:arg value='host,vendor=GenuineIntel,+hypervisor,+invtsc,kvm=on,+fma,+avx,+avx2,+aes,+ssse3,+sse4_2,+popcnt,+sse4a,+bmi1,+bmi2'/> -->
