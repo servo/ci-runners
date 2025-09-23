@@ -969,7 +969,6 @@ mod test {
     ) -> Profile {
         Profile {
             profile_name: key.to_owned(),
-            configuration_name: key.to_owned(),
             github_runner_label: key.to_owned(),
             target_count,
             image_type: settings::profile::ImageType::Rust,

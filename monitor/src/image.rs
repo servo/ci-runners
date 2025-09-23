@@ -173,43 +173,43 @@ fn rebuild_with_rust(
     let base_images_path = create_base_images_dir(&profile)?;
     undefine_libvirt_guest(&profile.profile_guest_name())?;
 
-    match match match &*profile.configuration_name {
-        "macos13" => macos13::rebuild(
+    match match match &*profile.profile_name {
+        "servo-macos13" => macos13::rebuild(
             &base_images_path,
             &profile,
             snapshot_name,
             ByteSize::gib(90),
             Duration::from_secs(2000),
         ),
-        "ubuntu2204" => ubuntu2204::rebuild(
+        "servo-ubuntu2204" => ubuntu2204::rebuild(
             &base_images_path,
             &profile,
             snapshot_name,
             ByteSize::gib(90),
             Duration::from_secs(2000),
         ),
-        "ubuntu2204-bench" => ubuntu2204::rebuild(
+        "servo-ubuntu2204-bench" => ubuntu2204::rebuild(
             &base_images_path,
             &profile,
             snapshot_name,
             ByteSize::gib(90),
             Duration::from_secs(1000),
         ),
-        "ubuntu2204-rust" => ubuntu2204::rebuild(
+        "servo-ubuntu2204-rust" => ubuntu2204::rebuild(
             &base_images_path,
             &profile,
             snapshot_name,
             ByteSize::gib(20),
             Duration::from_secs(90),
         ),
-        "ubuntu2204-wpt" => ubuntu2204::rebuild(
+        "servo-ubuntu2204-wpt" => ubuntu2204::rebuild(
             &base_images_path,
             &profile,
             snapshot_name,
             ByteSize::gib(90),
             Duration::from_secs(2000),
         ),
-        "windows10" => windows10::rebuild(
+        "servo-windows10" => windows10::rebuild(
             &base_images_path,
             &profile,
             snapshot_name,
@@ -231,23 +231,23 @@ fn rebuild_with_rust(
         result => {
             // After a rebuild attempt, the base guest should always use the symlinks to the last known good image.
             // On success, these will be the new image files. On failure, these will be the old image files.
-            match &*profile.configuration_name {
-                "macos13" => {
+            match &*profile.profile_name {
+                "servo-macos13" => {
                     macos13::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
                 }
-                "ubuntu2204" => {
+                "servo-ubuntu2204" => {
                     ubuntu2204::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
                 }
-                "ubuntu2204-bench" => {
+                "servo-ubuntu2204-bench" => {
                     ubuntu2204::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
                 }
-                "ubuntu2204-rust" => {
+                "servo-ubuntu2204-rust" => {
                     ubuntu2204::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
                 }
-                "ubuntu2204-wpt" => {
+                "servo-ubuntu2204-wpt" => {
                     ubuntu2204::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
                 }
-                "windows10" => {
+                "servo-windows10" => {
                     windows10::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
                 }
                 other => {
@@ -260,37 +260,37 @@ fn rebuild_with_rust(
 }
 
 pub fn prune_images(profile: &Profile) -> eyre::Result<()> {
-    match &*profile.configuration_name {
-        "macos13" => macos13::prune_images(profile),
-        "ubuntu2204" => ubuntu2204::prune_images(profile),
-        "ubuntu2204-bench" => ubuntu2204::prune_images(profile),
-        "ubuntu2204-rust" => ubuntu2204::prune_images(profile),
-        "ubuntu2204-wpt" => ubuntu2204::prune_images(profile),
-        "windows10" => windows10::prune_images(profile),
+    match &*profile.profile_name {
+        "servo-macos13" => macos13::prune_images(profile),
+        "servo-ubuntu2204" => ubuntu2204::prune_images(profile),
+        "servo-ubuntu2204-bench" => ubuntu2204::prune_images(profile),
+        "servo-ubuntu2204-rust" => ubuntu2204::prune_images(profile),
+        "servo-ubuntu2204-wpt" => ubuntu2204::prune_images(profile),
+        "servo-windows10" => windows10::prune_images(profile),
         other => todo!("Image pruning not yet implemented: {other}"),
     }
 }
 
 pub fn delete_image(profile: &Profile, snapshot_name: &str) {
-    match &*profile.configuration_name {
-        "macos13" => macos13::delete_image(profile, snapshot_name),
-        "ubuntu2204" => ubuntu2204::delete_image(profile, snapshot_name),
-        "ubuntu2204-bench" => ubuntu2204::delete_image(profile, snapshot_name),
-        "ubuntu2204-rust" => ubuntu2204::delete_image(profile, snapshot_name),
-        "ubuntu2204-wpt" => ubuntu2204::delete_image(profile, snapshot_name),
-        "windows10" => windows10::delete_image(profile, snapshot_name),
+    match &*profile.profile_name {
+        "servo-macos13" => macos13::delete_image(profile, snapshot_name),
+        "servo-ubuntu2204" => ubuntu2204::delete_image(profile, snapshot_name),
+        "servo-ubuntu2204-bench" => ubuntu2204::delete_image(profile, snapshot_name),
+        "servo-ubuntu2204-rust" => ubuntu2204::delete_image(profile, snapshot_name),
+        "servo-ubuntu2204-wpt" => ubuntu2204::delete_image(profile, snapshot_name),
+        "servo-windows10" => windows10::delete_image(profile, snapshot_name),
         other => todo!("Image pruning not yet implemented: {other}"),
     }
 }
 
 pub fn register_runner(profile: &Profile, runner_guest_name: &str) -> eyre::Result<String> {
-    match &*profile.configuration_name {
-        "macos13" => macos13::register_runner(profile, runner_guest_name),
-        "ubuntu2204" => ubuntu2204::register_runner(profile, runner_guest_name),
-        "ubuntu2204-bench" => ubuntu2204::register_runner(profile, runner_guest_name),
-        "ubuntu2204-rust" => ubuntu2204::register_runner(profile, runner_guest_name),
-        "ubuntu2204-wpt" => ubuntu2204::register_runner(profile, runner_guest_name),
-        "windows10" => windows10::register_runner(profile, runner_guest_name),
+    match &*profile.profile_name {
+        "servo-macos13" => macos13::register_runner(profile, runner_guest_name),
+        "servo-ubuntu2204" => ubuntu2204::register_runner(profile, runner_guest_name),
+        "servo-ubuntu2204-bench" => ubuntu2204::register_runner(profile, runner_guest_name),
+        "servo-ubuntu2204-rust" => ubuntu2204::register_runner(profile, runner_guest_name),
+        "servo-ubuntu2204-wpt" => ubuntu2204::register_runner(profile, runner_guest_name),
+        "servo-windows10" => windows10::register_runner(profile, runner_guest_name),
         other => todo!("Runner registration not yet implemented: {other}"),
     }
 }
@@ -300,13 +300,15 @@ pub fn create_runner(
     runner_guest_name: &str,
     runner_id: usize,
 ) -> eyre::Result<String> {
-    match &*profile.configuration_name {
-        "macos13" => macos13::create_runner(profile, runner_guest_name, runner_id),
-        "ubuntu2204" => ubuntu2204::create_runner(profile, runner_guest_name, runner_id),
-        "ubuntu2204-bench" => ubuntu2204::create_runner(profile, runner_guest_name, runner_id),
-        "ubuntu2204-rust" => ubuntu2204::create_runner(profile, runner_guest_name, runner_id),
-        "ubuntu2204-wpt" => ubuntu2204::create_runner(profile, runner_guest_name, runner_id),
-        "windows10" => windows10::create_runner(profile, runner_guest_name, runner_id),
+    match &*profile.profile_name {
+        "servo-macos13" => macos13::create_runner(profile, runner_guest_name, runner_id),
+        "servo-ubuntu2204" => ubuntu2204::create_runner(profile, runner_guest_name, runner_id),
+        "servo-ubuntu2204-bench" => {
+            ubuntu2204::create_runner(profile, runner_guest_name, runner_id)
+        }
+        "servo-ubuntu2204-rust" => ubuntu2204::create_runner(profile, runner_guest_name, runner_id),
+        "servo-ubuntu2204-wpt" => ubuntu2204::create_runner(profile, runner_guest_name, runner_id),
+        "servo-windows10" => windows10::create_runner(profile, runner_guest_name, runner_id),
         other => todo!("Runner creation not yet implemented: {other}"),
     }
 }
@@ -316,13 +318,13 @@ pub fn destroy_runner(
     runner_guest_name: &str,
     runner_id: usize,
 ) -> eyre::Result<()> {
-    match &*profile.configuration_name {
-        "macos13" => macos13::destroy_runner(runner_guest_name, runner_id),
-        "ubuntu2204" => ubuntu2204::destroy_runner(runner_guest_name, runner_id),
-        "ubuntu2204-bench" => ubuntu2204::destroy_runner(runner_guest_name, runner_id),
-        "ubuntu2204-rust" => ubuntu2204::destroy_runner(runner_guest_name, runner_id),
-        "ubuntu2204-wpt" => ubuntu2204::destroy_runner(runner_guest_name, runner_id),
-        "windows10" => windows10::destroy_runner(runner_guest_name, runner_id),
+    match &*profile.profile_name {
+        "servo-macos13" => macos13::destroy_runner(runner_guest_name, runner_id),
+        "servo-ubuntu2204" => ubuntu2204::destroy_runner(runner_guest_name, runner_id),
+        "servo-ubuntu2204-bench" => ubuntu2204::destroy_runner(runner_guest_name, runner_id),
+        "servo-ubuntu2204-rust" => ubuntu2204::destroy_runner(runner_guest_name, runner_id),
+        "servo-ubuntu2204-wpt" => ubuntu2204::destroy_runner(runner_guest_name, runner_id),
+        "servo-windows10" => windows10::destroy_runner(runner_guest_name, runner_id),
         other => todo!("Runner destruction not yet implemented: {other}"),
     }
 }
