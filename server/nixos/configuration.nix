@@ -216,7 +216,7 @@
       hash = "sha256-mROaUYqcOa+XePl4CzM/zM/mE21ejM2UhyQSYc8emc4=";
     };
 
-    intermittent-tracker = workingDir: {
+    intermittent-tracker-service = workingDir: script: {
       # Wait for networking
       wants = ["network-online.target"];
       after = ["network-online.target"];
@@ -225,15 +225,38 @@
       wantedBy = ["multi-user.target"];
 
       path = ["/run/current-system/sw"];
-      script = ''
-        . .venv/bin/activate
-        FLASK_DEBUG=1 python3 -m intermittent_tracker.flask_server
-      '';
+      inherit script;
 
       serviceConfig = {
         WorkingDirectory = workingDir;
         Restart = "on-failure";
       };
+    };
+    # v1 service requires manual deployment of the app:
+    # $ git clone https://github.com/servo/intermittent-tracker.git <staging|prod>
+    # $ cd <staging|prod>
+    # $ uv venv
+    # $ . .venv/bin/activate
+    # $ uv pip install -r requirements.txt
+    # $ cp config.json.example config.json
+    intermittent-tracker-service-v1 = workingDir:
+      intermittent-tracker-service workingDir ''
+        . .venv/bin/activate
+        FLASK_DEBUG=1 python3 -m intermittent_tracker.flask_server
+      '';
+    intermittent-tracker-service-v2 = workingDir: app:
+      intermittent-tracker-service workingDir ''
+        FLASK_DEBUG=1 ${app}/bin/intermittent_tracker
+      '';
+
+    intermittent-tracker-staging = pkgs.callPackage ./python-app.nix {
+      src = pkgs.fetchFromGitHub {
+        owner = "servo";
+        repo = "intermittent-tracker";
+        rev = "42d55fdcce5e1d4e3aec70e4cfeb575d8569c8d3";
+        hash = "sha256-L8Sk1aL3Na0JFymFj07eCcFIUZ0uYLt1ED2DDKnZ4VU=";
+      };
+      packageName = "intermittent-tracker";
     };
   in {
     # For benchmarking: disable CPU frequency boost, offline SMT siblings, etc.
@@ -255,14 +278,13 @@
       };
     };
 
-    # $ git clone https://github.com/servo/intermittent-tracker.git <staging|prod>
-    # $ cd <staging|prod>
-    # $ uv venv
-    # $ . .venv/bin/activate
-    # $ uv pip install -r requirements.txt
-    # $ cp config.json.example config.json
-    intermittent-tracker-staging = lib.mkIf hasIntermittentTracker (intermittent-tracker "/config/intermittent-tracker/staging");
-    intermittent-tracker-prod = lib.mkIf hasIntermittentTracker (intermittent-tracker "/config/intermittent-tracker/prod");
+    intermittent-tracker-staging = lib.mkIf hasIntermittentTracker
+      (intermittent-tracker-service-v2
+        "/config/intermittent-tracker/staging"
+        intermittent-tracker-staging);
+    intermittent-tracker-prod = lib.mkIf hasIntermittentTracker
+      (intermittent-tracker-service-v1
+        "/config/intermittent-tracker/prod");
 
     monitor = {
       # Wait for networking
