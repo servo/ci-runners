@@ -16,6 +16,7 @@
   libvirt,
   openssh,
   time,
+  unzip,
   virt-manager,
   zfs,
   zsh,
@@ -55,10 +56,10 @@ in stdenv.mkDerivation rec {
     libvirt  # for virsh(1)
     openssh  # for ssh(1)
     time  # for time(1)
+    unzip  # for funzip(1)
     virt-manager  # for virt-clone(1)
     zfs
     zsh
-    # TODO: list other commands needed by scripts here
   ];
 
   # Some of the scripts run in the guest, like {macos13,ubuntu2204}/init.sh.

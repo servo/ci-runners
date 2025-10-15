@@ -30,6 +30,17 @@ pub struct ApiRunnerLabel {
     pub name: String,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ApiWorkflowRunArtifactsResponse {
+    pub artifacts: Vec<ApiArtifact>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ApiArtifact {
+    pub name: String,
+    pub archive_download_url: String,
+}
+
 impl ApiRunner {
     pub fn labels(&self) -> impl Iterator<Item = &str> {
         self.labels.iter().map(|label| label.name.as_str())
@@ -129,4 +140,20 @@ pub fn unregister_runner(id: usize) -> eyre::Result<()> {
         "$github_api_scope/actions/runners/$id")?;
 
     Ok(())
+}
+
+pub fn list_workflow_run_artifacts(
+    qualified_repo: &str,
+    run_id: &str,
+) -> eyre::Result<Vec<ApiArtifact>> {
+    // FIXME: breaks if we have more than 100 artifacts
+    let result = run_fun!(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
+        "/repos/$qualified_repo/actions/runs/$run_id/artifacts?per_page=100")?;
+    let result: ApiWorkflowRunArtifactsResponse =
+        serde_json::from_str(&result).wrap_err("Failed to parse JSON")?;
+    Ok(result.artifacts)
+}
+
+pub fn download_artifact_string(url: &str) -> eyre::Result<String> {
+    Ok(run_fun!(gh api -- $url | funzip)?)
 }

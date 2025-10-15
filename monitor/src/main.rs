@@ -23,7 +23,7 @@ use std::{
 use askama::Template;
 use askama_web::WebTemplate;
 use crossbeam_channel::{Receiver, Sender};
-use jane_eyre::eyre::{self, eyre, Context, OptionExt};
+use jane_eyre::eyre::{self, bail, eyre, Context, OptionExt};
 use mktemp::Temp;
 use rocket::{
     delete,
@@ -47,7 +47,10 @@ use web::{
 use crate::{
     dashboard::Dashboard,
     data::{get_profile_data_path, get_runner_data_path, run_migrations},
-    github::{list_registered_runners_for_host, Cache},
+    github::{
+        download_artifact_string, list_registered_runners_for_host, list_workflow_run_artifacts,
+        Cache,
+    },
     id::IdGen,
     image::{start_libvirt_guest, Rebuilds},
     libvirt::list_runner_guests,
@@ -230,6 +233,77 @@ fn take_runners_route(
     Ok(RawJson(result))
 }
 
+#[post("/select-runner?<unique_id>&<qualified_repo>&<run_id>")]
+fn select_runner_route(
+    unique_id: String,
+    qualified_repo: String,
+    run_id: String,
+) -> rocket_eyre::Result<RawJson<String>> {
+    let artifacts = list_workflow_run_artifacts(&qualified_repo, &run_id)?;
+    let done_artifact = format!("servo-ci-runners_{unique_id}_done");
+    if artifacts
+        .iter()
+        .find(|artifact| artifact.name == done_artifact)
+        .is_some()
+    {
+        Err(EyreReport::InternalServerError(eyre!(
+            "Job has artifact marking it as done: {done_artifact}"
+        )))?;
+    }
+    let args_artifact = format!("servo-ci-runners_{unique_id}");
+    let Some(args_artifact) = artifacts
+        .into_iter()
+        .find(|artifact| artifact.name == args_artifact)
+    else {
+        Err(EyreReport::InternalServerError(eyre!(
+            "No args artifact found: {args_artifact}"
+        )))?
+    };
+    let args_artifact = download_artifact_string(&args_artifact.archive_download_url)?;
+    let mut args = args_artifact
+        .lines()
+        .flat_map(|line| line.split_once("="))
+        .collect::<BTreeMap<&str, &str>>();
+    if args.remove("unique_id") != Some(&*unique_id) {
+        Err(EyreReport::InternalServerError(eyre!(
+            "Wrong unique_id in artifact"
+        )))?;
+    }
+    if args.remove("qualified_repo") != Some(&*qualified_repo) {
+        Err(EyreReport::InternalServerError(eyre!(
+            "Wrong qualified_repo in artifact"
+        )))?;
+    }
+    if args.remove("run_id") != Some(&*run_id) {
+        Err(EyreReport::InternalServerError(eyre!(
+            "Wrong run_id in artifact"
+        )))?;
+    }
+    let Some(profile_key) = args.remove("self_hosted_image_name") else {
+        Err(EyreReport::InternalServerError(eyre!(
+            "Wrong run_id in artifact"
+        )))?
+    };
+
+    let (response_tx, response_rx) = crossbeam_channel::bounded(0);
+    REQUEST.sender.send_timeout(
+        Request::TakeRunners {
+            response_tx,
+            profile_key: profile_key.to_owned(),
+            query: TakeRunnerQuery {
+                unique_id,
+                qualified_repo,
+                run_id,
+            },
+            count: 1,
+        },
+        DOTENV.monitor_thread_send_timeout,
+    )?;
+    let result = response_rx.recv_timeout(DOTENV.monitor_thread_recv_timeout)?;
+
+    Ok(RawJson(result))
+}
+
 #[get("/policy/override")]
 fn get_override_policy_route() -> rocket_eyre::Result<Json<Option<Override>>> {
     let (response_tx, response_rx) = crossbeam_channel::bounded(0);
@@ -388,6 +462,7 @@ async fn main() -> eyre::Result<()> {
                 dashboard_json_route,
                 take_runner_route,
                 take_runners_route,
+                select_runner_route,
                 get_override_policy_route,
                 override_policy_route,
                 delete_override_policy_route,
