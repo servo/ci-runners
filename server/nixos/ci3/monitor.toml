@@ -1,0 +1,53 @@
+# Prepend this to any internal URL in our own responses. Must end with trailing slash.
+external_base_url = "https://ci3.servo.org/"
+
+# GitHub Actions runner scope (`/repos/<owner>/<repo>` or `/orgs/<owner>`).
+github_api_scope = "/orgs/servo"
+
+# Register runners as “name.0@host”, where “host” is a name identifying this host.
+github_api_suffix = "ci3"
+
+# Time to wait before polling for resources again.
+monitor_poll_interval = 5
+
+# Time to cache GitHub API responses, to avoid REST API rate limits.
+api_cache_timeout = 30
+
+# Maximum time to allow a runner to be StartedOrCrashed.
+monitor_start_timeout = 120
+
+# Maximum time to allow a runner to be Reserved.
+monitor_reserve_timeout = 60
+
+# Internals: maximum time to wait when sending to the monitor thread.
+monitor_thread_send_timeout = 10
+
+# Internals: maximum time to wait when receiving from the monitor thread.
+monitor_thread_recv_timeout = 10
+
+# Uncomment to destroy all non-busy runners.
+# destroy_all_non_busy_runners = true
+
+# Uncomment to skip GitHub API registration.
+# dont_register_runners = true
+
+# Uncomment to avoid creating any runners.
+# dont_create_runners = true
+
+# Path to a Servo main repo on the host, to be injected into base images.
+main_repo_path = "/root/servo"
+
+# Maximum age of base images before they need to be rebuilt, in seconds.
+base_image_max_age = 604800
+
+# How much memory is available for our runners.
+available_1g_hugepages = 24
+available_normal_memory = "16G"
+
+[profiles.servo-ubuntu2204-bench]
+profile_name = "servo-ubuntu2204-bench"
+github_runner_label = "self-hosted-image:ubuntu2204-bench"
+target_count = 1
+image_type = "Rust"
+requires_1g_hugepages = 24
+requires_normal_memory = "1G"  # Arbitrary non-zero guess
