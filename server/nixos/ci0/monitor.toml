@@ -4,6 +4,9 @@ external_base_url = "https://ci0.servo.org/"
 # GitHub Actions runner scope (`/repos/<owner>/<repo>` or `/orgs/<owner>`)
 github_api_scope = "/orgs/servo"
 
+# For tokenless runner select, qualified repos must start with this prefix.
+allowed_qualified_repo_prefix = "servo/"
+
 # Register runners as “name.0@host”, where “host” is a name identifying this host.
 github_api_suffix = "ci0"
 

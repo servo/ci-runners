@@ -62,6 +62,7 @@ pub struct Dotenv {
 pub struct Toml {
     pub external_base_url: String,
     pub github_api_scope: String,
+    pub allowed_qualified_repo_prefix: String,
     pub github_api_suffix: String,
     monitor_poll_interval: u64,
     api_cache_timeout: u64,

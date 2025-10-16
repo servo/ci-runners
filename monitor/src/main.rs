@@ -239,6 +239,11 @@ fn select_runner_route(
     qualified_repo: String,
     run_id: String,
 ) -> rocket_eyre::Result<RawJson<String>> {
+    if !qualified_repo.starts_with(&TOML.allowed_qualified_repo_prefix) {
+        Err(EyreReport::InternalServerError(eyre!(
+            "Not allowed on this `qualified_repo`"
+        )))?;
+    }
     let artifacts = list_workflow_run_artifacts(&qualified_repo, &run_id)?;
     let done_artifact = format!("servo-ci-runners_{unique_id}_done");
     if artifacts
