@@ -5,7 +5,6 @@ use std::{
     io::Read,
     net::Ipv4Addr,
     path::Path,
-    process::Command,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
@@ -19,9 +18,8 @@ use tracing::{error, info, trace, warn};
 
 use crate::{
     data::get_runner_data_path,
-    github::ApiRunner,
+    github::{reserve_runner, ApiRunner},
     libvirt::{get_ipv4_address, take_screenshot, update_screenshot},
-    LIB_MONITOR_DIR,
 };
 
 #[derive(Debug, Serialize)]
@@ -139,20 +137,8 @@ impl Runners {
             bail!("Tried to reserve an unregistered runner");
         };
         info!(runner_id = id, registration.id, "Reserving runner");
-        let exit_status = Command::new("./reserve-runner.sh")
-            .current_dir(&*LIB_MONITOR_DIR)
-            .arg(&registration.id.to_string())
-            .arg(unique_id)
-            .arg(format!("{qualified_repo}/actions/runs/{run_id}"))
-            .spawn()
-            .unwrap()
-            .wait()
-            .unwrap();
-        if exit_status.success() {
-            Ok(())
-        } else {
-            eyre::bail!("Command exited with status {}", exit_status);
-        }
+        let reserved_by = format!("{qualified_repo}/actions/runs/{run_id}");
+        reserve_runner(registration.id, unique_id, SystemTime::now(), &reserved_by)
     }
 
     pub fn screenshot_runner(&self, id: usize) -> eyre::Result<Temp> {

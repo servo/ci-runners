@@ -36,7 +36,7 @@ use rocket::{
 };
 use serde::Deserialize;
 use serde_json::json;
-use settings::{IMAGE_DEPS_DIR, LIB_MONITOR_DIR, TOML};
+use settings::{IMAGE_DEPS_DIR, TOML};
 use tokio::try_join;
 use tracing::{debug, error, info, trace, warn};
 use web::{

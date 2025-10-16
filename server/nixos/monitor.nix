@@ -28,7 +28,6 @@
       ../../monitor
       ../../profiles
       ../../shared
-      ../../reserve-runner.sh
     ]
   );
 in stdenv.mkDerivation rec {
@@ -74,7 +73,6 @@ in stdenv.mkDerivation rec {
     mkdir -p $out/lib/monitor
     cp -R profiles $out/lib/monitor
     cp -R shared $out/lib/monitor
-    cp -R reserve-runner.sh $out/lib/monitor
   '';
 
   postFixup = ''
