@@ -6,9 +6,8 @@ use std::{
 use cmd_lib::{run_cmd, run_fun};
 use jane_eyre::eyre::{self, Context};
 use serde::{Deserialize, Serialize};
+use settings::TOML;
 use tracing::trace;
-
-use crate::DOTENV;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ApiRunner {
@@ -70,7 +69,7 @@ impl<Response: Clone + Debug> Cache<Response> {
         if let Some(cached) = &mut self.inner {
             let now = Instant::now();
             let age = now.duration_since(cached.cached_at);
-            if age >= DOTENV.api_cache_timeout {
+            if age >= TOML.api_cache_timeout() {
                 trace!(?age, "Cache expired");
                 self.invalidate();
             } else if self.forced_expiry.is_some_and(|e| now >= e) {
@@ -106,7 +105,7 @@ impl<Response: Clone + Debug> Cache<Response> {
 }
 
 fn list_registered_runners() -> eyre::Result<Vec<ApiRunner>> {
-    let github_api_scope = &DOTENV.github_api_scope;
+    let github_api_scope = &TOML.github_api_scope;
     let result = run_fun!(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
     "$github_api_scope/actions/runners" --paginate -q ".runners[]"
     | jq -s .)?;
@@ -115,7 +114,7 @@ fn list_registered_runners() -> eyre::Result<Vec<ApiRunner>> {
 }
 
 pub fn list_registered_runners_for_host() -> eyre::Result<Vec<ApiRunner>> {
-    let suffix = format!("@{}", DOTENV.github_api_suffix);
+    let suffix = format!("@{}", TOML.github_api_suffix);
     let result = list_registered_runners()?
         .into_iter()
         .filter(|runner| runner.name.ends_with(&suffix));
@@ -124,8 +123,8 @@ pub fn list_registered_runners_for_host() -> eyre::Result<Vec<ApiRunner>> {
 }
 
 pub fn register_runner(runner_name: &str, label: &str, work_folder: &str) -> eyre::Result<String> {
-    let github_api_suffix = &DOTENV.github_api_suffix;
-    let github_api_scope = &DOTENV.github_api_scope;
+    let github_api_suffix = &TOML.github_api_suffix;
+    let github_api_scope = &TOML.github_api_scope;
     let result = run_fun!(gh api --method POST -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
     "$github_api_scope/actions/runners/generate-jitconfig"
     -f "name=$runner_name@$github_api_suffix" -F "runner_group_id=1" -f "work_folder=$work_folder"
@@ -135,7 +134,7 @@ pub fn register_runner(runner_name: &str, label: &str, work_folder: &str) -> eyr
 }
 
 pub fn unregister_runner(id: usize) -> eyre::Result<()> {
-    let github_api_scope = &DOTENV.github_api_scope;
+    let github_api_scope = &TOML.github_api_scope;
     run_cmd!(gh api --method DELETE -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
         "$github_api_scope/actions/runners/$id")?;
 

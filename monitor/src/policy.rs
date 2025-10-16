@@ -17,7 +17,7 @@ use serde::Serialize;
 use settings::{
     profile::{ImageType, Profile},
     units::MemorySize,
-    DOTENV, TOML,
+    TOML,
 };
 use tracing::{debug, info, info_span, warn};
 
@@ -168,12 +168,12 @@ impl Policy {
             .runners()
             .filter(|(_id, runner)| runner.status() == Status::DoneOrUnregistered)
             // Don’t destroy unregistered runners if we aren’t registering them in the first place.
-            .filter(|_| !DOTENV.dont_register_runners);
+            .filter(|_| !TOML.dont_register_runners());
         let started_or_crashed_and_too_old = self.runners().filter(|(_id, runner)| {
             runner.status() == Status::StartedOrCrashed
                 && runner
                     .age()
-                    .map_or(true, |age| age > DOTENV.monitor_start_timeout)
+                    .map_or(true, |age| age > TOML.monitor_start_timeout())
         });
         let reserved_for_too_long = self.runners().filter(|(_id, runner)| {
             runner.status() == Status::Reserved
@@ -181,7 +181,7 @@ impl Policy {
                     .reserved_since()
                     .ok()
                     .flatten()
-                    .map_or(true, |duration| duration > DOTENV.monitor_reserve_timeout)
+                    .map_or(true, |duration| duration > TOML.monitor_reserve_timeout())
         });
 
         // Destroy invalid runners, but don’t count them as healthy.
@@ -289,7 +289,7 @@ impl Policy {
                         get_profile_configuration_path(&profile, Path::new("boot-script"))?,
                         get_runner_data_path(id, Path::new("boot-script"))?,
                     )?;
-                    if !DOTENV.dont_register_runners {
+                    if !TOML.dont_register_runners() {
                         let github_api_registration =
                             register_runner(&profile, &runner_guest_name)?;
                         let mut github_api_registration_file = File::create_new(
@@ -360,7 +360,7 @@ impl Policy {
     }
 
     pub fn target_runner_count(&self, profile: &Profile) -> usize {
-        if DOTENV.dont_create_runners || self.image_needs_rebuild(profile).unwrap_or(true) {
+        if TOML.dont_create_runners() || self.image_needs_rebuild(profile).unwrap_or(true) {
             0
         } else {
             self.target_runner_count_with_override(profile)
@@ -951,7 +951,7 @@ mod test {
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     use jane_eyre::eyre;
-    use settings::{profile::Profile, DOTENV, TOML};
+    use settings::{profile::Profile, TOML};
 
     use crate::{
         github::{ApiRunner, ApiRunnerLabel},
@@ -1035,7 +1035,7 @@ mod test {
             ApiRunner {
                 id: 0,       // any
                 busy: false, // any
-                name: format!("{}@{}", guest_name, DOTENV.github_api_suffix),
+                name: format!("{}@{}", guest_name, TOML.github_api_suffix),
                 status: "".to_owned(), // any
                 labels: vec![],        // any
             }

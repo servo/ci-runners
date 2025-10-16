@@ -1,6 +1,42 @@
 # Prepend this to any internal URL in our own responses. Must end with trailing slash.
 external_base_url = "http://[::1]:8000/"
 
+# GitHub Actions runner scope (`/repos/<owner>/<repo>` or `/orgs/<owner>`).
+github_api_scope = "/repos/delan/servo"
+
+# Register runners as “name.0@host”, where “host” is a name identifying this host.
+github_api_suffix = "host"
+
+# Time to wait before polling for resources again.
+monitor_poll_interval = 5
+
+# Time to cache GitHub API responses, to avoid REST API rate limits.
+api_cache_timeout = 30
+
+# Maximum time to allow a runner to be StartedOrCrashed.
+monitor_start_timeout = 120
+
+# Maximum time to allow a runner to be Reserved.
+monitor_reserve_timeout = 60
+
+# Internals: maximum time to wait when sending to the monitor thread.
+monitor_thread_send_timeout = 10
+
+# Internals: maximum time to wait when receiving from the monitor thread.
+monitor_thread_recv_timeout = 10
+
+# Uncomment to destroy all non-busy runners.
+# destroy_all_non_busy_runners = true
+
+# Uncomment to skip GitHub API registration.
+# dont_register_runners = true
+
+# Uncomment to avoid creating any runners.
+# dont_create_runners = true
+
+# Path to a Servo main repo on the host, to be injected into base images.
+main_repo_path = "/home/me/servo"
+
 # Maximum age of base images before they need to be rebuilt, in seconds.
 base_image_max_age = 86400
 

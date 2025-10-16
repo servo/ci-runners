@@ -55,24 +55,24 @@ pub struct Dotenv {
     // GITHUB_TOKEN not used
     // LIBVIRT_DEFAULT_URI not used
     pub monitor_api_token_authorization_value: String,
-    pub github_api_scope: String,
-    pub github_api_suffix: String,
     pub monitor_data_path: Option<String>,
-    pub monitor_poll_interval: Duration,
-    pub api_cache_timeout: Duration,
-    pub monitor_start_timeout: Duration,
-    pub monitor_reserve_timeout: Duration,
-    pub monitor_thread_send_timeout: Duration,
-    pub monitor_thread_recv_timeout: Duration,
-    pub destroy_all_non_busy_runners: bool,
-    pub dont_register_runners: bool,
-    pub dont_create_runners: bool,
-    pub main_repo_path: String,
 }
 
 #[derive(Deserialize)]
 pub struct Toml {
     pub external_base_url: String,
+    pub github_api_scope: String,
+    pub github_api_suffix: String,
+    monitor_poll_interval: u64,
+    api_cache_timeout: u64,
+    monitor_start_timeout: u64,
+    monitor_reserve_timeout: u64,
+    monitor_thread_send_timeout: u64,
+    monitor_thread_recv_timeout: u64,
+    destroy_all_non_busy_runners: Option<bool>,
+    dont_register_runners: Option<bool>,
+    dont_create_runners: Option<bool>,
+    pub main_repo_path: String,
     base_image_max_age: u64,
     dont_update_cached_servo_repo: Option<bool>,
     libvirt_runner_guest_prefix: Option<String>,
@@ -88,19 +88,7 @@ impl Dotenv {
             monitor_api_token_authorization_value: Self::monitor_api_token_authorization_value(
                 &monitor_api_token,
             ),
-            github_api_scope: env_string("SERVO_CI_GITHUB_API_SCOPE"),
-            github_api_suffix: env_string("SERVO_CI_GITHUB_API_SUFFIX"),
             monitor_data_path: env_option_string("SERVO_CI_MONITOR_DATA_PATH"),
-            monitor_poll_interval: env_duration_secs("SERVO_CI_MONITOR_POLL_INTERVAL"),
-            api_cache_timeout: env_duration_secs("SERVO_CI_API_CACHE_TIMEOUT"),
-            monitor_start_timeout: env_duration_secs("SERVO_CI_MONITOR_START_TIMEOUT"),
-            monitor_reserve_timeout: env_duration_secs("SERVO_CI_MONITOR_RESERVE_TIMEOUT"),
-            monitor_thread_send_timeout: env_duration_secs("SERVO_CI_MONITOR_THREAD_SEND_TIMEOUT"),
-            monitor_thread_recv_timeout: env_duration_secs("SERVO_CI_MONITOR_THREAD_RECV_TIMEOUT"),
-            destroy_all_non_busy_runners: env_bool("SERVO_CI_DESTROY_ALL_NON_BUSY_RUNNERS"),
-            dont_register_runners: env_bool("SERVO_CI_DONT_REGISTER_RUNNERS"),
-            dont_create_runners: env_bool("SERVO_CI_DONT_CREATE_RUNNERS"),
-            main_repo_path: env_string("SERVO_CI_MAIN_REPO_PATH"),
         };
 
         result.validate()
@@ -108,19 +96,7 @@ impl Dotenv {
 
     #[cfg(any(test, feature = "test"))]
     fn load_for_tests() -> Self {
-        let mut github_api_scope = None;
-        let mut github_api_suffix = None;
         let mut monitor_data_path = None;
-        let mut monitor_poll_interval = None;
-        let mut api_cache_timeout = None;
-        let mut monitor_start_timeout = None;
-        let mut monitor_reserve_timeout = None;
-        let mut monitor_thread_send_timeout = None;
-        let mut monitor_thread_recv_timeout = None;
-        let mut destroy_all_non_busy_runners = None;
-        let mut dont_register_runners = None;
-        let mut dont_create_runners = None;
-        let mut main_repo_path = None;
 
         // TODO: find a way to do this without a temporary file
         use std::io::Write;
@@ -137,21 +113,7 @@ impl Dotenv {
             let (key, value) = entry.expect("Failed to load entry");
             match &*key {
                 "SERVO_CI_MONITOR_API_TOKEN" => { /* do nothing (see below) */ }
-                "SERVO_CI_GITHUB_API_SCOPE" => github_api_scope = Some(value),
-                "SERVO_CI_GITHUB_API_SUFFIX" => github_api_suffix = Some(value),
                 "SERVO_CI_MONITOR_DATA_PATH" => monitor_data_path = Some(value),
-                "SERVO_CI_MONITOR_POLL_INTERVAL" => monitor_poll_interval = Some(value),
-                "SERVO_CI_API_CACHE_TIMEOUT" => api_cache_timeout = Some(value),
-                "SERVO_CI_MONITOR_START_TIMEOUT" => monitor_start_timeout = Some(value),
-                "SERVO_CI_MONITOR_RESERVE_TIMEOUT" => monitor_reserve_timeout = Some(value),
-                "SERVO_CI_MONITOR_THREAD_SEND_TIMEOUT" => monitor_thread_send_timeout = Some(value),
-                "SERVO_CI_MONITOR_THREAD_RECV_TIMEOUT" => monitor_thread_recv_timeout = Some(value),
-                "SERVO_CI_DESTROY_ALL_NON_BUSY_RUNNERS" => {
-                    destroy_all_non_busy_runners = Some(value)
-                }
-                "SERVO_CI_DONT_REGISTER_RUNNERS" => dont_register_runners = Some(value),
-                "SERVO_CI_DONT_CREATE_RUNNERS" => dont_create_runners = Some(value),
-                "SERVO_CI_MAIN_REPO_PATH" => main_repo_path = Some(value),
                 _ => { /* do nothing */ }
             }
         }
@@ -163,40 +125,7 @@ impl Dotenv {
             monitor_api_token_authorization_value: Self::monitor_api_token_authorization_value(
                 monitor_api_token,
             ),
-            github_api_scope: mandatory_string("SERVO_CI_GITHUB_API_SCOPE", github_api_scope),
-            github_api_suffix: mandatory_string("SERVO_CI_GITHUB_API_SUFFIX", github_api_suffix),
             monitor_data_path,
-            monitor_poll_interval: parse_duration_secs(
-                "SERVO_CI_MONITOR_POLL_INTERVAL",
-                monitor_poll_interval,
-            ),
-            api_cache_timeout: parse_duration_secs("SERVO_CI_API_CACHE_TIMEOUT", api_cache_timeout),
-            monitor_start_timeout: parse_duration_secs(
-                "SERVO_CI_MONITOR_START_TIMEOUT",
-                monitor_start_timeout,
-            ),
-            monitor_reserve_timeout: parse_duration_secs(
-                "SERVO_CI_MONITOR_RESERVE_TIMEOUT",
-                monitor_reserve_timeout,
-            ),
-            monitor_thread_send_timeout: parse_duration_secs(
-                "SERVO_CI_MONITOR_THREAD_SEND_TIMEOUT",
-                monitor_thread_send_timeout,
-            ),
-            monitor_thread_recv_timeout: parse_duration_secs(
-                "SERVO_CI_MONITOR_THREAD_RECV_TIMEOUT",
-                monitor_thread_recv_timeout,
-            ),
-            destroy_all_non_busy_runners: parse_bool(
-                "SERVO_CI_DESTROY_ALL_NON_BUSY_RUNNERS",
-                destroy_all_non_busy_runners,
-            ),
-            dont_register_runners: parse_bool(
-                "SERVO_CI_DONT_REGISTER_RUNNERS",
-                dont_register_runners,
-            ),
-            dont_create_runners: parse_bool("SERVO_CI_DONT_CREATE_RUNNERS", dont_create_runners),
-            main_repo_path: mandatory_string("SERVO_CI_MAIN_REPO_PATH", main_repo_path),
         };
 
         result.validate()
@@ -250,6 +179,42 @@ impl Toml {
         Ok(self)
     }
 
+    pub fn monitor_poll_interval(&self) -> Duration {
+        Duration::from_secs(self.monitor_poll_interval)
+    }
+
+    pub fn api_cache_timeout(&self) -> Duration {
+        Duration::from_secs(self.api_cache_timeout)
+    }
+
+    pub fn monitor_start_timeout(&self) -> Duration {
+        Duration::from_secs(self.monitor_start_timeout)
+    }
+
+    pub fn monitor_reserve_timeout(&self) -> Duration {
+        Duration::from_secs(self.monitor_reserve_timeout)
+    }
+
+    pub fn monitor_thread_send_timeout(&self) -> Duration {
+        Duration::from_secs(self.monitor_thread_send_timeout)
+    }
+
+    pub fn monitor_thread_recv_timeout(&self) -> Duration {
+        Duration::from_secs(self.monitor_thread_recv_timeout)
+    }
+
+    pub fn destroy_all_non_busy_runners(&self) -> bool {
+        self.destroy_all_non_busy_runners.unwrap_or(false)
+    }
+
+    pub fn dont_register_runners(&self) -> bool {
+        self.dont_register_runners.unwrap_or(false)
+    }
+
+    pub fn dont_create_runners(&self) -> bool {
+        self.dont_create_runners.unwrap_or(false)
+    }
+
     pub fn base_image_max_age(&self) -> Duration {
         Duration::from_secs(self.base_image_max_age)
     }
@@ -283,26 +248,4 @@ fn env_string(key: &str) -> String {
 
 fn mandatory_string(key: &str, value: Option<String>) -> String {
     value.expect(&format!("{key} not defined!"))
-}
-
-fn parse_u64(key: &str, value: Option<String>) -> u64 {
-    mandatory_string(key, value)
-        .parse()
-        .expect(&format!("Failed to parse {key}!"))
-}
-
-fn env_duration_secs(key: &str) -> Duration {
-    parse_duration_secs(key, env_option_string(key))
-}
-
-fn parse_duration_secs(key: &str, value: Option<String>) -> Duration {
-    Duration::from_secs(parse_u64(key, value))
-}
-
-fn env_bool(key: &str) -> bool {
-    parse_bool(key, env::var_os(key).map(|_| "".to_owned()))
-}
-
-fn parse_bool(_key: &str, value: Option<String>) -> bool {
-    value.is_some()
 }

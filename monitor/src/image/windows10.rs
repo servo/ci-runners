@@ -9,7 +9,6 @@ use cmd_lib::spawn_with_output;
 use jane_eyre::eyre;
 use jane_eyre::eyre::OptionExt;
 use settings::profile::Profile;
-use settings::TOML;
 use tracing::info;
 use tracing::warn;
 

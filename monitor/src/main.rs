@@ -23,7 +23,7 @@ use std::{
 use askama::Template;
 use askama_web::WebTemplate;
 use crossbeam_channel::{Receiver, Sender};
-use jane_eyre::eyre::{self, bail, eyre, Context, OptionExt};
+use jane_eyre::eyre::{self, eyre, Context, OptionExt};
 use mktemp::Temp;
 use rocket::{
     delete,
@@ -36,7 +36,7 @@ use rocket::{
 };
 use serde::Deserialize;
 use serde_json::json;
-use settings::{DOTENV, IMAGE_DEPS_DIR, LIB_MONITOR_DIR, TOML};
+use settings::{IMAGE_DEPS_DIR, LIB_MONITOR_DIR, TOML};
 use tokio::try_join;
 use tracing::{debug, error, info, trace, warn};
 use web::{
@@ -195,9 +195,9 @@ fn take_runner_route(
             },
             count: 1,
         },
-        DOTENV.monitor_thread_send_timeout,
+        TOML.monitor_thread_send_timeout(),
     )?;
-    let result = response_rx.recv_timeout(DOTENV.monitor_thread_recv_timeout)?;
+    let result = response_rx.recv_timeout(TOML.monitor_thread_recv_timeout())?;
 
     Ok(RawJson(result))
 }
@@ -223,11 +223,11 @@ fn take_runners_route(
             },
             count,
         },
-        DOTENV.monitor_thread_send_timeout,
+        TOML.monitor_thread_send_timeout(),
     )?;
     let result = response_rx.recv_timeout(
         // TODO: make this configurable?
-        DOTENV.monitor_thread_recv_timeout + Duration::from_secs(count as u64),
+        TOML.monitor_thread_recv_timeout() + Duration::from_secs(count as u64),
     )?;
 
     Ok(RawJson(result))
@@ -297,9 +297,9 @@ fn select_runner_route(
             },
             count: 1,
         },
-        DOTENV.monitor_thread_send_timeout,
+        TOML.monitor_thread_send_timeout(),
     )?;
-    let result = response_rx.recv_timeout(DOTENV.monitor_thread_recv_timeout)?;
+    let result = response_rx.recv_timeout(TOML.monitor_thread_recv_timeout())?;
 
     Ok(RawJson(result))
 }
@@ -309,11 +309,11 @@ fn get_override_policy_route() -> rocket_eyre::Result<Json<Option<Override>>> {
     let (response_tx, response_rx) = crossbeam_channel::bounded(0);
     REQUEST.sender.send_timeout(
         Request::GetOverridePolicy { response_tx },
-        DOTENV.monitor_thread_send_timeout,
+        TOML.monitor_thread_send_timeout(),
     )?;
 
     Ok(Json(
-        response_rx.recv_timeout(DOTENV.monitor_thread_recv_timeout)?,
+        response_rx.recv_timeout(TOML.monitor_thread_recv_timeout())?,
     ))
 }
 
@@ -328,11 +328,11 @@ fn override_policy_route(
             response_tx,
             profile_override_counts,
         },
-        DOTENV.monitor_thread_send_timeout,
+        TOML.monitor_thread_send_timeout(),
     )?;
 
     Ok(Json(
-        response_rx.recv_timeout(DOTENV.monitor_thread_recv_timeout)??,
+        response_rx.recv_timeout(TOML.monitor_thread_recv_timeout())??,
     ))
 }
 
@@ -341,11 +341,11 @@ fn delete_override_policy_route(_auth: ApiKeyGuard) -> rocket_eyre::Result<Json<
     let (response_tx, response_rx) = crossbeam_channel::bounded(0);
     REQUEST.sender.send_timeout(
         Request::CancelOverridePolicy { response_tx },
-        DOTENV.monitor_thread_send_timeout,
+        TOML.monitor_thread_send_timeout(),
     )?;
 
     Ok(Json(
-        response_rx.recv_timeout(DOTENV.monitor_thread_recv_timeout)??,
+        response_rx.recv_timeout(TOML.monitor_thread_recv_timeout())??,
     ))
 }
 
@@ -375,9 +375,9 @@ fn runner_screenshot_now_route(runner_id: usize) -> rocket_eyre::Result<(Content
             response_tx,
             runner_id,
         },
-        DOTENV.monitor_thread_send_timeout,
+        TOML.monitor_thread_send_timeout(),
     )?;
-    let path = response_rx.recv_timeout(DOTENV.monitor_thread_recv_timeout)??;
+    let path = response_rx.recv_timeout(TOML.monitor_thread_recv_timeout())??;
     debug!(?path);
 
     // Moving `path` into File ensures Temp is not dropped until close
@@ -394,10 +394,10 @@ fn github_jitconfig_route(
             response_tx,
             remote_addr,
         },
-        DOTENV.monitor_thread_send_timeout,
+        TOML.monitor_thread_send_timeout(),
     )?;
     let result = response_rx
-        .recv_timeout(DOTENV.monitor_thread_recv_timeout)?
+        .recv_timeout(TOML.monitor_thread_recv_timeout())?
         .map_err(EyreReport::ServiceUnavailable)?;
 
     Ok(RawJson(json!(result).to_string()))
@@ -411,10 +411,10 @@ fn boot_script_route(remote_addr: web::auth::RemoteAddr) -> rocket_eyre::Result<
             response_tx,
             remote_addr,
         },
-        DOTENV.monitor_thread_send_timeout,
+        TOML.monitor_thread_send_timeout(),
     )?;
     let result = response_rx
-        .recv_timeout(DOTENV.monitor_thread_recv_timeout)?
+        .recv_timeout(TOML.monitor_thread_recv_timeout())?
         .map_err(EyreReport::ServiceUnavailable)?;
 
     Ok(RawText(result))
@@ -480,7 +480,7 @@ async fn main() -> eyre::Result<()> {
         .mount(
             "/cache/servo/",
             FileServer::new(
-                &DOTENV.main_repo_path,
+                &TOML.main_repo_path,
                 rocket::fs::Options::NormalizeDirs | rocket::fs::Options::DotFiles,
             ),
         )
@@ -558,7 +558,7 @@ fn monitor_thread() -> eyre::Result<()> {
         policy.update_screenshots();
         policy.update_ipv4_addresses_for_profile_guests();
 
-        if DOTENV.destroy_all_non_busy_runners {
+        if TOML.destroy_all_non_busy_runners() {
             let non_busy_runners = policy
                 .runners()
                 .filter(|(_id, runner)| runner.status() != Status::Busy);
@@ -616,7 +616,7 @@ fn monitor_thread() -> eyre::Result<()> {
         }
 
         // Handle one request from the API.
-        if let Ok(request) = REQUEST.receiver.recv_timeout(DOTENV.monitor_poll_interval) {
+        if let Ok(request) = REQUEST.receiver.recv_timeout(TOML.monitor_poll_interval()) {
             info!(?request, "Received API request");
 
             match request {

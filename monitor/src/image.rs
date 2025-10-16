@@ -19,7 +19,7 @@ use bytesize::ByteSize;
 use chrono::{SecondsFormat, Utc};
 use cmd_lib::{run_cmd, spawn_with_output};
 use jane_eyre::eyre::{self, bail, OptionExt};
-use settings::{profile::Profile, DOTENV, TOML};
+use settings::{profile::Profile, TOML};
 use tracing::{debug, error, info, trace, warn};
 
 use crate::{
@@ -148,7 +148,7 @@ impl Rebuilds {
 fn servo_update_thread() -> eyre::Result<()> {
     info!("Starting repo update");
 
-    let main_repo_path = &DOTENV.main_repo_path;
+    let main_repo_path = &TOML.main_repo_path;
     let pipe = || |reader| log_output_as_info(reader);
     spawn_with_output!(git -C $main_repo_path reset --hard 2>&1)?.wait_with_pipe(&mut pipe())?;
     spawn_with_output!(git -C $main_repo_path fetch origin main 2>&1)?
