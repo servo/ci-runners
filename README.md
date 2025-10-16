@@ -134,6 +134,23 @@ $ vim -p /config/monitor/.env /config/monitor/monitor.toml
 $ systemctl restart monitor
 ```
 
+Hacking on the monitor locally
+------------------------------
+
+Easy but slow way:
+
+```
+$ nix develop -c sudo [RUST_BACKTRACE=1] monitor
+```
+
+Harder but faster way:
+
+```
+$ export RUSTFLAGS=-Clink-arg=-fuse-ld=mold
+$ cargo build --manifest-path monitor/Cargo.toml
+$ sudo [RUST_BACKTRACE=1] IMAGE_DEPS_DIR=$(nix eval --raw .\#image-deps) LIB_MONITOR_DIR=. monitor/target/debug/monitor
+```
+
 Windows 10 runner
 -----------------
 

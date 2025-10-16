@@ -230,7 +230,7 @@ impl Toml {
 
     #[cfg(any(test, feature = "test"))]
     fn load_for_tests() -> eyre::Result<Self> {
-        let result: Toml = toml::from_str(include_str!("../../monitor.toml.example"))?;
+        let result: Toml = toml::from_str(include_str!("../../../monitor.toml.example"))?;
 
         result.validate()
     }
