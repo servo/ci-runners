@@ -7,6 +7,9 @@ case "$action" in
     for host; do
         ./deploy -s "$host".servo.org "$host"
     done
+    for host; do
+        printf '>>> %s\n' https://"$host".servo.org
+    done
     ;;
 (read)
     for host; do
@@ -18,6 +21,8 @@ case "$action" in
     for host; do
         rsync "$host"/{.env,monitor.toml} root@"$host".servo.org:/config/monitor/
     done
+    ;;
+(restart-monitor)
     for host; do
         ssh root@"$host".servo.org systemctl restart monitor
     done

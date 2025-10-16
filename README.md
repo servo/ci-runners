@@ -37,7 +37,7 @@ $ ./deploy -s ci3.servo.org ci3
 $ ./deploy -s ci4.servo.org ci4
 ```
 
-To deploy, read monitor config, write monitor config, or run a command on one or more servers:
+To deploy, read monitor config, write monitor config, restart the monitor, or run a command on one or more servers:
 
 ```
 $ cd server/nixos
@@ -45,6 +45,7 @@ $ ./do <deploy|read|write> [host ...]
 $ ./do deploy ci0 ci1 ci2
 $ ./do read ci0 ci1
 $ ./do write ci1 ci2
+$ ./do restart-monitor ci0 ci1 ci2
 
 $ ./do run [host ...] -- <command ...>
 $ ./do run ci0 ci2 -- virsh edit servo-ubuntu2204
