@@ -8,102 +8,130 @@ $ ./download-logs.sh ci{0..4}.servo.org
 $ cargo run -r -- ci{0..4}.servo.org.log
 ```
 
-## 2025-09-24
+## 2025-10-27
 
 ```
-$ cargo run -r -- ci{0..2}.servo.org.log
+$ cargo run -r -- ci{0..4}.servo.org.log
 ```
 ### ci0.servo.org.log
-Over the last PT4134359.863421S (47.85 days) of uptime:
-- 14 runners in profile servo-macos13:
-    - Busy for 0.25%, PT10293.37245S (0.12 days)
-    - DoneOrUnregistered for 0.00%, PT74.156025S (0.00 days)
-    - Idle for 1.06%, PT43936.083203S (0.51 days)
-    - Reserved for 0.01%, PT297.483276S (0.00 days)
-    - StartedOrCrashed for 0.01%, PT580.52404S (0.01 days)
-- 2956 runners in profile servo-ubuntu2204:
-    - Busy for 11.89%, PT491583.851343S (5.69 days)
-    - DoneOrUnregistered for 0.13%, PT5172.208085S (0.06 days)
-    - Idle for 178.89%, PT7396007.395667S (85.60 days)
+Over the last PT4359414.12643S (50.46 days) of uptime:
+- 647 runners in profile servo-macos13:
+    - Busy for 13.18%, PT574580.774981S (6.65 days)
+    - DoneOrUnregistered for 0.09%, PT3930.32133S (0.05 days)
+    - Idle for 52.37%, PT2283090.212073S (26.42 days)
+    - Reserved for 0.34%, PT14667.737668S (0.17 days)
+    - StartedOrCrashed for 0.58%, PT25336.974917S (0.29 days)
+- 2817 runners in profile servo-ubuntu2204:
+    - Busy for 9.41%, PT410177.701741S (4.75 days)
+    - DoneOrUnregistered for 0.11%, PT4579.755804S (0.05 days)
+    - Idle for 116.50%, PT5078926.710406S (58.78 days)
     - Invalid for 0.00%, PT25.612676S (0.00 days)
-    - Reserved for 0.50%, PT20800.647281S (0.24 days)
-    - StartedOrCrashed for 6.24%, PT257963.814314S (2.99 days)
-- 3768 runners in profile servo-windows10:
-    - Busy for 26.32%, PT1088329.166799S (12.60 days)
-    - DoneOrUnregistered for 0.23%, PT9603.388518S (0.11 days)
-    - Idle for 163.43%, PT6756947.0056S (78.21 days)
+    - Reserved for 0.39%, PT16942.403332S (0.20 days)
+    - StartedOrCrashed for 5.87%, PT255687.732156S (2.96 days)
+- 3740 runners in profile servo-windows10:
+    - Busy for 29.57%, PT1288939.629473S (14.92 days)
+    - DoneOrUnregistered for 0.24%, PT10333.818407S (0.12 days)
+    - Idle for 160.65%, PT7003371.818586S (81.06 days)
     - Invalid for 0.00%, PT126.549871S (0.00 days)
-    - Reserved for 1.09%, PT44910.582155S (0.52 days)
-    - StartedOrCrashed for 7.02%, PT290195.324798S (3.36 days)
+    - Reserved for 1.02%, PT44577.186043S (0.52 days)
+    - StartedOrCrashed for 6.66%, PT290504.057738S (3.36 days)
 ### ci1.servo.org.log
-Over the last PT4226954.94317S (48.92 days) of uptime:
-- 2484 runners in profile servo-macos13:
-    - Busy for 12.75%, PT539036.593032S (6.24 days)
-    - DoneOrUnregistered for 0.11%, PT4855.302898S (0.06 days)
-    - Idle for 78.29%, PT3309280.06831S (38.30 days)
+Over the last PT4397509.039447S (50.90 days) of uptime:
+- 1411 runners in profile servo-macos13:
+    - Busy for 3.64%, PT160073.278362S (1.85 days)
+    - DoneOrUnregistered for 0.03%, PT1378.371932S (0.02 days)
+    - Idle for 25.95%, PT1140939.748582S (13.21 days)
     - Invalid for 0.00%, PT6.455368S (0.00 days)
-    - Reserved for 0.58%, PT24426.983473S (0.28 days)
-    - StartedOrCrashed for 5.21%, PT220360.094476S (2.55 days)
-- 1 runners in profile servo-macos15:
-    - Idle for 1.91%, PT80819.344573S (0.94 days)
-    - StartedOrCrashed for 0.00%, PT30.969065S (0.00 days)
-- 4006 runners in profile servo-ubuntu2204:
-    - Busy for 9.42%, PT398043.558698S (4.61 days)
-    - DoneOrUnregistered for 0.12%, PT5235.43797S (0.06 days)
-    - Idle for 279.83%, PT11828441.455651S (136.90 days)
+    - Reserved for 0.16%, PT6986.619457S (0.08 days)
+    - StartedOrCrashed for 3.17%, PT139603.062723S (1.62 days)
+- 11 runners in profile servo-macos15:
+    - Idle for 66.29%, PT2915017.002033S (33.74 days)
+    - StartedOrCrashed for 0.01%, PT440.328884S (0.01 days)
+- 4177 runners in profile servo-ubuntu2204:
+    - Busy for 11.13%, PT489314.68796S (5.66 days)
+    - DoneOrUnregistered for 0.14%, PT6305.946189S (0.07 days)
+    - Idle for 278.16%, PT12232229.503484S (141.58 days)
     - Invalid for 0.00%, PT105.205117S (0.00 days)
-    - Reserved for 0.58%, PT24495.749191S (0.28 days)
-    - StartedOrCrashed for 8.59%, PT363236.06395S (4.20 days)
+    - Reserved for 0.73%, PT32206.83027S (0.37 days)
+    - StartedOrCrashed for 8.36%, PT367673.212093S (4.26 days)
 ### ci2.servo.org.log
-Over the last PT3011011.207145S (34.85 days) of uptime:
-- 2097 runners in profile servo-macos13:
-    - Busy for 12.62%, PT380081.255097S (4.40 days)
-    - DoneOrUnregistered for 0.11%, PT3331.050649S (0.04 days)
-    - Idle for 75.87%, PT2284514.258751S (26.44 days)
+Over the last PT3237622.61303S (37.47 days) of uptime:
+- 1114 runners in profile servo-macos13:
+    - Busy for 0.85%, PT27582.546489S (0.32 days)
+    - DoneOrUnregistered for 0.01%, PT287.674168S (0.00 days)
+    - Idle for 4.66%, PT150838.538644S (1.75 days)
     - Invalid for 0.00%, PT6.131445S (0.00 days)
-    - Reserved for 0.54%, PT16293.936156S (0.19 days)
-    - StartedOrCrashed for 6.50%, PT195603.919187S (2.26 days)
-- 2 runners in profile servo-macos14:
+    - Reserved for 0.04%, PT1419.986452S (0.02 days)
+    - StartedOrCrashed for 3.73%, PT120736.699154S (1.40 days)
+- 18 runners in profile servo-macos14:
     - Busy for 0.01%, PT263.49627S (0.00 days)
     - DoneOrUnregistered for 0.00%, PT6.093588S (0.00 days)
-    - Idle for 2.75%, PT82719.086562S (0.96 days)
+    - Idle for 90.06%, PT2915796.337922S (33.75 days)
     - Reserved for 0.00%, PT33.196788S (0.00 days)
-    - StartedOrCrashed for 0.00%, PT62.842819S (0.00 days)
-- 3850 runners in profile servo-ubuntu2204:
-    - Busy for 11.45%, PT344701.85398S (3.99 days)
-    - DoneOrUnregistered for 0.15%, PT4440.240026S (0.05 days)
-    - Idle for 273.90%, PT8247061.653337S (95.45 days)
-    - Invalid for 0.00%, PT30.747625S (0.00 days)
-    - Reserved for 0.68%, PT20479.706976S (0.24 days)
-    - StartedOrCrashed for 12.09%, PT363897.976352S (4.21 days)
+    - StartedOrCrashed for 0.03%, PT897.856105S (0.01 days)
+- 4014 runners in profile servo-ubuntu2204:
+    - Busy for 12.70%, PT411046.302011S (4.76 days)
+    - DoneOrUnregistered for 0.16%, PT5288.134224S (0.06 days)
+    - Idle for 273.15%, PT8843489.77199S (102.36 days)
+    - Invalid for 0.04%, PT1179.552101S (0.01 days)
+    - Reserved for 0.85%, PT27497.625377S (0.32 days)
+    - StartedOrCrashed for 11.36%, PT367697.771998S (4.26 days)
+### ci3.servo.org.log
+Over the last PT3888098.542751S (45.00 days) of uptime:
+- 2 runners in profile servo-ubuntu2204:
+    - Idle for 0.12%, PT4540.294826S (0.05 days)
+    - StartedOrCrashed for 0.00%, PT54.072544S (0.00 days)
+- 1240 runners in profile servo-ubuntu2204-bench:
+    - Busy for 0.70%, PT27260.561535S (0.32 days)
+    - DoneOrUnregistered for 0.02%, PT641.931572S (0.01 days)
+    - Idle for 95.15%, PT3699457.693178S (42.82 days)
+    - Invalid for 0.00%, PT6.176017S (0.00 days)
+    - Reserved for 0.09%, PT3487.732688S (0.04 days)
+    - StartedOrCrashed for 3.45%, PT134045.426597S (1.55 days)
+### ci4.servo.org.log
+Over the last PT3888116.065537S (45.00 days) of uptime:
+- 2 runners in profile servo-ubuntu2204:
+    - Idle for 0.12%, PT4588.370027S (0.05 days)
+    - StartedOrCrashed for 0.00%, PT51.7589S (0.00 days)
+- 1216 runners in profile servo-ubuntu2204-bench:
+    - Busy for 0.62%, PT24127.762173S (0.28 days)
+    - DoneOrUnregistered for 0.01%, PT558.120552S (0.01 days)
+    - Idle for 95.26%, PT3703732.108603S (42.87 days)
+    - Reserved for 0.08%, PT3112.286828S (0.04 days)
+    - StartedOrCrashed for 3.44%, PT133760.751399S (1.55 days)
 ### Monthly usage (per month of 30 days)
 Runner hours spent in Busy, scaled to 30 days:
-- servo-macos13: PT664183.847270946S (7.69 days)
-- servo-macos14: PT226.828226417S (0.00 days)
-- servo-ubuntu2204: PT849010.62844953S (9.83 days)
-- servo-windows10: PT682318.253256453S (7.90 days)
+- servo-macos13: PT458064.909777884S (5.30 days)
+- servo-macos14: PT210.951804293S (0.00 days)
+- servo-ubuntu2204: PT861374.153848706S (9.97 days)
+- servo-ubuntu2204-bench: PT34257.94170027S (0.40 days)
+- servo-windows10: PT766371.678097479S (8.87 days)
 ### Equivalent spend (per month of 30 days)
 NOTE: this doesn’t even consider the speedup vs free runners!
 - servo-macos13:
     - Namespace macOS arm64 5cpu:
-      7.69 days/month × 91.53 EUR/day = 703.64 EUR/month
+      5.30 days/month × 91.53 EUR/day = 485.28 EUR/month
     - WarpBuild macOS arm64 6cpu:
-      7.69 days/month × 97.64 EUR/day = 750.55 EUR/month
+      5.30 days/month × 97.64 EUR/day = 517.63 EUR/month
     - GitHub macOS arm64 5cpu:
-      7.69 days/month × 195.27 EUR/day = 1501.11 EUR/month
+      5.30 days/month × 195.27 EUR/day = 1035.26 EUR/month
 - servo-ubuntu2204:
     - Namespace Linux x64 8cpu:
-      9.83 days/month × 14.65 EUR/day = 143.91 EUR/month
+      9.97 days/month × 14.65 EUR/day = 146.01 EUR/month
     - WarpBuild Linux arm64 8cpu:
-      9.83 days/month × 14.65 EUR/day = 143.91 EUR/month
+      9.97 days/month × 14.65 EUR/day = 146.01 EUR/month
     - WarpBuild Linux x64 8cpu:
-      9.83 days/month × 19.53 EUR/day = 191.88 EUR/month
+      9.97 days/month × 19.53 EUR/day = 194.68 EUR/month
     - GitHub Linux x64 8cpu:
-      9.83 days/month × 39.05 EUR/day = 383.77 EUR/month
+      9.97 days/month × 39.05 EUR/day = 389.35 EUR/month
 - servo-windows10:
     - Namespace Windows x64 8cpu:
-      7.90 days/month × 29.29 EUR/day = 231.31 EUR/month
+      8.87 days/month × 29.29 EUR/day = 259.81 EUR/month
     - WarpBuild Linux x64 8cpu:
-      7.90 days/month × 39.05 EUR/day = 308.42 EUR/month
+      8.87 days/month × 39.05 EUR/day = 346.41 EUR/month
     - GitHub Windows x64 8cpu:
-      7.90 days/month × 78.11 EUR/day = 616.84 EUR/month
+      8.87 days/month × 78.11 EUR/day = 692.82 EUR/month
+
+## Past reports
+
+- [2025-09-24](2025-09-24.md)
