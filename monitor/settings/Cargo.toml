@@ -8,6 +8,7 @@ test = []
 
 [dependencies]
 bytesize = "2.0.1"
+chrono = { workspace = true }
 dotenv = { workspace = true }
 jane-eyre = { workspace = true }
 mktemp = { workspace = true }

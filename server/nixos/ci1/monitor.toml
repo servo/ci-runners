@@ -19,6 +19,9 @@ monitor_poll_interval = 5
 # Time to cache GitHub API responses, to avoid REST API rate limits.
 api_cache_timeout = 30
 
+# For tokenless select (POST /select-runner), maximum acceptable age of artifact.
+tokenless_select_artifact_max_age = 300
+
 # Maximum time to allow a runner to be StartedOrCrashed.
 monitor_start_timeout = 120
 

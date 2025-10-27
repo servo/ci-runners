@@ -22,6 +22,7 @@ use std::{
 
 use askama::Template;
 use askama_web::WebTemplate;
+use chrono::Utc;
 use crossbeam_channel::{Receiver, Sender};
 use jane_eyre::eyre::{self, eyre, Context, OptionExt};
 use mktemp::Temp;
@@ -245,16 +246,6 @@ fn select_runner_route(
         )))?;
     }
     let artifacts = list_workflow_run_artifacts(&qualified_repo, &run_id)?;
-    let done_artifact = format!("servo-ci-runners_{unique_id}_done");
-    if artifacts
-        .iter()
-        .find(|artifact| artifact.name == done_artifact)
-        .is_some()
-    {
-        Err(EyreReport::InternalServerError(eyre!(
-            "Job has artifact marking it as done: {done_artifact}"
-        )))?;
-    }
     let args_artifact = format!("servo-ci-runners_{unique_id}");
     let Some(args_artifact) = artifacts
         .into_iter()
@@ -264,6 +255,14 @@ fn select_runner_route(
             "No args artifact found: {args_artifact}"
         )))?
     };
+    let artifact_age = Utc::now().signed_duration_since(args_artifact.created_at);
+    if artifact_age > TOML.tokenless_select_artifact_max_age() {
+        Err(EyreReport::InternalServerError(eyre!(
+            "Args artifact is too old ({}): {}",
+            artifact_age,
+            args_artifact.name,
+        )))?
+    }
     let args_artifact = download_artifact_string(&args_artifact.archive_download_url)?;
     let mut args = args_artifact
         .lines()

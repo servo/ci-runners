@@ -3,6 +3,7 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
+use chrono::{DateTime, FixedOffset};
 use cmd_lib::{run_cmd, run_fun};
 use jane_eyre::eyre::{self, Context};
 use serde::{Deserialize, Serialize};
@@ -37,6 +38,7 @@ pub struct ApiWorkflowRunArtifactsResponse {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ApiArtifact {
     pub name: String,
+    pub created_at: DateTime<FixedOffset>,
     pub archive_download_url: String,
 }
 

@@ -13,6 +13,7 @@ use std::{
     time::Duration,
 };
 
+use chrono::TimeDelta;
 use jane_eyre::eyre::{self, bail};
 use serde::Deserialize;
 
@@ -67,6 +68,7 @@ pub struct Toml {
     pub github_api_suffix: String,
     monitor_poll_interval: u64,
     api_cache_timeout: u64,
+    tokenless_select_artifact_max_age: u32,
     monitor_start_timeout: u64,
     monitor_reserve_timeout: u64,
     monitor_thread_send_timeout: u64,
@@ -187,6 +189,11 @@ impl Toml {
 
     pub fn api_cache_timeout(&self) -> Duration {
         Duration::from_secs(self.api_cache_timeout)
+    }
+
+    pub fn tokenless_select_artifact_max_age(&self) -> TimeDelta {
+        TimeDelta::new(self.tokenless_select_artifact_max_age.into(), 0)
+            .expect("`tokenless_select_artifact_max_age` setting is out of range")
     }
 
     pub fn monitor_start_timeout(&self) -> Duration {
