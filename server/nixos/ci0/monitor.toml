@@ -56,21 +56,21 @@ available_normal_memory = "16G"
 [profiles.servo-windows10]
 profile_name = "servo-windows10"
 github_runner_label = "self-hosted-image:windows10"
-target_count = 2
+target_count = 1
 requires_1g_hugepages = 24
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
 
 [profiles.servo-ubuntu2204]
 profile_name = "servo-ubuntu2204"
 github_runner_label = "self-hosted-image:ubuntu2204"
-target_count = 1
+target_count = 3
 requires_1g_hugepages = 24
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
 
 [profiles.servo-macos13]
 profile_name = "servo-macos13"
 github_runner_label = "self-hosted-image:macos13"
-target_count = 1
+target_count = 0
 requires_1g_hugepages = 24
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
 
