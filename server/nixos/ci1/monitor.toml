@@ -1,3 +1,6 @@
+# IP addresses to listen on, e.g. ::1 for nginx and 192.168.100.1 for libvirt.
+listen_on = ["::1", "192.168.100.1"]
+
 # Prepend this to any internal URL in our own responses. Must end with trailing slash.
 external_base_url = "https://ci1.servo.org/"
 

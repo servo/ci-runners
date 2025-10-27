@@ -60,6 +60,7 @@ pub struct Dotenv {
 
 #[derive(Deserialize)]
 pub struct Toml {
+    pub listen_on: Vec<String>,
     pub external_base_url: String,
     pub github_api_scope: String,
     pub allowed_qualified_repo_prefix: String,

@@ -37,7 +37,7 @@ use rocket::{
 use serde::Deserialize;
 use serde_json::json;
 use settings::{IMAGE_DEPS_DIR, TOML};
-use tokio::try_join;
+use tokio::task::JoinSet;
 use tracing::{debug, error, info, trace, warn};
 use web::{
     auth::ApiKeyGuard,
@@ -492,7 +492,13 @@ async fn main() -> eyre::Result<()> {
         .launch()
     };
 
-    try_join!(rocket("::1"), rocket("192.168.100.1"))?;
+    let mut set = JoinSet::new();
+    for address in TOML.listen_on.iter() {
+        set.spawn(rocket(&address));
+    }
+    for result in set.join_all().await {
+        result?;
+    }
 
     Ok(())
 }
