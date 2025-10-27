@@ -54,4 +54,8 @@ case "$action" in
 (htop)
     mosh root@"$1".servo.org tmux new 'htop'
     ;;
+(*)
+    >&2 echo 'usage: ./do <deploy|read|write|restart-monitor|run|logs|htop> [args ...]'
+    exit 1
+    ;;
 esac
