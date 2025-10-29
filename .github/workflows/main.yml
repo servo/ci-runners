@@ -1,0 +1,16 @@
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          cd monitor && cargo fmt --all -- --check
+      - run: |
+          cd monitor && cargo test --workspace
+      # TODO: `cargo clippy --workspace -- --deny warnings`
+      # TODO: Check nix derivations
