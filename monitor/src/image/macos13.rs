@@ -19,7 +19,7 @@ use crate::image::libvirt_change_media;
 use crate::image::prune_base_image_files;
 use crate::image::undefine_libvirt_guest;
 use crate::image::CdromImage;
-use crate::policy::runner_images_path;
+use crate::policy::runner_image_path;
 use crate::shell::atomic_symlink;
 use crate::shell::log_output_as_info;
 use crate::shell::reflink_or_copy_with_warning;
@@ -125,8 +125,8 @@ pub fn create_runner(
     // because the latter can’t be parallelised without causing errors.
     let base_images_path = create_base_images_dir(profile)?;
     let base_image_symlink_path = base_images_path.join(format!("base.img"));
-    let runner_images_path = create_runner_images_dir(runner_id)?;
-    let runner_base_image_path = runner_images_path.join(format!("base.img"));
+    create_runner_images_dir()?;
+    let runner_base_image_path = runner_image_path(runner_id, "base.img");
     reflink_or_copy_with_warning(&base_image_symlink_path, &runner_base_image_path)?;
 
     let ovmf_vars_base_path =
@@ -141,8 +141,7 @@ pub fn create_runner(
 }
 
 pub fn destroy_runner(runner_guest_name: &str, runner_id: usize) -> eyre::Result<()> {
-    let runner_images_path = runner_images_path(runner_id);
-    let runner_base_image_path = runner_images_path.join(format!("base.img"));
+    let runner_base_image_path = runner_image_path(runner_id, "base.img");
     if let Err(error) = remove_file(&runner_base_image_path) {
         warn!(?runner_base_image_path, ?error, "Failed to delete file");
     }

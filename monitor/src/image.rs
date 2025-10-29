@@ -367,9 +367,9 @@ pub(self) fn create_base_images_dir(profile: &Profile) -> eyre::Result<PathBuf> 
     Ok(base_images_path)
 }
 
-pub(self) fn create_runner_images_dir(runner_id: usize) -> eyre::Result<PathBuf> {
-    let runner_images_path = runner_images_path(runner_id);
-    debug!(?runner_images_path, "Creating runner images subdirectory");
+pub(self) fn create_runner_images_dir() -> eyre::Result<PathBuf> {
+    let runner_images_path = runner_images_path();
+    debug!(?runner_images_path, "Creating runner images directory");
     create_dir_all(&runner_images_path)?;
 
     Ok(runner_images_path)

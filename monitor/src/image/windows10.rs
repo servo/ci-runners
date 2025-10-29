@@ -18,7 +18,7 @@ use crate::image::create_runner_images_dir;
 use crate::image::delete_base_image_file;
 use crate::image::prune_base_image_files;
 use crate::image::undefine_libvirt_guest;
-use crate::policy::runner_images_path;
+use crate::policy::runner_image_path;
 use crate::shell::atomic_symlink;
 use crate::shell::log_output_as_info;
 use crate::shell::reflink_or_copy_with_warning;
@@ -164,8 +164,8 @@ pub fn create_runner(
     // TODO copy config.iso?
     let base_images_path = create_base_images_dir(profile)?;
     let base_image_symlink_path = base_images_path.join(format!("base.img"));
-    let runner_images_path = create_runner_images_dir(runner_id)?;
-    let runner_base_image_path = runner_images_path.join(format!("base{runner_id}.img"));
+    create_runner_images_dir()?;
+    let runner_base_image_path = runner_image_path(runner_id, "base.img");
     reflink_or_copy_with_warning(&base_image_symlink_path, &runner_base_image_path)?;
 
     spawn_with_output!(virt-clone -o $profile_guest_name -n $runner_guest_name --preserve-data -f $runner_base_image_path 2>&1)?
@@ -176,8 +176,7 @@ pub fn create_runner(
 
 pub fn destroy_runner(runner_guest_name: &str, runner_id: usize) -> eyre::Result<()> {
     // TODO delete config.iso?
-    let runner_images_path = runner_images_path(runner_id);
-    let runner_base_image_path = runner_images_path.join(format!("base.img"));
+    let runner_base_image_path = runner_image_path(runner_id, "base.img");
     if let Err(error) = remove_file(&runner_base_image_path) {
         warn!(?runner_base_image_path, ?error, "Failed to delete file");
     }

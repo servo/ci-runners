@@ -874,8 +874,8 @@ pub fn base_images_path(profile: &Profile) -> PathBuf {
     Path::new("/var/lib/libvirt/images/base").join(&profile.profile_name)
 }
 
-pub fn runner_images_path(runner_id: usize) -> PathBuf {
-    Path::new("/var/lib/libvirt/images/runner").join(&format!("{runner_id}"))
+pub fn runner_images_path() -> PathBuf {
+    PathBuf::from("/var/lib/libvirt/images/runner")
 }
 
 pub fn base_image_path<'snap>(
@@ -887,6 +887,10 @@ pub fn base_image_path<'snap>(
     } else {
         base_images_path(profile).join("base.img")
     }
+}
+
+pub fn runner_image_path(runner_id: usize, filename: impl AsRef<str>) -> PathBuf {
+    runner_images_path().join(format!("{runner_id}-{}", filename.as_ref()))
 }
 
 fn read_base_image_snapshot(profile: &Profile) -> eyre::Result<Option<String>> {
