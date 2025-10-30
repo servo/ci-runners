@@ -12,5 +12,8 @@ jobs:
           cd monitor && cargo fmt --all -- --check
       - run: |
           cd monitor && cargo test --workspace
+      - run: |
+          rustup target add aarch64-apple-darwin
+          cargo check --target aarch64-apple-darwin
       # TODO: `cargo clippy --workspace -- --deny warnings`
       # TODO: Check nix derivations

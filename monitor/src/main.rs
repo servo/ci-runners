@@ -7,6 +7,8 @@ mod libvirt;
 mod policy;
 mod runner;
 mod shell;
+#[cfg_attr(not(target_os = "macos"), path = "utm_dummy.rs")]
+mod utm;
 
 use core::str;
 use std::{
@@ -507,6 +509,9 @@ async fn main() -> eyre::Result<()> {
 /// It handles one [`Request`] at a time, polling for updated resources before
 /// each request, then sends one response to the API server for each request.
 fn monitor_thread() -> eyre::Result<()> {
+    #[cfg(target_os = "macos")]
+    crate::utm::request_automation_permission()?;
+
     let mut id_gen = IdGen::new_load().unwrap_or_else(|error| {
         warn!(?error, "Failed to read last-runner-id: {error}");
         IdGen::new_empty()
