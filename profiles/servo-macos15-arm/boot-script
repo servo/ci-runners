@@ -1,0 +1,114 @@
+#!/usr/bin/env zsh
+set -euxo pipefail -o bsdecho
+
+download() {
+    curl -fsSLO "http://192.168.100.1:8000/image-deps/macos13/$1"
+}
+
+install_github_actions_runner() {
+    if ! [ -e actions-runner-osx-x64.tar.gz ]; then
+        download actions-runner-osx-x64.tar.gz
+        rm -Rf actions-runner
+        mkdir -p actions-runner
+        ( cd actions-runner; tar xf ../actions-runner-osx-x64.tar.gz )
+    fi
+}
+
+bake_servo_repo() (
+    # Note the parentheses around this block, so we only cd for this function
+    cd ~/a/servo/servo
+
+    # Fix the remote url, since it’s still set to our cache
+    git remote set-url origin https://github.com/servo/servo.git
+
+    # Install the Rust toolchain, for checkouts without servo#35795
+    rustup show active-toolchain || rustup toolchain install
+
+    ./mach bootstrap --force
+    # Build the same way as a typical macOS libservo job, to allow for incremental builds.
+    # FIXME: `cargo build -p libservo` is busted on most platforms <https://github.com/servo/servo/issues/37939>
+    # FIXME: `cargo build -p libservo` is untested in CI <https://github.com/servo/servo/issues/38015>
+    # cargo build -p libservo --all-targets --release --target-dir target/libservo
+    # Build the same way as a typical macOS build job, to allow for incremental builds.
+    ./mach build --use-crown --locked --release
+)
+
+start_github_actions_runner() {
+    curl -fsS --max-time 5 --retry 99 --retry-all-errors http://192.168.100.1:8000/github-jitconfig | jq -er . > jitconfig
+    actions-runner/run.sh --jitconfig $(cat jitconfig)
+}
+
+mkdir -p /Users/servo/ci
+cd /Users/servo/ci
+
+# Resize the window to occupy more of the 1280x800 display
+# - Method based on <https://apple.stackexchange.com/a/290802>
+# - Another method for exclusive fullscreen <https://apple.stackexchange.com/a/58962>
+# - Another method with unclear automation <https://apple.stackexchange.com/a/228052>
+osascript -e 'tell application "Terminal"' -e 'activate' -e 'set the bounds of the first window to {0,0,1280,600}' -e 'end tell'
+
+# Disable sleep and display sleep
+# <https://apple.stackexchange.com/a/458157>
+sudo pmset sleep 0
+sudo pmset displaysleep 0
+
+# ~/.cargo/env requires HOME to be set
+export HOME=/Users/servo
+
+# Ensure uv is on PATH
+export PATH=$HOME/.local/bin:$PATH
+
+if ! [ -e image-built ]; then
+    # Install Xcode CLT (Command Line Tools) non-interactively
+    # <https://github.com/actions/runner-images/blob/3d5f09a90fd475a3531b0ef57325aa7e27b24595/images/macos/scripts/build/install-xcode-clt.sh>
+    download install-xcode-clt.sh
+    chmod +x install-xcode-clt.sh
+    sudo -i mkdir -p /var/root/utils
+    sudo -i touch /var/root/utils/utils.sh
+    sudo -i $PWD/install-xcode-clt.sh
+
+    # Install Homebrew
+    if ! [ -e /usr/local/bin/brew ]; then
+        download install-homebrew.sh
+        chmod +x install-homebrew.sh
+        NONINTERACTIVE=1 ./install-homebrew.sh
+    fi
+
+    set -- gnu-tar  # Install gtar(1)
+    set -- "$@" jq  # Used by start_github_actions_runner()
+
+    brew install "$@"
+
+    # Install rustup and the latest Rust
+    if ! [ -e ~/.rustup ]; then
+        download rustup-init
+        chmod +x rustup-init
+        ./rustup-init -y --quiet
+        mkdir -p ~/.cargo
+        curl -fsSLo ~/.cargo/config.toml http://192.168.100.1:8000/image-deps/cargo-config.toml
+    fi
+
+    # Install uv
+    if ! [ -e ~/.local/bin/uv ]; then
+        download uv-installer.sh
+        chmod +x uv-installer.sh
+        ./uv-installer.sh
+    fi
+fi
+
+# Set up Cargo
+. ~/.cargo/env
+
+if ! [ -e image-built ]; then
+    # Clone and bake the Servo repo
+    mkdir -p ~/a/servo
+    git clone http://192.168.100.1:8000/cache/servo/.git ~/a/servo/servo
+    bake_servo_repo
+
+    install_github_actions_runner
+    touch image-built
+    sudo shutdown -h now
+    exit  # `shutdown` does not exit
+else
+    start_github_actions_runner
+fi
