@@ -163,8 +163,8 @@
       <target type='virtio' name='org.qemu.guest_agent.0'/>
       <address type='virtio-serial' controller='0' bus='0' port='1'/>
     </channel>
-    <graphics type='spice' autoport='yes'>
-      <listen type='address'/>
+    <graphics type="vnc" port="5901" autoport="yes" listen="127.0.0.1">
+      <listen type="address" address="127.0.0.1"/>
     </graphics>
     <video>
       <model type="virtio" heads="1" primary="yes"/>
