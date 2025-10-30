@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <!-- Based on <https://github.com/kholia/OSX-KVM/blob/182e2dd0715175801521f6342ac7cc715044cb12/macOS-libvirt-Catalina.xml> -->
-<domain type='kvm' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'>
+<domain type='hvf' xmlns:qemu='http://libvirt.org/schemas/domain/qemu/1.0'>
 <!--
 	macOS libvirt XML configuration.
 
