@@ -72,6 +72,10 @@
       <!-- <driver name='qemu' type='qcow2' cache='writeback' io='threads'/> -->
       <driver name='qemu' type='raw' cache='none' io='native' discard='unmap'/>
       <!-- virt-clone(1) will replace this with the first `-f` -->
+      <!--
+        FIXME:
+        2025-10-30T05:06:57.286979Z qemu-system-aarch64: -blockdev {"driver":"host_device","filename":"/dev/null","aio":"native","node-name":"libvirt-2-storage","read-only":false,"discard":"unmap","cache":{"direct":true,"no-flush":false}}: aio=native was specified, but is not supported in this build.
+      -->
       <source dev='/dev/null'/>
       <target dev='sdb' bus='sata'/>
       <boot order='1'/>
