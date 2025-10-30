@@ -6,6 +6,7 @@ Description=Run the servo_ci runner
 Environment="DOCKER_HOST=unix:///run/user/<USERID>/docker.sock"
 Environment="GITHUB_TOKEN=<INSERT YOUR TOKEN>"
 Environment="SERVO_CI_GITHUB_API_SCOPE=<YOUR API SCOPE, /repos/servo/servo>"
+Environment="RUNNER_SUFFIX=<FILLIN>"
 ExecStart=/home/servo_ci/ci-runners/docker/docker_jit_monitor/target/release/docker_jit_monitor
 ExecStopPost=sh -c 'docker ps -q | xargs docker stop'
 ProtectKernelModules=no
