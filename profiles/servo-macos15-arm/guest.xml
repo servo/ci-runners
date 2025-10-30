@@ -44,7 +44,7 @@
   </memoryBacking>
   <vcpu placement='static'>16</vcpu>
   <os>
-    <type arch='x86_64' machine='pc-q35-4.2'>hvm</type>
+    <type arch='aarch64'>hvm</type>
     <!-- We don't need patched OVMF anymore when using latest OpenCore, stock one is okay -->
     <loader readonly='yes' type='pflash'>/var/lib/libvirt/images/OSX-KVM/OVMF_CODE.fd</loader>
     <nvram>/var/lib/libvirt/images/OSX-KVM/OVMF_VARS.fd</nvram>
@@ -62,7 +62,7 @@
   <on_reboot>restart</on_reboot>
   <on_crash>restart</on_crash>
   <devices>
-    <emulator>/run/libvirt/nix-emulators/qemu-system-x86_64</emulator>
+    <emulator>/opt/homebrew/bin/qemu-system-aarch64</emulator>
     <disk type='file' device='disk'>
       <driver name='qemu' type='qcow2' cache='writeback' io='threads'/>
       <source file='/var/lib/libvirt/images/OSX-KVM/OpenCore/OpenCore.macos15-arm.qcow2'/>
