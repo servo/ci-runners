@@ -1,21 +1,3 @@
-[workspace]
-members = ["cli", "settings", "web"]
-
-[workspace.dependencies]
-bytesize = "2.0.1"
-chrono = { version = "0.4.39", features = ["serde"] }
-cli = { path = "cli" }
-dotenv = "0.15.0"
-jane-eyre = "0.3.0"
-mktemp = "0.5.1"
-rocket = { version = "0.5.1", features = ["json"] }
-serde = { version = "1.0.204", features = ["derive"] }
-settings = { path = "settings" }
-toml = "0.8.15"
-tracing = "0.1.40"
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-web = { path = "web" }
-
 [package]
 name = "monitor"
 version = "0.1.0"

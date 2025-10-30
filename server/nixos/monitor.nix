@@ -25,7 +25,6 @@
 
   sources = fs.intersection (fs.gitTracked ../..) (
     fs.unions [
-      ../../monitor
       ../../profiles
       ../../shared
     ]
@@ -38,7 +37,6 @@ in stdenv.mkDerivation rec {
     root = ../..;
     fileset = sources;
   };
-  sourceRoot = "/build/source/monitor";
 
   nativeBuildInputs = [
     makeWrapper
@@ -69,7 +67,6 @@ in stdenv.mkDerivation rec {
     mkdir -p $out/bin
     ln -s ${monitorCrate}/bin/monitor $out/bin/monitor
     ln -s ${monitorCrate}/bin/chunker $out/bin/chunker
-    cd ..  # cd back out of sourceRoot
     mkdir -p $out/lib/monitor
     cp -R profiles $out/lib/monitor
     cp -R shared $out/lib/monitor
