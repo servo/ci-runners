@@ -11,5 +11,5 @@ Harder but faster way:
 ```
 $ export RUSTFLAGS=-Clink-arg=-fuse-ld=mold
 $ cargo build
-$ sudo [RUST_BACKTRACE=1] IMAGE_DEPS_DIR=$(nix eval --raw .\#image-deps) LIB_MONITOR_DIR=. target/debug/monitor
+$ sudo [RUST_BACKTRACE=1] IMAGE_DEPS_DIR=$(nix build --print-out-paths .\#image-deps) LIB_MONITOR_DIR=. target/debug/monitor
 ```
