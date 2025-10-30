@@ -10,32 +10,30 @@ inputs:
 runs:
   using: composite
   steps:
-    - if: ${{ runner.environment != 'self-hosted' && github.event_name != 'pull_request_target' }}
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: ${{ inputs.fetch-depth }}
+    - id: choose-commit
+      shell: bash
+      # The special case is necessary to check out the pull request if this run
+      # was triggered via a `pull_request_target` event.
+      run: |
+        if [ '${{ github.event_name }}' == pull_request_target ]; then
+          echo "commit=${{ github.event.pull_request.head.sha }}" | tee -a $GITHUB_OUTPUT
+        else
+          echo "commit=$GITHUB_SHA" | tee -a $GITHUB_OUTPUT
+        fi
 
-    # This is necessary to check out the pull request if this run was triggered via a
-    # `pull_request_target` event.
-    - if: ${{ runner.environment != 'self-hosted' && github.event_name == 'pull_request_target' }}
+    - if: ${{ runner.environment != 'self-hosted' }}
       uses: actions/checkout@v4
       with:
-        ref: ${{ github.event.pull_request.head.sha }}
+        ref: ${{ steps.choose-commit.outputs.commit }}
         fetch-depth: ${{ inputs.fetch-depth }}
 
     # Use prebaked repo on self-hosted runners
-    - if: ${{ runner.environment == 'self-hosted' && github.event_name != 'pull_request_target' && inputs.fetch-depth != 0 }}
+    - if: ${{ runner.environment == 'self-hosted' && inputs.fetch-depth != 0 }}
       shell: bash
-      run: git fetch --depth=${{ inputs.fetch-depth }} origin $env:GITHUB_SHA
-    - if: ${{ runner.environment == 'self-hosted' && github.event_name != 'pull_request_target' && inputs.fetch-depth == 0 }}
+      run: git fetch --depth=${{ inputs.fetch-depth }} origin ${{ steps.choose-commit.outputs.commit }}
+    - if: ${{ runner.environment == 'self-hosted' && inputs.fetch-depth == 0 }}
       shell: bash
-      run: git fetch origin $env:GITHUB_SHA
-    - if: ${{ runner.environment == 'self-hosted' && github.event_name == 'pull_request_target' && inputs.fetch-depth != 0 }}
-      shell: bash
-      run: git fetch --depth=${{ inputs.fetch-depth }} origin ${{ github.event.pull_request.head.sha }}
-    - if: ${{ runner.environment == 'self-hosted' && github.event_name == 'pull_request_target' && inputs.fetch-depth == 0 }}
-      shell: bash
-      run: git fetch origin ${{ github.event.pull_request.head.sha }}
+      run: git fetch origin ${{ steps.choose-commit.outputs.commit }}
     - if: ${{ runner.environment == 'self-hosted' }}
       shell: bash
       # Same as `git switch --detach FETCH_HEAD`, but fixes up dirty working
