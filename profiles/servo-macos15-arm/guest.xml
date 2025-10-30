@@ -39,9 +39,6 @@
   <uuid>512d54e2-486d-409c-a873-6d8d5b9fa43f</uuid>
   <memory unit="KiB">25165824</memory>
   <currentMemory unit="KiB">25165824</currentMemory>
-  <memoryBacking>
-    <hugepages/>
-  </memoryBacking>
   <vcpu placement='static'>16</vcpu>
   <os>
     <type arch='aarch64'>hvm</type>
