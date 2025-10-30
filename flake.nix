@@ -7,10 +7,16 @@
 
   outputs = inputs@{ self, unstable, ... }:
   let
-    pkgsUnstable = import unstable {
-      system = "x86_64-linux";
-      config = { allowUnfree = true; };
-    };
+    forEachSystem = fn:
+      unstable.lib.genAttrs [
+        "x86_64-linux"
+        "aarch64-darwin"
+      ] (system: fn system (
+        import unstable {
+          inherit system;
+          config.allowUnfree = true;
+        }
+      ));
     monitor = inputs.crate2nix.tools.x86_64-linux.appliedCargoNix {
       name = "monitor";
       src = ./.;
@@ -69,15 +75,22 @@
         monitor = self.packages.x86_64-linux.monitor;
       }) ];
     };
-    packages.x86_64-linux.monitor = pkgsUnstable.callPackage server/nixos/monitor.nix {
-      monitorCrate = monitor.workspaceMembers.monitor.build;
-      image-deps = self.packages.x86_64-linux.image-deps;
-    };
-    packages.x86_64-linux.image-deps = pkgsUnstable.callPackage server/nixos/image-deps.nix {};
-    devShells.x86_64-linux.default = import ./shell.nix {
-      inherit (pkgsUnstable) pkgs;
-      image-deps = self.packages.x86_64-linux.image-deps;
-      monitor = self.packages.x86_64-linux.monitor;
-    };
+    packages = forEachSystem (
+      system: pkgs: {
+        monitor = pkgs.callPackage server/nixos/monitor.nix {
+          monitorCrate = monitor.workspaceMembers.monitor.build;
+          image-deps = self.packages.${system}.image-deps;
+        };
+        image-deps = pkgs.callPackage server/nixos/image-deps.nix {};
+      }
+    );
+    devShells = forEachSystem (
+      system: pkgs: {
+        default = import ./shell.nix {
+          inherit pkgs;
+          inherit (self.packages.${system}) image-deps monitor;
+        };
+      }
+    );
   };
 }
