@@ -15,6 +15,16 @@ use tracing::{debug, info};
 
 use crate::libvirt::{delete_template_or_rebuild_image_file, template_or_rebuild_images_path};
 
+pub fn initialise() -> eyre::Result<()> {
+    // Do nothing (not applicable to libvirt)
+    Ok(())
+}
+
+pub fn handle_main_thread_request() -> eyre::Result<()> {
+    // Do nothing (not applicable to libvirt)
+    Ok(())
+}
+
 pub fn list_template_guests() -> eyre::Result<Vec<String>> {
     // Output is not filtered by prefix, so we must filter it ourselves.
     let prefix = format!("{}-", TOML.libvirt_template_guest_prefix());

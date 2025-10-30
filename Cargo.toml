@@ -9,6 +9,7 @@ bytesize = "2.0.1"
 chrono = { version = "0.4.39", features = ["serde"] }
 cli = { path = "monitor/cli" }
 cmd_lib = "1.9.5"
+crossbeam-channel = "0.5.13"
 dotenv = "0.15.0"
 hypervisor = { path = "monitor/hypervisor" }
 jane-eyre = "0.3.0"

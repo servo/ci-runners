@@ -5,7 +5,11 @@ edition = "2024"
 
 [dependencies]
 cmd_lib.workspace = true
+crossbeam-channel.workspace = true
 jane-eyre.workspace = true
 settings.workspace = true
 shell.workspace = true
 tracing.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+osakit = { version = "0.3.1", features = ["full"] }
