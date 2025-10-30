@@ -7,6 +7,7 @@ mod libvirt;
 mod policy;
 mod runner;
 mod shell;
+mod utm;
 
 use core::str;
 use std::{
@@ -16,7 +17,7 @@ use std::{
     path::Path,
     process::exit,
     sync::{LazyLock, RwLock},
-    thread::{self},
+    thread,
     time::Duration,
 };
 
@@ -56,6 +57,7 @@ use crate::{
     image::{start_libvirt_guest, Rebuilds},
     policy::{Override, Policy, RunnerCounts},
     runner::{Runners, Status},
+    utm::handle_utm_request,
 };
 
 static DASHBOARD: RwLock<Option<Dashboard>> = RwLock::new(None);
@@ -375,8 +377,7 @@ fn boot_script_route(remote_addr: web::auth::RemoteAddr) -> rocket_eyre::Result<
     Ok(RawText(result))
 }
 
-#[rocket::main]
-async fn main() -> eyre::Result<()> {
+fn main() -> eyre::Result<()> {
     if env::var_os("RUST_LOG").is_none() {
         // EnvFilter Builder::with_default_directive doesn’t support multiple directives,
         // so we need to apply defaults ourselves.
@@ -385,24 +386,38 @@ async fn main() -> eyre::Result<()> {
     cli::init()?;
     run_migrations()?;
 
-    tokio::task::spawn(async move {
-        let thread = thread::spawn(monitor_thread);
-        loop {
-            if thread.is_finished() {
-                match thread.join() {
-                    Ok(Ok(())) => {
-                        info!("Monitor thread exited");
-                        exit(0);
-                    }
-                    Ok(Err(report)) => error!(%report, "Monitor thread error"),
-                    Err(panic) => error!(?panic, "Monitor thread panic"),
-                };
-                exit(1);
-            }
-            tokio::time::sleep(Duration::from_secs(1)).await;
-        }
-    });
+    let web_server_thread = thread::spawn(web_server_thread);
+    let monitor_thread = thread::spawn(monitor_thread);
 
+    loop {
+        if monitor_thread.is_finished() {
+            match monitor_thread.join() {
+                Ok(Ok(())) => {
+                    info!("Monitor thread exited");
+                    exit(0);
+                }
+                Ok(Err(report)) => error!(?report, "Monitor thread error"),
+                Err(panic) => error!(?panic, "Monitor thread panic"),
+            };
+            exit(1);
+        }
+        if web_server_thread.is_finished() {
+            match web_server_thread.join() {
+                Ok(Ok(())) => {
+                    info!("Web server thread exited");
+                    exit(0);
+                }
+                Ok(Err(report)) => error!(?report, "Web server thread error"),
+                Err(panic) => error!(?panic, "Web server thread panic"),
+            };
+            exit(1);
+        }
+        handle_utm_request()?;
+    }
+}
+
+#[rocket::main]
+async fn web_server_thread() -> eyre::Result<()> {
     let rocket = |listen_addr: &str| {
         rocket::custom(
             rocket::Config::figment()
@@ -458,6 +473,9 @@ async fn main() -> eyre::Result<()> {
 /// It handles one [`Request`] at a time, polling for updated resources before
 /// each request, then sends one response to the API server for each request.
 fn monitor_thread() -> eyre::Result<()> {
+    #[cfg(target_os = "macos")]
+    crate::utm::request_automation_permission()?;
+
     let mut id_gen = IdGen::new_load().unwrap_or_else(|error| {
         warn!(?error, "Failed to read last-runner-id: {error}");
         IdGen::new_empty()
