@@ -46,8 +46,8 @@
   <os>
     <type arch='aarch64'>hvm</type>
     <!-- We don't need patched OVMF anymore when using latest OpenCore, stock one is okay -->
-    <loader readonly='yes' type='pflash'>/var/lib/libvirt/images/OSX-KVM/OVMF_CODE.fd</loader>
-    <nvram>/var/lib/libvirt/images/OSX-KVM/OVMF_VARS.fd</nvram>
+    <loader readonly='yes' type='pflash'>/Users/shuppy/OSX-KVM/OVMF_CODE.fd</loader>
+    <nvram>/Users/shuppy/OSX-KVM/OVMF_VARS.fd</nvram>
   </os>
   <features>
     <acpi/>
@@ -65,7 +65,7 @@
     <emulator>/opt/homebrew/bin/qemu-system-aarch64</emulator>
     <disk type='file' device='disk'>
       <driver name='qemu' type='qcow2' cache='writeback' io='threads'/>
-      <source file='/var/lib/libvirt/images/OSX-KVM/OpenCore/OpenCore.macos15-arm.qcow2'/>
+      <source file='/Users/shuppy/OSX-KVM/OpenCore/OpenCore.macos15-arm.qcow2'/>
       <target dev='sda' bus='sata'/>
       <boot order='2'/>
       <address type='drive' controller='0' bus='0' target='0' unit='0'/>
@@ -82,7 +82,7 @@
     </disk>
     <disk type="file" device="disk">
       <driver name="qemu" type="raw" cache="writeback"/>
-      <source file="/var/lib/libvirt/images/OSX-KVM/BaseSystem.macos15-arm.img"/>
+      <source file="/Users/shuppy/OSX-KVM/BaseSystem.macos15-arm.img"/>
       <target dev="sdc" bus="sata"/>
       <boot order="3"/>
       <address type="drive" controller="0" bus="0" target="0" unit="2"/>
