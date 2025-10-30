@@ -142,12 +142,13 @@
       <address type='pci' domain='0x0000' bus='0x00' slot='0x07' function='0x2'/>
     </controller>
     <!-- Make sure you put your nic in bus 0x0 and slot 0x0y(y is numeric), this will make nic built-in and apple-store work-->
-    <interface type="bridge">
+    <!-- TODO <https://www.sobyte.net/post/2022-10/mac-qemu-bridge/>? -->
+    <!-- <interface type="bridge">
       <mac address="52:54:00:e6:85:40"/>
       <source bridge="cinet"/>
       <model type="vmxnet3"/>
       <address type="pci" domain="0x0000" bus="0x00" slot="0x00" function="0x0"/>
-    </interface>
+    </interface> -->
     <!-- <serial type='pty'>
       <target type='isa-serial' port='0'>
         <model name='isa-serial'/>
