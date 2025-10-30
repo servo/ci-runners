@@ -189,6 +189,9 @@ To prepare a server for macOS 13/14/15 guests, build a clean image, replacing â€
     - `virsh define profiles/servo-macos13/guest.xml`
     - `virt-clone --preserve-data --check path_in_use=off -o servo-macos13.init -n servo-macos13.clean --nvram /Users/servo/OSX-KVM/OVMF_VARS.servo-macos13.clean.fd --skip-copy sda -f /dev/zvol/tank/base/servo-macos13.clean --skip-copy sdc`
     - `cp /Users/servo/OSX-KVM/{OVMF_VARS-1920x1080.fd,OVMF_VARS.servo-macos13.clean.fd}`
+    - Pad the firmware images to 64MiB [as required by qemu on aarch64](https://www.kraxel.org/blog/2022/05/edk2-virt-quickstart/):
+        - `truncate -s 64M OVMF_CODE.fd`
+        - `truncate -s 64M OVMF_VARS.servo-macos15-arm.clean.fd`
     - `virsh undefine --keep-nvram servo-macos13.init`
         - TODO: improve per-vm nvram management
     - `virsh start servo-macos13.clean`
