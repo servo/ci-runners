@@ -173,22 +173,22 @@ Runners created from this image preinstall all dependencies (including those spe
 
 To prepare a server for macOS 13/14/15 guests, build a clean image, replacing “13” with the macOS version as needed:
 
-- Clone the OSX-KVM repo: `git clone --recursive https://github.com/kholia/OSX-KVM.git /var/lib/libvirt/images/OSX-KVM`
-- Download the BaseSystem.dmg: `( cd /var/lib/libvirt/images/OSX-KVM; ./fetch-macOS-v2.py )`
-- Rename it to reflect the macOS version: `mv /var/lib/libvirt/images/OSX-KVM/BaseSystem{,.macos13}.dmg`
-- Convert that .dmg to .img: `dmg2img -i /var/lib/libvirt/images/OSX-KVM/BaseSystem.macos13.{dmg,img}`
+- Clone the OSX-KVM repo: `git clone --recursive https://github.com/kholia/OSX-KVM.git /Users/servo/OSX-KVM`
+- Download the BaseSystem.dmg: `( cd /Users/servo/OSX-KVM; ./fetch-macOS-v2.py )`
+- Rename it to reflect the macOS version: `mv /Users/servo/OSX-KVM/BaseSystem{,.macos13}.dmg`
+- Convert that .dmg to .img: `dmg2img -i /Users/servo/OSX-KVM/BaseSystem.macos13.{dmg,img}`
 - Reduce the OpenCore `Timeout` setting:
-    - `cd /var/lib/libvirt/images/OSX-KVM/OpenCore`
+    - `cd /Users/servo/OSX-KVM/OpenCore`
     - `vim config.plist`
     - Type `/<key>Timeout<`, press **Enter**, type `j0f>wcw5`, press **Escape**, type `:x`, press **Enter**
     - `rm OpenCore.qcow2`
     - `./opencore-image-ng.sh --cfg config.plist --img OpenCore.qcow2`
-    - `cp /var/lib/libvirt/images/OSX-KVM/OpenCore/OpenCore{,.macos13}.qcow2`
+    - `cp /Users/servo/OSX-KVM/OpenCore/OpenCore{,.macos13}.qcow2`
 - Create zvol and libvirt guest with random UUID and MAC address
     - `zfs create -V 90G tank/base/servo-macos13.clean`
     - `virsh define profiles/servo-macos13/guest.xml`
-    - `virt-clone --preserve-data --check path_in_use=off -o servo-macos13.init -n servo-macos13.clean --nvram /var/lib/libvirt/images/OSX-KVM/OVMF_VARS.servo-macos13.clean.fd --skip-copy sda -f /dev/zvol/tank/base/servo-macos13.clean --skip-copy sdc`
-    - `cp /var/lib/libvirt/images/OSX-KVM/{OVMF_VARS-1920x1080.fd,OVMF_VARS.servo-macos13.clean.fd}`
+    - `virt-clone --preserve-data --check path_in_use=off -o servo-macos13.init -n servo-macos13.clean --nvram /Users/servo/OSX-KVM/OVMF_VARS.servo-macos13.clean.fd --skip-copy sda -f /dev/zvol/tank/base/servo-macos13.clean --skip-copy sdc`
+    - `cp /Users/servo/OSX-KVM/{OVMF_VARS-1920x1080.fd,OVMF_VARS.servo-macos13.clean.fd}`
     - `virsh undefine --keep-nvram servo-macos13.init`
         - TODO: improve per-vm nvram management
     - `virsh start servo-macos13.clean`
