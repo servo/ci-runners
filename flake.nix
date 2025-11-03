@@ -13,7 +13,7 @@
     };
     monitor = inputs.crate2nix.tools.x86_64-linux.appliedCargoNix {
       name = "monitor";
-      src = ./monitor;
+      src = ./.;
     };
   in {
     nixosConfigurations.ci0 = unstable.lib.nixosSystem {
