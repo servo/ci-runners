@@ -2,7 +2,7 @@
 resolver = "3"
 default-members = ["monitor"]
 members = ["monitor", "monitor/cli", "monitor/settings", "monitor/web"]
-exclude = ["docker"]
+exclude = ["analysis", "docker"]
 
 [workspace.dependencies]
 bytesize = "2.0.1"
