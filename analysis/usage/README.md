@@ -10,6 +10,10 @@ $ cargo run -r -- ci{0..4}.servo.org.log
 
 ## 2025-11-04
 
+efficiency of utilisation for servo-ubuntu2204 has improved (6.34% vs 4.59%), but for servo-windows10 it has regressed (10.75% vs 14.92%).
+
+relevant changes: [servo#39900](https://github.com/servo/servo/pull/39900), [servo#39915](https://github.com/servo/servo/pull/39915).
+
 ```
 $ ./download-logs.sh ci{0..4}.servo.org -- -S '187 hours ago'
 $ cargo run -r -- ci{0..4}.servo.org.log -
@@ -85,9 +89,19 @@ Over the last PT673158.105448S (7.79 days) of uptime:
     - Idle for 97.56%, PT656737.293073S (7.60 days)
     - Reserved for 0.23%, PT1536.837557S (0.02 days)
     - StartedOrCrashed for 0.15%, PT1029.550911S (0.01 days)
+### Efficiency of utilisation (Busy time / total time)
+Independent of runner concurrency:
+- servo-macos13: 41.66% (PT847.112719S / PT2033.478124S)
+- servo-macos14: 0.00% (P0D / PT2050.390185S)
+- servo-macos15: 0.00% (P0D / PT2061.346822S)
+- servo-ubuntu2204: 6.34% (PT382125.90562S / PT6028358.813897S)
+- servo-ubuntu2204-bench: 1.93% (PT25882.349628S / PT1343626.776077S)
+- servo-windows10: 10.75% (PT214816.31769S / PT1997712.920769S)
 ### Monthly usage (per month of 30 days)
 Runner hours spent in Busy, scaled to 30 days:
 - servo-macos13: PT3264.076689472S (0.04 days)
+- servo-macos14: P0D (0.00 days)
+- servo-macos15: P0D (0.00 days)
 - servo-ubuntu2204: PT1472333.12469623S (17.04 days)
 - servo-ubuntu2204-bench: PT99660.79784921S (1.15 days)
 - servo-windows10: PT827689.50209442S (9.58 days)

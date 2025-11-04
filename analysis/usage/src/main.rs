@@ -15,18 +15,35 @@ struct Args {
 }
 
 fn main() -> eyre::Result<()> {
+    let mut overall_utilisation_by_profile: BTreeMap<String, Utilisation> = BTreeMap::default();
     let mut monthly_usage_by_profile: BTreeMap<String, TimeDelta> = BTreeMap::default();
     for log in Args::parse().logs {
         println!("### {log}");
         let file = File::open(log)?;
         let result = analyse(BufReader::new(file))?;
-        for (profile, usage) in result.usage_by_profile {
+        for (profile, utilisation) in result.utilisation_by_profile {
+            let overall_utilisation = overall_utilisation_by_profile
+                .entry(profile.clone())
+                .or_default();
+            overall_utilisation.busy_time += utilisation.busy_time;
+            overall_utilisation.total_time += utilisation.total_time;
             let monthly_scale_factor =
                 TimeDelta::days(30).as_seconds_f64() / result.server_uptime.as_seconds_f64();
-            let monthly_usage = usage.as_seconds_f64() * monthly_scale_factor;
+            let monthly_usage = utilisation.busy_time.as_seconds_f64() * monthly_scale_factor;
             let monthly_usage = TimeDelta::nanoseconds((monthly_usage * 1_000_000_000.0) as _);
             *monthly_usage_by_profile.entry(profile).or_default() += monthly_usage;
         }
+    }
+
+    println!("### Efficiency of utilisation (Busy time / total time)");
+    println!("Independent of runner concurrency:");
+    for (profile, utilisation) in overall_utilisation_by_profile {
+        let efficiency_percent = 100.0 * utilisation.busy_time.as_seconds_f64()
+            / utilisation.total_time.as_seconds_f64();
+        println!(
+            "- {profile}: {efficiency_percent:.2}% ({} / {})",
+            utilisation.busy_time, utilisation.total_time
+        );
     }
 
     println!("### Monthly usage (per month of 30 days)");
@@ -116,8 +133,14 @@ fn day_string(duration: TimeDelta) -> String {
 }
 
 struct AnalyseResult {
-    usage_by_profile: BTreeMap<String, TimeDelta>,
+    utilisation_by_profile: BTreeMap<String, Utilisation>,
     server_uptime: TimeDelta,
+}
+
+#[derive(Default)]
+struct Utilisation {
+    busy_time: TimeDelta,
+    total_time: TimeDelta,
 }
 
 fn analyse(log: impl BufRead) -> Result<AnalyseResult, eyre::Error> {
@@ -191,7 +214,7 @@ fn analyse(log: impl BufRead) -> Result<AnalyseResult, eyre::Error> {
             .push((id, status, duration));
     }
 
-    let mut usage_by_profile: BTreeMap<&String, TimeDelta> = BTreeMap::default();
+    let mut utilisation_by_profile: BTreeMap<&String, Utilisation> = BTreeMap::default();
     println!(
         "Over the last {server_uptime} ({}) of uptime:",
         day_string(server_uptime)
@@ -202,8 +225,10 @@ fn analyse(log: impl BufRead) -> Result<AnalyseResult, eyre::Error> {
         for (id, status, duration) in runners {
             runner_ids.insert(id);
             *durations_by_status.entry(status).or_default() += **duration;
+            let utilisation = utilisation_by_profile.entry(profile).or_default();
+            utilisation.total_time += **duration;
             if *status == "Busy" {
-                *usage_by_profile.entry(profile).or_default() += **duration;
+                utilisation.busy_time += **duration;
             }
         }
         println!("- {} runners in profile {profile}:", runner_ids.len());
@@ -217,7 +242,7 @@ fn analyse(log: impl BufRead) -> Result<AnalyseResult, eyre::Error> {
     }
 
     Ok(AnalyseResult {
-        usage_by_profile: usage_by_profile
+        utilisation_by_profile: utilisation_by_profile
             .into_iter()
             .map(|(profile, usage)| (profile.to_owned(), usage))
             .collect(),
