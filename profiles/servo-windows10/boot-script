@@ -22,7 +22,11 @@ if (!(Test-Path .\image-built)) {
     # Note: installer automatically uninstalls first if needed, so the check is just there to save time
     if (!(Test-Path 'C:\Program Files\Git\cmd\git.exe')) {
         curl.exe -fsSLO 'http://192.168.100.1:8000/image-deps/windows10/Git-2.45.1-64-bit.exe'; Check
-        .\Git-2.45.1-64-bit.exe /silent | Out-Default; Check
+        # `CmdTools` is “Use Git and optional Unix tools from the Command Prompt”, and is required
+        # by many composite actions expecting to be able to run bash scripts on all platforms.
+        # This is what GitHub’s images use, and it does not seem to override stock Windows tools.
+        # <https://github.com/git-for-windows/build-extra/pull/653>
+        .\Git-2.45.1-64-bit.exe /silent /o:PathOption=CmdTools | Out-Default; Check
     }
 
     # Install Python, for checkouts without servo#34504
