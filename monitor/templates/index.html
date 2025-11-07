@@ -4,6 +4,34 @@
     *:not(xmp):not(pre):not(plaintext):not(tt):not(code):not(kbd):not(samp) {
         font-family: Atkinson Hyperlegible;
     }
+    #notice {
+        display: none;
+        position: fixed;
+        z-index: 2;
+        left: 0;
+        top: 0;
+        padding: 1em;
+        border: 1px solid red;
+        background: white;
+        font-family: monospace, monospace;
+        white-space: pre;
+    }
+    #notice.error {
+        display: block;
+        border: solid red;
+    }
+    #notice.stale {
+        display: block;
+        border: solid blue;
+    }
+    #notice.error ~ #noticeWash,
+    #notice.stale ~ #noticeWash {
+        position: fixed;
+        z-index: 1;
+        inset: 0;
+        background: white;
+        opacity: 0.5;
+    }
     .labels {
         line-height: 3;
         --radius: 0.25em;
@@ -39,6 +67,9 @@
     }
 </style>
 
+<div id="notice" hidden></div>
+<div id="noticeWash"></div>
+
 <main>
 {{ content|safe }}
 </main>
@@ -50,24 +81,42 @@
 
 <script>
     const screenshotImg = document.querySelector("#screenshot img");
+
     const pollInterval = 1000;
+    const notice = document.querySelector("#notice");
+    const output = document.querySelector("main");
     setTimeout(update, pollInterval);
 
     async function update() {
-        const response = await fetch("/dashboard.html");
-        document.querySelector("main").innerHTML = await response.text();
-        if (screenshotImg.complete) {
-            try {
-                // To convince the browser to even attempt to reload the image, we need to
-                // cache-bust the <img src> by changing the query string (Chromium) or at least the
-                // fragment (Firefox). Normally changing the query string would break caching
-                // entirely, but our endpoint redirects `screenshot.png?=12345` to `screenshot.png`,
-                // so the browser can still send its If-Modified-Since.
-                // <https://stackoverflow.com/a/9505557>
-                screenshotImg.src = cache_bust(screenshotImg.src);
-            } catch (e) {
-                // Do nothing; src is probably empty
+        try {
+            const response = await fetch("/dashboard.html", { signal: AbortSignal.timeout(3000) });
+            if (response.status == 503) {
+                notice.className = "stale";
+                notice.textContent = "...";
+                setTimeout(update, pollInterval);
+                return;
+            } else if (!response.ok) {
+                throw `HTTP ${response.status}`;
             }
+            output.innerHTML = await response.text();
+            if (screenshotImg.complete) {
+                try {
+                    // To convince the browser to even attempt to reload the image, we need to
+                    // cache-bust the <img src> by changing the query string (Chromium) or at least the
+                    // fragment (Firefox). Normally changing the query string would break caching
+                    // entirely, but our endpoint redirects `screenshot.png?=12345` to `screenshot.png`,
+                    // so the browser can still send its If-Modified-Since.
+                    // <https://stackoverflow.com/a/9505557>
+                    screenshotImg.src = cache_bust(screenshotImg.src);
+                } catch (e) {
+                    // Do nothing; src is probably empty
+                }
+            }
+            notice.className = "";
+            notice.textContent = "";
+        } catch (e) {
+            notice.className = "error";
+            notice.textContent = `[${new Date().toTimeString().split(" ")[0]}] ${e}`;
         }
         setTimeout(update, pollInterval);
     }

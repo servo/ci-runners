@@ -655,6 +655,11 @@ fn monitor_thread() -> eyre::Result<()> {
                             .reserve_runner(id, &unique_id, &qualified_repo, &run_id)
                             .is_ok()
                         {
+                            // Flush the dashboard, so we don’t mislead clients into thinking
+                            // the runners that were taken are still idle.
+                            if let Ok(mut dashboard) = DASHBOARD.write() {
+                                *dashboard = None;
+                            }
                             result.push(json!({
                                 "id": id,
                                 "runner": runner,
