@@ -1,21 +1,45 @@
 use std::{
-    collections::BTreeMap, fmt::Write as _, process::exit, sync::RwLock, thread, time::Duration,
+    collections::BTreeMap,
+    fmt::Write as _,
+    process::exit,
+    sync::{LazyLock, RwLock},
+    thread,
+    time::Duration,
 };
 
-use jane_eyre::eyre::{self, OptionExt};
+use crossbeam_channel::{Receiver, Sender};
+use jane_eyre::eyre::{self, bail, OptionExt};
 use reqwest::Client;
 use rocket::{
-    get,
+    get, post,
     response::content::{RawHtml, RawText},
+    serde::json::Json,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use settings::TOML;
-use tokio::{task::JoinSet, time::sleep};
+use tokio::task::JoinSet;
 use tracing::{error, info};
-use web::rocket_eyre;
+use web::{auth::ApiKeyGuard, rocket_eyre};
 
 static DASHBOARD: RwLock<Option<String>> = RwLock::new(None);
+
+#[derive(Debug)]
+enum Request {
+    Enqueue {
+        response_tx: Sender<eyre::Result<QueueEntry>>,
+        entry: QueueEntry,
+    },
+}
+
+struct Channel<T> {
+    sender: Sender<T>,
+    receiver: Receiver<T>,
+}
+static REQUEST: LazyLock<Channel<Request>> = LazyLock::new(|| {
+    let (sender, receiver) = crossbeam_channel::bounded(0);
+    Channel { sender, receiver }
+});
 
 #[get("/")]
 async fn index_route() -> rocket_eyre::Result<RawHtml<&'static str>> {
@@ -31,6 +55,32 @@ async fn dashboard_text_route() -> rocket_eyre::Result<RawText<String>> {
             .clone()
             .unwrap_or_default(),
     ))
+}
+
+#[post("/profile/<profile_key>/enqueue?<unique_id>&<qualified_repo>&<run_id>")]
+async fn profile_enqueue_route(
+    unique_id: String,
+    qualified_repo: String,
+    run_id: String,
+    profile_key: String,
+    _auth: ApiKeyGuard<'_>,
+) -> rocket_eyre::Result<Json<QueueEntry>> {
+    let (response_tx, response_rx) = crossbeam_channel::bounded(0);
+    REQUEST.sender.send_timeout(
+        Request::Enqueue {
+            response_tx,
+            entry: QueueEntry {
+                unique_id,
+                qualified_repo,
+                run_id,
+                profile_key,
+            },
+        },
+        TOML.monitor_thread_send_timeout(),
+    )?;
+    let result = response_rx.recv_timeout(TOML.monitor_thread_recv_timeout())??;
+
+    Ok(Json(result))
 }
 
 #[tokio::main]
@@ -61,7 +111,10 @@ async fn main() -> eyre::Result<()> {
                 .merge(("port", 8002))
                 .merge(("address", listen_addr)),
         )
-        .mount("/", rocket::routes![index_route, dashboard_text_route])
+        .mount(
+            "/",
+            rocket::routes![index_route, dashboard_text_route, profile_enqueue_route],
+        )
         .launch()
     };
 
@@ -76,6 +129,14 @@ async fn main() -> eyre::Result<()> {
     Ok(())
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct QueueEntry {
+    unique_id: String,
+    qualified_repo: String,
+    run_id: String,
+    profile_key: String,
+}
+
 #[tokio::main]
 async fn queue_thread() -> eyre::Result<()> {
     let config = TOML
@@ -85,9 +146,15 @@ async fn queue_thread() -> eyre::Result<()> {
     let client = Client::builder()
         .timeout(Duration::from_millis(1500))
         .build()?;
+    let mut queue_entries: Vec<QueueEntry> = vec![];
     let mut monitor_responses: BTreeMap<String, MonitorResponse> = BTreeMap::default();
 
     loop {
+        let mut queue_text = String::default();
+        for entry in queue_entries.iter() {
+            writeln!(&mut queue_text, "{entry:?}")?;
+        }
+
         info!("Querying servers for updates");
 
         let mut set = JoinSet::new();
@@ -127,10 +194,20 @@ async fn queue_thread() -> eyre::Result<()> {
         }
 
         let mut new_dashboard = String::default();
+        writeln!(&mut new_dashboard, ">>> queue\n{queue_text}")?;
         writeln!(&mut new_dashboard, ">>> servers\n{servers_text}")?;
         *DASHBOARD.write().expect("Poisoned") = Some(new_dashboard);
 
-        sleep(Duration::from_secs(1)).await;
+        // Handle one request from the API.
+        if let Ok(request) = REQUEST.receiver.recv_timeout(TOML.monitor_poll_interval()) {
+            match request {
+                Request::Enqueue { response_tx, entry } => {
+                    response_tx
+                        .send(try_enqueue(&mut queue_entries, entry))
+                        .expect("Failed to send Response to API thread");
+                }
+            }
+        }
     }
 }
 
@@ -157,4 +234,16 @@ async fn get_monitor_dashboard_for_server(
         .send()
         .await?;
     Ok(response.json::<MonitorResponse>().await?)
+}
+
+fn try_enqueue(queue_entries: &mut Vec<QueueEntry>, entry: QueueEntry) -> eyre::Result<QueueEntry> {
+    if queue_entries
+        .iter()
+        .find(|e| e.unique_id == entry.unique_id)
+        .is_some()
+    {
+        bail!("Already in queue: {:?}", entry.unique_id);
+    }
+    queue_entries.push(entry.clone());
+    Ok(entry)
 }
