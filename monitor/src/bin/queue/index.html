@@ -1,0 +1,23 @@
+<!doctype html><meta charset="utf-8">
+<style>
+    @import url("https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&display=swap");
+    *:not(xmp):not(pre):not(plaintext):not(tt):not(code):not(kbd):not(samp) {
+        font-family: Atkinson Hyperlegible;
+    }
+    main pre {
+        font-family: monospace, monospace;
+    }
+</style>
+
+<main><pre></pre></main>
+
+<script>
+    const pollInterval = 1000;
+    update();
+
+    async function update() {
+        const response = await fetch("/dashboard.txt");
+        document.querySelector("main pre").textContent = await response.text();
+        setTimeout(update, pollInterval);
+    }
+</script>

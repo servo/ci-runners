@@ -4,7 +4,10 @@ use std::{
 
 use jane_eyre::eyre::{self, OptionExt};
 use reqwest::Client;
-use rocket::{get, response::content::RawText};
+use rocket::{
+    get,
+    response::content::{RawHtml, RawText},
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use settings::TOML;
@@ -15,7 +18,12 @@ use web::rocket_eyre;
 static DASHBOARD: RwLock<Option<String>> = RwLock::new(None);
 
 #[get("/")]
-async fn index_route() -> rocket_eyre::Result<RawText<String>> {
+async fn index_route() -> rocket_eyre::Result<RawHtml<&'static str>> {
+    Ok(RawHtml(include_str!("queue/index.html")))
+}
+
+#[get("/dashboard.txt")]
+async fn dashboard_text_route() -> rocket_eyre::Result<RawText<String>> {
     Ok(RawText(
         DASHBOARD
             .read()
@@ -53,7 +61,7 @@ async fn main() -> eyre::Result<()> {
                 .merge(("port", 8002))
                 .merge(("address", listen_addr)),
         )
-        .mount("/", rocket::routes![index_route,])
+        .mount("/", rocket::routes![index_route, dashboard_text_route])
         .launch()
     };
 
