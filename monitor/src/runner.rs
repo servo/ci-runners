@@ -35,6 +35,7 @@ pub struct Runner {
     registration: Option<ApiRunner>,
     guest_name: Option<String>,
     ipv4_address: Option<Ipv4Addr>,
+    #[serde(skip)]
     github_jitconfig: Option<String>,
     details: RunnerDetails,
 }
