@@ -17,6 +17,7 @@ pub type Result<T, E = EyreReport> = std::result::Result<T, E>;
 #[derive(Debug)]
 pub enum EyreReport {
     Forbidden(eyre::Report),
+    NotFound(eyre::Report),
     InternalServerError(eyre::Report),
     ServiceUnavailable(eyre::Report),
     TryAgain(Duration),
@@ -36,6 +37,7 @@ impl<'r> Responder<'r, 'static> for EyreReport {
     fn respond_to(self, request: &Request<'_>) -> response::Result<'static> {
         let (status, error) = match self {
             Self::Forbidden(e) => (Status::Forbidden, e),
+            Self::NotFound(e) => (Status::NotFound, e),
             Self::InternalServerError(e) => (Status::InternalServerError, e),
             Self::ServiceUnavailable(e) => (Status::ServiceUnavailable, e),
             Self::TryAgain(duration) => {

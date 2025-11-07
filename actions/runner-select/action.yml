@@ -122,8 +122,8 @@ runs:
           fall_back_to_github_hosted
         fi
 
-        take_url=$queue_api_base_url/take\?unique_id=$unique_id
-        take_url_with_token=$take_url\&token=$(cat $result)
+        take_url=$queue_api_base_url/take/$unique_id
+        take_url_with_token=$take_url\?token=$(cat $result)
         result=$(mktemp)
         echo
         echo POST "$take_url"

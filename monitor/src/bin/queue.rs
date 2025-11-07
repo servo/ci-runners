@@ -148,15 +148,16 @@ async fn enqueue_route(
     Ok(RawText(result))
 }
 
-#[post("/take?<unique_id>&<token>")]
-async fn take_route(unique_id: UniqueId, token: String) -> rocket_eyre::Result<RawJson<String>> {
+#[post("/take/<unique_id>?<token>")]
+async fn take_route(unique_id: String, token: String) -> rocket_eyre::Result<RawJson<String>> {
+    let unique_id = UniqueId(unique_id);
     let Some(quick_lookup) = QUICK_LOOKUP
         .read()
         .expect("Poisoned")
         .get(&unique_id)
         .cloned()
     else {
-        return Err(eyre!("Not found: {unique_id:?}").into());
+        return Err(EyreReport::NotFound(eyre!("Not found: {unique_id:?}")));
     };
     ACCESS_TIMES
         .write()
