@@ -1,6 +1,6 @@
 pub mod data;
-
 pub mod profile;
+pub mod queue;
 pub mod units;
 
 use std::{
@@ -17,7 +17,7 @@ use chrono::TimeDelta;
 use jane_eyre::eyre::{self, bail};
 use serde::Deserialize;
 
-use crate::{profile::Profile, units::MemorySize};
+use crate::{profile::Profile, queue::QueueConfig, units::MemorySize};
 
 pub static LIB_MONITOR_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     if let Some(lib_monitor_dir) = env::var_os("LIB_MONITOR_DIR") {
@@ -84,6 +84,7 @@ pub struct Toml {
     pub available_1g_hugepages: usize,
     pub available_normal_memory: MemorySize,
     profiles: BTreeMap<String, Profile>,
+    pub queue: Option<QueueConfig>,
 }
 
 impl Dotenv {
