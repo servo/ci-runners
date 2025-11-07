@@ -9,12 +9,16 @@ use std::{
 
 use crossbeam_channel::{Receiver, Sender};
 use jane_eyre::eyre::{self, bail, eyre, OptionExt};
-use rand::seq::SliceRandom;
+use monitor::validate_tokenless_select;
+use rand::{
+    distr::{Alphanumeric, SampleString},
+    rng,
+    seq::SliceRandom,
+};
 use reqwest::Client;
 use rocket::{
     get, post,
     response::content::{RawHtml, RawJson, RawText},
-    serde::json::Json,
     FromForm,
 };
 use serde::{Deserialize, Serialize};
@@ -27,7 +31,17 @@ use web::{
     rocket_eyre::{self, EyreReport},
 };
 
-static QUICK_LOOKUP: RwLock<BTreeMap<UniqueId, QuickLookupStatus>> = RwLock::new(BTreeMap::new());
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+struct QuickLookupInfo {
+    token: String,
+    status: QuickLookupStatus,
+}
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+enum QuickLookupStatus {
+    ReadyToTake,
+    NotReadyYet,
+}
+static QUICK_LOOKUP: RwLock<BTreeMap<UniqueId, QuickLookupInfo>> = RwLock::new(BTreeMap::new());
 static DASHBOARD: RwLock<Option<String>> = RwLock::new(None);
 
 #[derive(Clone, Debug, Deserialize, Eq, FromForm, Hash, Ord, PartialEq, PartialOrd, Serialize)]
@@ -40,16 +54,10 @@ impl Display for UniqueId {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-enum QuickLookupStatus {
-    ReadyToTake,
-    NotReadyYet,
-}
-
 #[derive(Debug)]
 enum Request {
     Enqueue {
-        response_tx: Sender<eyre::Result<QueueEntry>>,
+        response_tx: Sender<eyre::Result<String>>,
         entry: QueueEntry,
     },
     Take {
@@ -95,7 +103,7 @@ async fn profile_enqueue_route(
     run_id: String,
     profile_key: String,
     _auth: ApiKeyGuard<'_>,
-) -> rocket_eyre::Result<Json<QueueEntry>> {
+) -> rocket_eyre::Result<RawText<String>> {
     let (response_tx, response_rx) = crossbeam_channel::bounded(0);
     REQUEST.sender.send_timeout(
         Request::Enqueue {
@@ -111,23 +119,50 @@ async fn profile_enqueue_route(
     )?;
     let result = response_rx.recv_timeout(TOML.monitor_thread_recv_timeout())??;
 
-    Ok(Json(result))
+    Ok(RawText(result))
 }
 
-#[post("/take?<unique_id>")]
-async fn take_route(
+#[post("/enqueue?<unique_id>&<qualified_repo>&<run_id>")]
+async fn enqueue_route(
     unique_id: UniqueId,
-    _auth: ApiKeyGuard<'_>,
-) -> rocket_eyre::Result<RawJson<String>> {
-    match QUICK_LOOKUP.read().expect("Poisoned").get(&unique_id) {
-        Some(QuickLookupStatus::ReadyToTake) => {}
-        Some(QuickLookupStatus::NotReadyYet) => {
-            return Err(EyreReport::TryAgain(Duration::from_secs(5)));
-        }
-        None => {
-            return Err(eyre!("Not found: {unique_id:?}").into());
-        }
+    qualified_repo: String,
+    run_id: String,
+) -> rocket_eyre::Result<RawText<String>> {
+    let profile_key = validate_tokenless_select(&unique_id.to_string(), &qualified_repo, &run_id)?;
+    let (response_tx, response_rx) = crossbeam_channel::bounded(0);
+    REQUEST.sender.send_timeout(
+        Request::Enqueue {
+            response_tx,
+            entry: QueueEntry {
+                unique_id,
+                qualified_repo,
+                run_id,
+                profile_key,
+            },
+        },
+        TOML.monitor_thread_send_timeout(),
+    )?;
+    let result = response_rx.recv_timeout(TOML.monitor_thread_recv_timeout())??;
+
+    Ok(RawText(result))
+}
+
+#[post("/take?<unique_id>&<token>")]
+async fn take_route(unique_id: UniqueId, token: String) -> rocket_eyre::Result<RawJson<String>> {
+    let Some(quick_lookup) = QUICK_LOOKUP
+        .read()
+        .expect("Poisoned")
+        .get(&unique_id)
+        .cloned()
+    else {
+        return Err(eyre!("Not found: {unique_id:?}").into());
     };
+    if token != quick_lookup.token {
+        return Err(EyreReport::Forbidden(eyre!("Bad token: {unique_id:?}")));
+    }
+    if quick_lookup.status == QuickLookupStatus::NotReadyYet {
+        return Err(EyreReport::TryAgain(Duration::from_secs(5)));
+    }
     let (response_tx, response_rx) = crossbeam_channel::bounded(0);
     REQUEST.sender.send_timeout(
         Request::Take {
@@ -177,6 +212,7 @@ async fn main() -> eyre::Result<()> {
                 index_route,
                 dashboard_text_route,
                 profile_enqueue_route,
+                enqueue_route,
                 take_route,
             ],
         )
@@ -196,7 +232,9 @@ async fn main() -> eyre::Result<()> {
 
 #[derive(Debug, Default)]
 struct Queue {
-    queue: Vec<QueueEntry>,
+    order: Vec<UniqueId>,
+    entries: BTreeMap<UniqueId, QueueEntry>,
+    tokens: BTreeMap<UniqueId, String>,
     servers: BTreeMap<Server, ServerStatus>,
 }
 
@@ -216,12 +254,18 @@ impl ServerStatus {
 }
 
 impl Queue {
-    fn try_enqueue(&mut self, entry: QueueEntry) -> eyre::Result<QueueEntry> {
-        if self.queue.iter().find(|e| e.matches(&entry)).is_some() {
+    fn try_enqueue(&mut self, entry: QueueEntry) -> eyre::Result<String> {
+        if self.order.iter().find(|id| entry.matches_id(id)).is_some() {
             bail!("Already in queue: {:?}", entry.unique_id);
         }
-        self.queue.push(entry.clone());
-        Ok(entry)
+        let unique_id = entry.unique_id.clone();
+        self.order.push(unique_id.clone());
+        self.entries.insert(unique_id.clone(), entry);
+        let token = self
+            .tokens
+            .entry(unique_id.clone())
+            .or_insert(Alphanumeric.sample_string(&mut rng(), 32));
+        Ok(token.clone())
     }
 
     async fn try_take(&mut self, unique_id: &UniqueId) -> eyre::Result<TakeResult> {
@@ -259,19 +303,29 @@ impl Queue {
         }
     }
 
+    fn iter(&self) -> impl Iterator<Item = (&UniqueId, &QueueEntry)> {
+        self.order
+            .iter()
+            .flat_map(|id| self.entries.get(id).map(|entry| (id, entry)))
+    }
+
     fn get_entry(&self, unique_id: &UniqueId) -> Option<QueueEntry> {
-        self.queue.iter().find(|e| e.matches_id(unique_id)).cloned()
+        self.entries.get(unique_id).cloned()
     }
 
     fn remove_entry(&mut self, unique_id: &UniqueId) {
-        self.queue.retain(|e| !e.matches_id(unique_id));
+        self.order.retain(|id| id != unique_id);
+        self.entries.remove(unique_id);
+        self.tokens.remove(unique_id);
     }
 
-    fn quick_lookup_status(&self, entry: &QueueEntry) -> QuickLookupStatus {
-        match self.pick_server(entry) {
+    fn quick_lookup_info(&self, entry: &QueueEntry) -> Option<QuickLookupInfo> {
+        let token = self.tokens.get(&entry.unique_id)?.clone();
+        let status = match self.pick_server(entry) {
             Some(_) => QuickLookupStatus::ReadyToTake,
             None => QuickLookupStatus::NotReadyYet,
-        }
+        };
+        Some(QuickLookupInfo { token, status })
     }
 
     fn pick_server(&self, entry: &QueueEntry) -> Option<Server> {
@@ -310,9 +364,6 @@ struct QueueEntry {
 }
 
 impl QueueEntry {
-    fn matches(&self, other: &Self) -> bool {
-        self.matches_id(&other.unique_id)
-    }
     fn matches_id(&self, unique_id: &UniqueId) -> bool {
         self.unique_id == *unique_id
     }
@@ -366,13 +417,16 @@ async fn queue_thread() -> eyre::Result<()> {
         }
 
         let mut queue_text = String::default();
-        for entry in queue.queue.iter() {
+        for (_unique_id, entry) in queue.iter() {
             writeln!(&mut queue_text, "{entry:?}")?;
         }
         *QUICK_LOOKUP.write().expect("Poisoned") = queue
-            .queue
             .iter()
-            .map(|entry| (entry.unique_id.clone(), queue.quick_lookup_status(entry)))
+            .flat_map(|(unique_id, entry)| {
+                queue
+                    .quick_lookup_info(entry)
+                    .map(|info| (unique_id.clone(), info))
+            })
             .collect();
 
         let mut servers_text = String::default();
