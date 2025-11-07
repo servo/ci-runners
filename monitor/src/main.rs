@@ -1,6 +1,5 @@
 mod dashboard;
 mod data;
-mod github;
 mod id;
 mod image;
 mod libvirt;
@@ -22,10 +21,13 @@ use std::{
 
 use askama::Template;
 use askama_web::WebTemplate;
-use chrono::Utc;
 use crossbeam_channel::{Receiver, Sender};
 use jane_eyre::eyre::{self, eyre, Context, OptionExt};
 use mktemp::Temp;
+use monitor::{
+    github::{list_registered_runners_for_host, Cache},
+    validate_tokenless_select,
+};
 use rocket::{
     delete,
     fs::{FileServer, NamedFile},
@@ -48,10 +50,6 @@ use web::{
 use crate::{
     dashboard::Dashboard,
     data::{get_profile_data_path, get_runner_data_path, run_migrations},
-    github::{
-        download_artifact_string, list_registered_runners_for_host, list_workflow_run_artifacts,
-        Cache,
-    },
     id::IdGen,
     image::{start_libvirt_guest, Rebuilds},
     libvirt::list_runner_guests,
@@ -240,55 +238,7 @@ fn select_runner_route(
     qualified_repo: String,
     run_id: String,
 ) -> rocket_eyre::Result<RawJson<String>> {
-    if !qualified_repo.starts_with(&TOML.allowed_qualified_repo_prefix) {
-        Err(EyreReport::InternalServerError(eyre!(
-            "Not allowed on this `qualified_repo`"
-        )))?;
-    }
-    let artifacts = list_workflow_run_artifacts(&qualified_repo, &run_id)?;
-    let args_artifact = format!("servo-ci-runners_{unique_id}");
-    let Some(args_artifact) = artifacts
-        .into_iter()
-        .find(|artifact| artifact.name == args_artifact)
-    else {
-        Err(EyreReport::InternalServerError(eyre!(
-            "No args artifact found: {args_artifact}"
-        )))?
-    };
-    let artifact_age = Utc::now().signed_duration_since(args_artifact.created_at);
-    if artifact_age > TOML.tokenless_select_artifact_max_age() {
-        Err(EyreReport::InternalServerError(eyre!(
-            "Args artifact is too old ({}): {}",
-            artifact_age,
-            args_artifact.name,
-        )))?
-    }
-    let args_artifact = download_artifact_string(&args_artifact.archive_download_url)?;
-    let mut args = args_artifact
-        .lines()
-        .flat_map(|line| line.split_once("="))
-        .collect::<BTreeMap<&str, &str>>();
-    if args.remove("unique_id") != Some(&*unique_id) {
-        Err(EyreReport::InternalServerError(eyre!(
-            "Wrong unique_id in artifact"
-        )))?;
-    }
-    if args.remove("qualified_repo") != Some(&*qualified_repo) {
-        Err(EyreReport::InternalServerError(eyre!(
-            "Wrong qualified_repo in artifact"
-        )))?;
-    }
-    if args.remove("run_id") != Some(&*run_id) {
-        Err(EyreReport::InternalServerError(eyre!(
-            "Wrong run_id in artifact"
-        )))?;
-    }
-    let Some(profile_key) = args.remove("self_hosted_image_name") else {
-        Err(EyreReport::InternalServerError(eyre!(
-            "Wrong run_id in artifact"
-        )))?
-    };
-
+    let profile_key = validate_tokenless_select(&unique_id, &qualified_repo, &run_id)?;
     let (response_tx, response_rx) = crossbeam_channel::bounded(0);
     REQUEST.sender.send_timeout(
         Request::TakeRunners {
