@@ -4,7 +4,7 @@ use std::{
     process::exit,
     sync::{LazyLock, RwLock},
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use crossbeam_channel::{Receiver, Sender};
@@ -41,6 +41,7 @@ enum QuickLookupStatus {
     ReadyToTake,
     NotReadyYet,
 }
+static ACCESS_TIMES: RwLock<BTreeMap<UniqueId, Instant>> = RwLock::new(BTreeMap::new());
 static QUICK_LOOKUP: RwLock<BTreeMap<UniqueId, QuickLookupInfo>> = RwLock::new(BTreeMap::new());
 static DASHBOARD: RwLock<Option<String>> = RwLock::new(None);
 
@@ -157,6 +158,10 @@ async fn take_route(unique_id: UniqueId, token: String) -> rocket_eyre::Result<R
     else {
         return Err(eyre!("Not found: {unique_id:?}").into());
     };
+    ACCESS_TIMES
+        .write()
+        .expect("Poisoned")
+        .insert(unique_id.clone(), Instant::now());
     if token != quick_lookup.token {
         return Err(EyreReport::Forbidden(eyre!("Bad token: {unique_id:?}")));
     }
@@ -265,6 +270,10 @@ impl Queue {
             .tokens
             .entry(unique_id.clone())
             .or_insert(Alphanumeric.sample_string(&mut rng(), 32));
+        ACCESS_TIMES
+            .write()
+            .expect("Poisoned")
+            .insert(unique_id.clone(), Instant::now());
         Ok(token.clone())
     }
 
@@ -300,6 +309,19 @@ impl Queue {
             }
         } else {
             bail!("Not found: {unique_id:?}");
+        }
+    }
+
+    fn start_update(&mut self) {
+        let mut access_times = ACCESS_TIMES.write().expect("Poisoned");
+        for (unique_id, access_time) in access_times.clone() {
+            if access_time.elapsed() > Duration::from_secs(30) {
+                self.remove_entry(&unique_id);
+                access_times.remove(&unique_id);
+            }
+        }
+        for status in self.servers.values_mut() {
+            status.stale = true;
         }
     }
 
@@ -382,10 +404,7 @@ async fn queue_thread() -> eyre::Result<()> {
 
     loop {
         info!("Querying servers for updates");
-
-        for status in queue.servers.values_mut() {
-            status.stale = true;
-        }
+        queue.start_update();
 
         let mut set = JoinSet::new();
         for server_url in config.servers.iter() {
@@ -417,8 +436,15 @@ async fn queue_thread() -> eyre::Result<()> {
         }
 
         let mut queue_text = String::default();
-        for (_unique_id, entry) in queue.iter() {
-            writeln!(&mut queue_text, "{entry:?}")?;
+        for (unique_id, entry) in queue.iter() {
+            let access_times = ACCESS_TIMES.read().expect("Poisoned");
+            let access_time = access_times.get(unique_id).expect("Guaranteed by Queue");
+            writeln!(
+                &mut queue_text,
+                "- {unique_id} (last request {:?} ago)",
+                access_time.elapsed()
+            )?;
+            writeln!(&mut queue_text, "  {entry:?}")?;
         }
         *QUICK_LOOKUP.write().expect("Poisoned") = queue
             .iter()
