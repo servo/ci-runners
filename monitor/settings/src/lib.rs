@@ -55,6 +55,7 @@ pub static TOML: LazyLock<Toml> = LazyLock::new(|| {
 pub struct Dotenv {
     // GITHUB_TOKEN not used
     // LIBVIRT_DEFAULT_URI not used
+    pub monitor_api_token_raw_value: String,
     pub monitor_api_token_authorization_value: String,
     pub monitor_data_path: Option<String>,
 }
@@ -89,6 +90,7 @@ impl Dotenv {
     pub fn load() -> Self {
         let monitor_api_token = env_string("SERVO_CI_MONITOR_API_TOKEN");
         let result = Self {
+            monitor_api_token_raw_value: monitor_api_token.clone(),
             monitor_api_token_authorization_value: Self::monitor_api_token_authorization_value(
                 &monitor_api_token,
             ),
@@ -126,6 +128,7 @@ impl Dotenv {
         let monitor_api_token = "ChangedMe";
 
         let result = Self {
+            monitor_api_token_raw_value: monitor_api_token.to_owned(),
             monitor_api_token_authorization_value: Self::monitor_api_token_authorization_value(
                 monitor_api_token,
             ),
