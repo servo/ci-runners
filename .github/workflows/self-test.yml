@@ -2,7 +2,7 @@ on: workflow_dispatch
 
 jobs:
   runner-select:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     outputs:
       unique-id: ${{ steps.select.outputs.unique-id }}
       selected-runner-label: ${{ steps.select.outputs.selected-runner-label }}
@@ -30,7 +30,7 @@ jobs:
     needs:
       - runner-select
     if: ${{ fromJSON(needs.runner-select.outputs.is-self-hosted) }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Runner timeout
