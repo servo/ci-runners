@@ -16,7 +16,7 @@ USER root
 # Java is required for signing the hap, libatomic1 for hdc
 RUN apt-get update && \
     apt-get -y install --no-install-recommends \
-        openjdk-21-jre-headless libatomic1 libc6 build-essential jq \
+        openjdk-21-jre-headless libatomic1 libc6 build-essential jq python3 \
     && rm -rf /var/cache/apt/lists
 
 ARG USERNAME
