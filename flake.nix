@@ -25,6 +25,7 @@
         hugepages = 96;
         hasIntermittentTracker = true;
         hasChunker = true;
+        hasQueue = true;
         monitor = self.packages.x86_64-linux.monitor;
       }) ];
     };
