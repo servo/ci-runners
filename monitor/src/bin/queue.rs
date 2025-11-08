@@ -434,6 +434,18 @@ impl Queue {
         if self.order.iter().find(|id| entry.matches_id(id)).is_some() {
             bail!("Already in queue: {:?}", entry.unique_id);
         }
+        // If no servers are configured to target non-zero runners for the requested profile,
+        // reject the request, because we may never be able to satisfy it.
+        if !self
+            .fresh_servers()
+            .flat_map(|(_, status)| status.profile_runner_counts.get(&entry.profile_key))
+            .any(|counts| counts.target > 0)
+        {
+            bail!(
+                "Request for profile not satisfiable: {:?}",
+                entry.profile_key
+            );
+        }
         let unique_id = entry.unique_id.clone();
         self.order.push(unique_id.clone());
         self.entries.insert(unique_id.clone(), entry);
@@ -457,6 +469,8 @@ impl Queue {
 
     async fn try_take(&mut self, unique_id: &UniqueId) -> eyre::Result<TakeResult> {
         if let Some(entry) = self.get_entry(unique_id) {
+            // If we can find a server with idle runners for the requested profile, forward the
+            // request to the queue thread of that server.
             if let Some(server) = self.pick_server(&entry) {
                 self.remove_entry(unique_id);
                 let QueueEntry {
@@ -546,6 +560,12 @@ impl Queue {
             }
         }
         None
+    }
+
+    fn fresh_servers(&self) -> impl Iterator<Item = (&Server, &MonitorResponse)> {
+        self.servers
+            .iter()
+            .flat_map(|(server, status)| status.fresh_only().map(|status| (server, status)))
     }
 }
 
