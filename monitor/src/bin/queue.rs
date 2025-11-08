@@ -31,6 +31,21 @@ use web::{
     rocket_eyre::{self, EyreReport},
 };
 
+/// How long to wait for the completion of downstream dashboard requests to the monitor API.
+const DASHBOARD_UPDATE_REQUEST_TIMEOUT: Duration = Duration::from_millis(1500);
+
+/// How long to wait for the completion of downstream take requests to the monitor API.
+const DOWNSTREAM_TAKE_REQUEST_TIMEOUT: Duration = Duration::from_secs(3);
+
+/// How long to tell the client to wait before retrying a `/take` request (via ‘Retry-After’).
+const TAKE_RESPONSE_RETRY_AFTER: Duration = Duration::from_secs(5);
+
+/// Queued jobs are considered abandoned if the last related request was this long ago.
+const QUEUED_JOB_EXPIRY_AGE: Duration = Duration::from_secs(30);
+
+/// How long to pause after the queue thread exits, cleanly or otherwise.
+const PAUSE_AFTER_QUEUE_THREAD_EXIT: Duration = Duration::from_secs(1);
+
 /// Requests for the queue thread (see [`Request`] for more details).
 static REQUEST: LazyLock<Channel<Request>> = LazyLock::new(|| {
     let (sender, receiver) = crossbeam_channel::bounded(0);
@@ -216,7 +231,7 @@ async fn take_route(unique_id: String, token: String) -> rocket_eyre::Result<Raw
         return Err(EyreReport::Forbidden(eyre!("Bad token: {unique_id:?}")));
     }
     if quick_lookup.ready == ReadyToTake::No {
-        return Err(EyreReport::TryAgain(Duration::from_secs(5)));
+        return Err(EyreReport::TryAgain(TAKE_RESPONSE_RETRY_AFTER));
     }
     let (response_tx, response_rx) = crossbeam_channel::bounded(0);
     REQUEST.sender.send_timeout(
@@ -251,7 +266,7 @@ async fn main() -> eyre::Result<()> {
                 };
                 exit(1);
             }
-            tokio::time::sleep(Duration::from_secs(1)).await;
+            tokio::time::sleep(PAUSE_AFTER_QUEUE_THREAD_EXIT).await;
         }
     });
 
@@ -293,9 +308,6 @@ async fn queue_thread() -> eyre::Result<()> {
         .queue
         .as_ref()
         .ok_or_eyre("monitor.toml has no [queue]!")?;
-    let client = Client::builder()
-        .timeout(Duration::from_millis(1500))
-        .build()?;
     let mut queue = Queue::default();
 
     loop {
@@ -304,11 +316,10 @@ async fn queue_thread() -> eyre::Result<()> {
 
         let mut set = JoinSet::new();
         for server_url in config.servers.iter() {
-            let client = client.clone();
             set.spawn(async {
                 (
                     Server(server_url.clone()),
-                    get_monitor_dashboard_for_server(client, server_url).await,
+                    get_monitor_dashboard_for_server(server_url).await,
                 )
             });
         }
@@ -449,7 +460,7 @@ impl Queue {
                 } = entry;
                 Ok(TakeResult::Success(
                     (async || {
-                        Ok(client(Duration::from_millis(3000))?
+                        Ok(client(DOWNSTREAM_TAKE_REQUEST_TIMEOUT)?
                             .post(format!("{server}/profile/{profile_key}/take"))
                             .query(&[
                                 ("unique_id", unique_id.to_string()),
@@ -465,7 +476,7 @@ impl Queue {
                     .await,
                 ))
             } else {
-                Ok(TakeResult::TryAgain(Duration::from_secs(1)))
+                Ok(TakeResult::TryAgain(TAKE_RESPONSE_RETRY_AFTER))
             }
         } else {
             bail!("Not found: {unique_id:?}");
@@ -475,7 +486,7 @@ impl Queue {
     fn start_update(&mut self) {
         let mut access_times = ACCESS_TIMES.write().expect("Poisoned");
         for (unique_id, access_time) in access_times.clone() {
-            if access_time.elapsed() > Duration::from_secs(30) {
+            if access_time.elapsed() > QUEUED_JOB_EXPIRY_AGE {
                 self.remove_entry(&unique_id);
                 access_times.remove(&unique_id);
             }
@@ -565,11 +576,8 @@ struct ProfileRunnerCounts {
     rest: BTreeMap<String, Value>,
 }
 
-async fn get_monitor_dashboard_for_server(
-    client: Client,
-    server: &str,
-) -> eyre::Result<MonitorResponse> {
-    let response = client
+async fn get_monitor_dashboard_for_server(server: &str) -> eyre::Result<MonitorResponse> {
+    let response = client(DASHBOARD_UPDATE_REQUEST_TIMEOUT)?
         .get(format!("{server}/dashboard.json"))
         .send()
         .await?;
