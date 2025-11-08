@@ -31,20 +31,22 @@ use web::{
     rocket_eyre::{self, EyreReport},
 };
 
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-struct QuickLookupInfo {
-    token: String,
-    status: QuickLookupStatus,
-}
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-enum QuickLookupStatus {
-    ReadyToTake,
-    NotReadyYet,
-}
-static ACCESS_TIMES: RwLock<BTreeMap<UniqueId, Instant>> = RwLock::new(BTreeMap::new());
-static QUICK_LOOKUP: RwLock<BTreeMap<UniqueId, QuickLookupInfo>> = RwLock::new(BTreeMap::new());
+/// Requests for the queue thread (see [`Request`] for more details).
+static REQUEST: LazyLock<Channel<Request>> = LazyLock::new(|| {
+    let (sender, receiver) = crossbeam_channel::bounded(0);
+    Channel { sender, receiver }
+});
+
+/// Cached dashboard contents, to help service requests without cranking the queue thread.
 static DASHBOARD: RwLock<Option<String>> = RwLock::new(None);
 
+/// Cached data about each queued job, to help service requests without cranking the queue thread.
+static QUEUE_CACHE: RwLock<BTreeMap<UniqueId, CachedEntry>> = RwLock::new(BTreeMap::new());
+
+/// Last time each queued job was mentioned in a request, to help clean up abandoned entries.
+static ACCESS_TIMES: RwLock<BTreeMap<UniqueId, Instant>> = RwLock::new(BTreeMap::new());
+
+/// Newtype for the unique id of a queued job, which should be a UUIDv4.
 #[derive(Clone, Debug, Deserialize, Eq, FromForm, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(transparent)]
 #[repr(transparent)]
@@ -55,6 +57,42 @@ impl Display for UniqueId {
     }
 }
 
+/// Newtype for the base url of one of our underlying servers.
+#[repr(transparent)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+struct Server(String);
+impl Display for Server {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+struct CachedEntry {
+    /// Random value generated in `/enqueue` and checked in `/take`, to ensure that the client
+    /// sending a `/take` is the same as the client that sent the `/enqueue`.
+    token: String,
+    ready: ReadyToTake,
+}
+
+/// Whether a `/take` request should actually be forwarded to the queue thread.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+enum ReadyToTake {
+    /// There may be enough capacity to take the runner, but it may fail under contention.
+    Maybe,
+    /// There is definitely not enough capacity to take the runner yet.
+    No,
+}
+
+struct Channel<T> {
+    sender: Sender<T>,
+    receiver: Receiver<T>,
+}
+
+/// Request for the queue thread.
+///
+/// These requests are assumed to be authorised, and each request that gets forwarded to the queue
+/// thread requires refreshing the status of our resources, so they are relatively expensive.
 #[derive(Debug)]
 enum Request {
     Enqueue {
@@ -66,20 +104,12 @@ enum Request {
         unique_id: UniqueId,
     },
 }
+
 #[derive(Debug)]
 enum TakeResult {
     Success(eyre::Result<String>),
     TryAgain(Duration),
 }
-
-struct Channel<T> {
-    sender: Sender<T>,
-    receiver: Receiver<T>,
-}
-static REQUEST: LazyLock<Channel<Request>> = LazyLock::new(|| {
-    let (sender, receiver) = crossbeam_channel::bounded(0);
-    Channel { sender, receiver }
-});
 
 #[get("/")]
 async fn index_route() -> rocket_eyre::Result<RawHtml<&'static str>> {
@@ -97,6 +127,12 @@ async fn dashboard_text_route() -> rocket_eyre::Result<RawText<String>> {
     ))
 }
 
+/// Enqueue a job, tokenful version.
+///
+/// Returns a random token that the client needs to send in its `/take` requests.
+///
+/// There are currently no validation checks, but you need to send the monitor API token as
+/// `Authorization: Bearer <token>`.
 #[post("/profile/<profile_key>/enqueue?<unique_id>&<qualified_repo>&<run_id>")]
 async fn profile_enqueue_route(
     unique_id: UniqueId,
@@ -123,6 +159,13 @@ async fn profile_enqueue_route(
     Ok(RawText(result))
 }
 
+/// Enqueue a job, tokenless version.
+///
+/// Returns a random token that the client needs to send in its `/take` requests.
+///
+/// There is no `profile_key`, because that needs to be set in a GitHub Actions artifact, which
+/// also serves as proof that an authorised job actually requested it. Since this endpoint is not
+/// protected by the monitor API token, there are several validation checks.
 #[post("/enqueue?<unique_id>&<qualified_repo>&<run_id>")]
 async fn enqueue_route(
     unique_id: UniqueId,
@@ -148,10 +191,16 @@ async fn enqueue_route(
     Ok(RawText(result))
 }
 
+/// Take a runner from one of the underlying servers.
+///
+/// `<token>` must be the same as in the response to POST `/enqueue`.
+///
+/// Returns the same response as POST `/profile/<profile_key>/take` does in the monitor API,
+/// because this endpoint just forwards the request to a server with available capacity.
 #[post("/take/<unique_id>?<token>")]
 async fn take_route(unique_id: String, token: String) -> rocket_eyre::Result<RawJson<String>> {
     let unique_id = UniqueId(unique_id);
-    let Some(quick_lookup) = QUICK_LOOKUP
+    let Some(quick_lookup) = QUEUE_CACHE
         .read()
         .expect("Poisoned")
         .get(&unique_id)
@@ -166,7 +215,7 @@ async fn take_route(unique_id: String, token: String) -> rocket_eyre::Result<Raw
     if token != quick_lookup.token {
         return Err(EyreReport::Forbidden(eyre!("Bad token: {unique_id:?}")));
     }
-    if quick_lookup.status == QuickLookupStatus::NotReadyYet {
+    if quick_lookup.ready == ReadyToTake::No {
         return Err(EyreReport::TryAgain(Duration::from_secs(5)));
     }
     let (response_tx, response_rx) = crossbeam_channel::bounded(0);
@@ -236,6 +285,117 @@ async fn main() -> eyre::Result<()> {
     Ok(())
 }
 
+// ----- Queue thread (backend) -----
+
+#[tokio::main]
+async fn queue_thread() -> eyre::Result<()> {
+    let config = TOML
+        .queue
+        .as_ref()
+        .ok_or_eyre("monitor.toml has no [queue]!")?;
+    let client = Client::builder()
+        .timeout(Duration::from_millis(1500))
+        .build()?;
+    let mut queue = Queue::default();
+
+    loop {
+        info!("Querying servers for updates");
+        queue.start_update();
+
+        let mut set = JoinSet::new();
+        for server_url in config.servers.iter() {
+            let client = client.clone();
+            set.spawn(async {
+                (
+                    Server(server_url.clone()),
+                    get_monitor_dashboard_for_server(client, server_url).await,
+                )
+            });
+        }
+
+        for (server, result) in set.join_all().await {
+            match result {
+                Ok(response) => {
+                    debug!(?server, ?response);
+                    queue.servers.insert(
+                        server,
+                        ServerStatus {
+                            last_monitor_response: response,
+                            fresh: true,
+                        },
+                    );
+                }
+                Err(error) => {
+                    error!(?error);
+                }
+            }
+        }
+
+        let mut queue_text = String::default();
+        for (unique_id, entry) in queue.iter() {
+            let access_times = ACCESS_TIMES.read().expect("Poisoned");
+            let access_time = access_times.get(unique_id).expect("Guaranteed by Queue");
+            writeln!(
+                &mut queue_text,
+                "- {unique_id} (last request {:?} ago)",
+                access_time.elapsed()
+            )?;
+            writeln!(&mut queue_text, "  {entry:?}")?;
+        }
+        *QUEUE_CACHE.write().expect("Poisoned") = queue
+            .iter()
+            .flat_map(|(unique_id, entry)| {
+                queue
+                    .quick_lookup_info(entry)
+                    .map(|info| (unique_id.clone(), info))
+            })
+            .collect();
+
+        let mut servers_text = String::default();
+        for (server, status) in queue.servers.iter() {
+            write!(&mut servers_text, "- {server}")?;
+            if status.fresh {
+                writeln!(&mut servers_text, "")?;
+            } else {
+                writeln!(&mut servers_text, " (stale!)")?;
+            }
+            for (profile_key, runner_counts) in status.fresh_or_stale().profile_runner_counts.iter()
+            {
+                writeln!(&mut servers_text, "    - {profile_key}")?;
+                writeln!(
+                    &mut servers_text,
+                    "      {} idle, {} healthy, {} target",
+                    runner_counts.idle, runner_counts.healthy, runner_counts.target
+                )?;
+            }
+        }
+
+        let mut new_dashboard = String::default();
+        writeln!(&mut new_dashboard, ">>> queue\n{queue_text}")?;
+        writeln!(&mut new_dashboard, ">>> servers\n{servers_text}")?;
+        *DASHBOARD.write().expect("Poisoned") = Some(new_dashboard);
+
+        // Handle one request from the API.
+        if let Ok(request) = REQUEST.receiver.recv_timeout(TOML.monitor_poll_interval()) {
+            match request {
+                Request::Enqueue { response_tx, entry } => {
+                    response_tx
+                        .send(queue.try_enqueue(entry))
+                        .expect("Failed to send Response to API thread");
+                }
+                Request::Take {
+                    response_tx,
+                    unique_id,
+                } => {
+                    response_tx
+                        .send(queue.try_take(&unique_id).await)
+                        .expect("Failed to send Response to API thread");
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 struct Queue {
     order: Vec<UniqueId>,
@@ -244,18 +404,17 @@ struct Queue {
     servers: BTreeMap<Server, ServerStatus>,
 }
 
-#[derive(Clone, Debug)]
-struct ServerStatus {
-    last_monitor_response: MonitorResponse,
-    stale: bool,
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct QueueEntry {
+    unique_id: UniqueId,
+    qualified_repo: String,
+    run_id: String,
+    profile_key: String,
 }
 
-impl ServerStatus {
-    fn fresh_only(&self) -> Option<&MonitorResponse> {
-        (!self.stale).then_some(&self.last_monitor_response)
-    }
-    fn fresh_or_stale(&self) -> &MonitorResponse {
-        &self.last_monitor_response
+impl QueueEntry {
+    fn matches_id(&self, unique_id: &UniqueId) -> bool {
+        self.unique_id == *unique_id
     }
 }
 
@@ -322,7 +481,7 @@ impl Queue {
             }
         }
         for status in self.servers.values_mut() {
-            status.stale = true;
+            status.fresh = false;
         }
     }
 
@@ -342,13 +501,16 @@ impl Queue {
         self.tokens.remove(unique_id);
     }
 
-    fn quick_lookup_info(&self, entry: &QueueEntry) -> Option<QuickLookupInfo> {
+    fn quick_lookup_info(&self, entry: &QueueEntry) -> Option<CachedEntry> {
         let token = self.tokens.get(&entry.unique_id)?.clone();
         let status = match self.pick_server(entry) {
-            Some(_) => QuickLookupStatus::ReadyToTake,
-            None => QuickLookupStatus::NotReadyYet,
+            Some(_) => ReadyToTake::Maybe,
+            None => ReadyToTake::No,
         };
-        Some(QuickLookupInfo { token, status })
+        Some(CachedEntry {
+            token,
+            ready: status,
+        })
     }
 
     fn pick_server(&self, entry: &QueueEntry) -> Option<Server> {
@@ -369,140 +531,22 @@ impl Queue {
     }
 }
 
-#[repr(transparent)]
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-struct Server(String);
-impl Display for Server {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+#[derive(Clone, Debug)]
+struct ServerStatus {
+    last_monitor_response: MonitorResponse,
+    /// Whether this data was successfully updated in this iteration of the event loop.
+    ///
+    /// Only fresh data can be used to forward `/take` requests to a server.
+    fresh: bool,
+}
+
+impl ServerStatus {
+    fn fresh_only(&self) -> Option<&MonitorResponse> {
+        self.fresh.then_some(&self.last_monitor_response)
     }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-struct QueueEntry {
-    unique_id: UniqueId,
-    qualified_repo: String,
-    run_id: String,
-    profile_key: String,
-}
-
-impl QueueEntry {
-    fn matches_id(&self, unique_id: &UniqueId) -> bool {
-        self.unique_id == *unique_id
+    fn fresh_or_stale(&self) -> &MonitorResponse {
+        &self.last_monitor_response
     }
-}
-
-#[tokio::main]
-async fn queue_thread() -> eyre::Result<()> {
-    let config = TOML
-        .queue
-        .as_ref()
-        .ok_or_eyre("monitor.toml has no [queue]!")?;
-    let client = Client::builder()
-        .timeout(Duration::from_millis(1500))
-        .build()?;
-    let mut queue = Queue::default();
-
-    loop {
-        info!("Querying servers for updates");
-        queue.start_update();
-
-        let mut set = JoinSet::new();
-        for server_url in config.servers.iter() {
-            let client = client.clone();
-            set.spawn(async {
-                (
-                    Server(server_url.clone()),
-                    get_monitor_dashboard_for_server(client, server_url).await,
-                )
-            });
-        }
-
-        for (server, result) in set.join_all().await {
-            match result {
-                Ok(response) => {
-                    debug!(?server, ?response);
-                    queue.servers.insert(
-                        server,
-                        ServerStatus {
-                            last_monitor_response: response,
-                            stale: false,
-                        },
-                    );
-                }
-                Err(error) => {
-                    error!(?error);
-                }
-            }
-        }
-
-        let mut queue_text = String::default();
-        for (unique_id, entry) in queue.iter() {
-            let access_times = ACCESS_TIMES.read().expect("Poisoned");
-            let access_time = access_times.get(unique_id).expect("Guaranteed by Queue");
-            writeln!(
-                &mut queue_text,
-                "- {unique_id} (last request {:?} ago)",
-                access_time.elapsed()
-            )?;
-            writeln!(&mut queue_text, "  {entry:?}")?;
-        }
-        *QUICK_LOOKUP.write().expect("Poisoned") = queue
-            .iter()
-            .flat_map(|(unique_id, entry)| {
-                queue
-                    .quick_lookup_info(entry)
-                    .map(|info| (unique_id.clone(), info))
-            })
-            .collect();
-
-        let mut servers_text = String::default();
-        for (server, status) in queue.servers.iter() {
-            write!(&mut servers_text, "- {server}")?;
-            if status.stale {
-                writeln!(&mut servers_text, " (stale!)")?;
-            } else {
-                writeln!(&mut servers_text, "")?;
-            }
-            for (profile_key, runner_counts) in status.fresh_or_stale().profile_runner_counts.iter()
-            {
-                writeln!(&mut servers_text, "    - {profile_key}")?;
-                writeln!(
-                    &mut servers_text,
-                    "      {} idle, {} healthy, {} target",
-                    runner_counts.idle, runner_counts.healthy, runner_counts.target
-                )?;
-            }
-        }
-
-        let mut new_dashboard = String::default();
-        writeln!(&mut new_dashboard, ">>> queue\n{queue_text}")?;
-        writeln!(&mut new_dashboard, ">>> servers\n{servers_text}")?;
-        *DASHBOARD.write().expect("Poisoned") = Some(new_dashboard);
-
-        // Handle one request from the API.
-        if let Ok(request) = REQUEST.receiver.recv_timeout(TOML.monitor_poll_interval()) {
-            match request {
-                Request::Enqueue { response_tx, entry } => {
-                    response_tx
-                        .send(queue.try_enqueue(entry))
-                        .expect("Failed to send Response to API thread");
-                }
-                Request::Take {
-                    response_tx,
-                    unique_id,
-                } => {
-                    response_tx
-                        .send(queue.try_take(&unique_id).await)
-                        .expect("Failed to send Response to API thread");
-                }
-            }
-        }
-    }
-}
-
-fn client(timeout: Duration) -> eyre::Result<Client> {
-    Ok(Client::builder().timeout(timeout).build()?)
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -511,6 +555,7 @@ struct MonitorResponse {
     #[serde(flatten)]
     rest: BTreeMap<String, Value>,
 }
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct ProfileRunnerCounts {
     idle: usize,
@@ -519,6 +564,7 @@ struct ProfileRunnerCounts {
     #[serde(flatten)]
     rest: BTreeMap<String, Value>,
 }
+
 async fn get_monitor_dashboard_for_server(
     client: Client,
     server: &str,
@@ -528,4 +574,8 @@ async fn get_monitor_dashboard_for_server(
         .send()
         .await?;
     Ok(response.json::<MonitorResponse>().await?)
+}
+
+fn client(timeout: Duration) -> eyre::Result<Client> {
+    Ok(Client::builder().timeout(timeout).build()?)
 }
