@@ -448,23 +448,22 @@ impl Queue {
         }
         let unique_id = entry.unique_id.clone();
         self.order.push(unique_id.clone());
-        self.entries.insert(unique_id.clone(), entry);
+        self.entries.insert(unique_id.clone(), entry.clone());
         let token = self
             .tokens
             .entry(unique_id.clone())
-            .or_insert(Alphanumeric.sample_string(&mut rng(), 32));
+            .or_insert(Alphanumeric.sample_string(&mut rng(), 32))
+            .clone();
         QUEUE_CACHE.write().expect("Poisoned").insert(
             unique_id.clone(),
-            CachedEntry {
-                token: token.clone(),
-                ready: ReadyToTake::No,
-            },
+            self.quick_lookup_info(&entry)
+                .expect("Guaranteed by inserts above"),
         );
         ACCESS_TIMES
             .write()
             .expect("Poisoned")
             .insert(unique_id.clone(), Instant::now());
-        Ok(token.clone())
+        Ok(token)
     }
 
     async fn try_take(&mut self, unique_id: &UniqueId) -> eyre::Result<TakeResult> {
