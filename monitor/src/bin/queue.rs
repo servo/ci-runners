@@ -441,6 +441,13 @@ impl Queue {
             .tokens
             .entry(unique_id.clone())
             .or_insert(Alphanumeric.sample_string(&mut rng(), 32));
+        QUEUE_CACHE.write().expect("Poisoned").insert(
+            unique_id.clone(),
+            CachedEntry {
+                token: token.clone(),
+                ready: ReadyToTake::No,
+            },
+        );
         ACCESS_TIMES
             .write()
             .expect("Poisoned")
