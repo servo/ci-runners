@@ -31,6 +31,8 @@ COPY --from=commandline_tools /data/command-line-tools/sdk/default/openharmony/t
 # servo workflows. I suspect that it is currently possible to extract secrets from the servo repo
 # via pull requests with malicous build scripts.
 ADD --chown=${USERNAME}:${USERNAME} ohos-signing-config.tar.gz /home/${USERNAME}/
+# `ADD --chown` does not work together with tar.gz files so we need to fix the ownership here.
+RUN chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}/.ohos
 # Used to authorize with the hdc device and avoid the confirmation dialog.
 COPY --chown=${USERNAME}:${USERNAME} hdckey hdckey.pub /home/${USERNAME}/.harmony/
 
