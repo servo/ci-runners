@@ -1,0 +1,96 @@
+# macOS 15 arm64 images
+
+Runners created from these images preinstall all dependencies (including those specified in the main repo, like mach bootstrap deps), preload the main repo, and prebuild Servo in the release profile.
+
+This is a **UTM**-based image, compatible with macOS arm64 servers only:
+
+- `servo-macos15-arm`
+
+To prepare a macOS server for macOS guests and build a clean image, replacing “15” with the macOS version as needed:
+
+- Install [Rust](https://rustup.rs)
+- Install [Nix](https://nixos.org/download/#nix-install-macos) (the package manager)
+- Install [UTM for macOS](https://mac.getutm.app) — the GitHub download version is free of charge
+- Install [Homebrew](https://brew.sh) and libvirt:
+    - `brew install libvirt`
+    - `brew services start libvirt`
+    - TODO: make libvirt optional and remove this?
+- Clone and enter this repo:
+    - `git clone https://github.com/servo/ci-runners.git ~/ci-runners`
+    - `cd ~/ci-runners`
+- Configure the monitor:
+    - `cp .env.example .env`
+    - `cp monitor.toml.example monitor.toml`
+    - `vim .env`
+        - **LIBVIRT_DEFAULT_URI** = `qemu:///session`
+    - `vim monitor.toml.example`
+        - **available_1g_hugepages** = **0** (it’s Linux only)
+        - **available_normal_memory** = RAM minus 8G
+        - Zero out the **target_count** of any Linux-only profiles
+- Download the IPSW list for macOS 15:
+    - macOS 15: `curl -fsSo com_apple_macOSIPSW_20250825041725.xml --compressed https://web.archive.org/web/20250825041725id_/https://mesu.apple.com/assets/macos/com_apple_macOSIPSW/com_apple_macOSIPSW.xml`
+- Download the IPSW image for macOS 15:
+    - macOS 15: `curl -O $(< com_apple_macOSIPSW_20250825041725.xml sed '/>VirtualMac2,1</,/>https:/!d' | tail -1 | egrep -o 'https://[^<]+')`
+- In UTM:
+    - **Settings** > **Network** > **Regenerate MAC addresses on clone** = on
+    - Close the settings window
+    - **Create a New Virtual Machine** > **Virtualize** > **macOS 12+**
+    - **Memory** = **8192** MiB (TODO: update for prod environment)
+    - **CPU Cores** = **5** (TODO: update for prod environment)
+    - On the **macOS** page: **Import IPSW** > **Browse...** > `~/ci-runners/UniversalMac_15.6.1_24G90_Restore.ipsw`
+    - On the **Storage** page: **Size** = **90** GiB (TODO: update for prod environment)
+    - On the **Summary** page:
+        - **Name** = **servo-macos15-arm-clean**
+        - **Open VM Settings** = on
+    - In the VM settings:
+        - **Virtualization** > **Enable Sound** = off
+        - **Virtualization** > **Enable Clipboard Sharing** = off
+        - **Display** > **Resolution** = 1280 × 800 (this should be enough for a [WPT reftest](https://web-platform-tests.org/reviewing-tests/checklist.html#reftests-only))
+        - **Display** > **Dynamic Resolution** = off
+    - Start **servo-macos15-arm-clean** using the GUI
+        - There seems to be a bug in UTM 4.7.4 (115) that breaks the VM if you start it with AppleScript
+    - At the **Confirmation** prompt: **Would you like to install macOS?** > **OK**
+- Once the clean vm boots:
+    - **Language** = **English**
+    - If latency is high:
+        - FIXME: this seems to be busted in Remmina + UTM + macOS 15 (Command+Option+F5 just enables VoiceOver)
+        - Press **Command**+**Option**+**F5**, then click **Full Keyboard Access**, then press **Enter**
+        - You can now press **Shift**+**Tab** to get to the buttons at the bottom of the wizard
+    - **Select Your Country or Region** = United States
+    - macOS 15: **Transfer Your Data to This Mac** = Set up as new
+    - If latency is high, **Accessibility** > **Vision** then:
+        - \> **Reduce Transparency** = Reduce Transparency
+        - \> **Reduce Motion** = Reduce Motion
+    - **Full name** = `servo`
+    - **Account name** = `servo`
+    - **Password** = `servo2024!`
+    - macOS 15: **Allow computer account password to be reset with your Apple Account** = off
+    - macOS 15: **Sign In to Your Apple Account** = Set Up Later
+    - **Enable Location Services** = Continue, Don’t Use
+    - **Select Your Time Zone** > **Closest City:** = UTC - United Kingdom
+    - Uncheck **Share Mac Analytics with Apple**
+    - **Screen Time** = Set Up Later
+    - macOS 15: **Update Mac Automatically** = Only Download Automatically
+        - TODO: can we prevent the download too?
+    - Quit the **Keyboard Setup Assistant**
+    - If latency is high:
+        - Press **Cmd**+**Space**, type `full keyboard access`, turn it on, then press **Cmd**+**Q**
+        - On macOS 15, this may make some steps *harder* to do with keyboard navigation for some reason
+    - Once installed, shut down macOS:
+        - **Apple logo** > **Shut Down…**
+        - **Reopen windows when logging back in** = off
+        - **Shut Down**
+- When the guest shuts down, clone it: `osascript -e 'tell application "UTM"' -e 'set vm to virtual machine named "servo-macos15-arm-clean"' -e 'duplicate vm with properties {configuration: {name: "servo-macos15-arm-clean@oobe"}}' -e 'end tell'`
+    - You may be prompted for permission in the GUI
+- Start the clean vm (the original, not the clone): `osascript -e 'tell application "UTM"' -e 'set vm to virtual machine named "servo-macos15-arm-clean"' -e 'start vm' -e 'end tell'`
+- Log in with the password above
+- In the UTM title bar, click **Capture input devices**
+- Press **Cmd**+**Space**, type `full disk access`, press **Enter**
+    - On macOS 14/15, you may have to explicitly select **Allow applications to access all user files**
+- Click the plus, type the password above, type `/System/Applications/Utilities/Terminal.app`, press **Enter** twice, press **Cmd**+**Q**
+- Shut down macOS: **Apple logo** > **Shut down…**
+- When the guest shuts down, make another clone: `osascript -e 'tell application "UTM"' -e 'set vm to virtual machine named "servo-macos15-arm-clean"' -e 'duplicate vm with properties {configuration: {name: "servo-macos15-arm-clean@preautomated"}}' -e 'end tell'`
+- Start the clean vm (the original, not the clone): `osascript -e 'tell application "UTM"' -e 'set vm to virtual machine named "servo-macos15-arm-clean"' -e 'start vm' -e 'end tell'`
+- Press **Cmd**+**Space**, type `terminal`, press **Enter**
+- Type `curl https://ci0.servo.org/static/macos13.sh | sed -E 's/100([.]1:8000)/64\1/' | sudo sh`, press **Enter**, type the password above, press **Enter**
+- When the guest shuts down, make another clone: `osascript -e 'tell application "UTM"' -e 'set vm to virtual machine named "servo-macos15-arm-clean"' -e 'duplicate vm with properties {configuration: {name: "servo-macos15-arm-clean@automated"}}' -e 'end tell'`

@@ -24,6 +24,7 @@
     - [Windows 10 images](servo/images/windows10.md)
     - [Ubuntu 22.04 images](servo/images/ubuntu2204.md)
     - [macOS 13/14/15 x64 images](servo/images/macos-x64.md)
+    - [macOS 15 arm64 images](servo/images/macos-arm64.md)
 
 # Meta
 
