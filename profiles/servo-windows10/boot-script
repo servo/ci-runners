@@ -87,7 +87,6 @@ if (!(Test-Path .\image-built)) {
             --add Microsoft.VisualStudio.Component.Windows10SDK.19041 `
             --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
             --add Microsoft.VisualStudio.Component.VC.ATL `
-            --add Microsoft.VisualStudio.Component.VC.ATLMFC `
             --passive | Out-Default; Check
         # FIXME: rebooting here as a speculative fix for choco hanging during warm.ps1
         shutdown /r /t 0
