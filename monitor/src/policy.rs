@@ -13,6 +13,7 @@ use cfg_if::cfg_if;
 use itertools::Itertools;
 use jane_eyre::eyre::{self, bail, Context, OptionExt};
 use mktemp::Temp;
+use monitor::github::unregister_runner;
 use serde::Serialize;
 use settings::{
     profile::{ImageType, Profile},
@@ -23,7 +24,6 @@ use tracing::{debug, info, info_span, warn};
 
 use crate::{
     data::{get_profile_configuration_path, get_profile_data_path, get_runner_data_path},
-    github::unregister_runner,
     image::{create_runner, destroy_runner, register_runner},
     libvirt::{get_ipv4_address, update_screenshot},
     runner::{Runner, Runners, Status},
@@ -955,10 +955,10 @@ mod test {
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     use jane_eyre::eyre;
+    use monitor::github::{ApiRunner, ApiRunnerLabel};
     use settings::{profile::Profile, TOML};
 
     use crate::{
-        github::{ApiRunner, ApiRunnerLabel},
         policy::{set_base_image_mtime_for_test, Override, RunnerChanges},
         runner::{set_runner_created_time_for_test, Runners, Status},
     };

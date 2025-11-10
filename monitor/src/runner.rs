@@ -12,13 +12,13 @@ use cfg_if::cfg_if;
 use itertools::Itertools;
 use jane_eyre::eyre::{self, bail};
 use mktemp::Temp;
+use monitor::github::{reserve_runner, ApiRunner};
 use serde::{Deserialize, Serialize};
 use settings::{profile::ImageType, TOML};
 use tracing::{error, info, trace, warn};
 
 use crate::{
     data::get_runner_data_path,
-    github::{reserve_runner, ApiRunner},
     libvirt::{get_ipv4_address, take_screenshot, update_screenshot},
 };
 
@@ -355,7 +355,7 @@ impl Runner {
 
 cfg_if! {
     if #[cfg(not(test))] {
-        use crate::github::ApiGenerateJitconfigResponse;
+        use monitor::github::ApiGenerateJitconfigResponse;
 
         fn read_github_jitconfig(id: usize) -> eyre::Result<String> {
             let result = get_runner_data_path(id, Path::new("github-api-registration"))?;

@@ -128,7 +128,7 @@ pub(super) fn delete_image(profile: &Profile, snapshot_name: &str) {
 }
 
 pub fn register_runner(profile: &Profile, runner_guest_name: &str) -> eyre::Result<String> {
-    crate::github::register_runner(runner_guest_name, &profile.github_runner_label, "/a")
+    monitor::github::register_runner(runner_guest_name, &profile.github_runner_label, "/a")
 }
 
 pub fn create_runner(

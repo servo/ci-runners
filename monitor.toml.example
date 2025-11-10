@@ -34,7 +34,7 @@ monitor_thread_send_timeout = 10
 # Internals: maximum time to wait when receiving from the monitor thread.
 monitor_thread_recv_timeout = 10
 
-# Uncomment to destroy all non-busy runners.
+# Uncomment to destroy all non-busy runners (implies `dont_create_runners`).
 # destroy_all_non_busy_runners = true
 
 # Uncomment to skip GitHub API registration.
