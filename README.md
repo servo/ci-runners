@@ -152,26 +152,46 @@ $ cargo build
 $ sudo [RUST_BACKTRACE=1] IMAGE_DEPS_DIR=$(nix eval --raw .\#image-deps) LIB_MONITOR_DIR=. target/debug/monitor
 ```
 
-Windows 10 runner
+Minimal test images
+-------------------
+
+A useful image for hacking on the monitor locally, since it only takes around a minute to build.
+
+This is a **libvirt/KVM**-based image, compatible with Linux amd64 servers only:
+
+- `servo-ubuntu2204-rust`
+
+Windows 10 images
 -----------------
 
-Runners created from this image preinstall all dependencies (including those specified in the main repo, like GStreamer and Chocolatey deps), preload the main repo, and prebuild Servo in the release profile.
+Runners created from these images preinstall all dependencies (including those specified in the main repo, like GStreamer and Chocolatey deps), preload the main repo, and prebuild Servo in the release profile.
 
-Building the base vm image is handled automatically by the monitor.
+This is a **libvirt/KVM**-based image, compatible with Linux amd64 servers only:
 
-Ubuntu runner
--------------
+- `servo-windows10`
 
-Runners created from this image preinstall all dependencies (including those specified in the main repo, like mach bootstrap deps), preload the main repo, and prebuild Servo in the release profile.
+Ubuntu 22.04 images
+-------------------
 
-Building the base vm image is handled automatically by the monitor.
+Runners created from these images preinstall all dependencies (including those specified in the main repo, like mach bootstrap deps), preload the main repo, and prebuild Servo in the release profile.
 
-macOS 13/14/15 runner
----------------------
+These are **libvirt/KVM**-based images, compatible with Linux amd64 servers only:
 
-Runners created from this image preinstall all dependencies (including those specified in the main repo, like mach bootstrap deps), preload the main repo, and prebuild Servo in the release profile.
+- `servo-ubuntu2204` (ci0, ci1, and ci2 only)
+- `servo-ubuntu2204-bench` (ci3 and ci4 only)
 
-To prepare a server for macOS 13/14/15 guests, build a clean image, replacing “13” with the macOS version as needed:
+macOS 13/14/15 x64 images
+-------------------------
+
+Runners created from these images preinstall all dependencies (including those specified in the main repo, like mach bootstrap deps), preload the main repo, and prebuild Servo in the release profile.
+
+These are **libvirt/KVM**-based images, compatible with Linux amd64 servers only:
+
+- `servo-macos13`
+- `servo-macos14`
+- `servo-macos15`
+
+Automating the macOS installer is difficult without paid tooling, but we can get close enough with some once-per-server setup. To prepare a server for macOS 13/14/15 guests, build a clean image, replacing “13” with the macOS version as needed:
 
 - Clone the OSX-KVM repo: `git clone --recursive https://github.com/kholia/OSX-KVM.git /var/lib/libvirt/images/OSX-KVM`
 - Download the BaseSystem.dmg: `( cd /var/lib/libvirt/images/OSX-KVM; ./fetch-macOS-v2.py )`
@@ -250,5 +270,3 @@ Remote deployment tip. If you’ve deployed the clean image, but now the base im
 - Change `<source file="..."/>` to `<source dev="/dev/null"/>`
 - Save and quit (nano): Ctrl+X, Y, Enter
 - Restart the monitor: `systemctl restart monitor`
-
-Building the base vm image is handled automatically by the monitor.
