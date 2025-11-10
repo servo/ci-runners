@@ -9,6 +9,8 @@
   hugepages,
   isBenchmarkingMachine ? false,
   hasIntermittentTracker ? false,
+  hasChunker ? false,
+  hasQueue ? false,
   monitor,
 }:
 
@@ -191,8 +193,11 @@
             alias ${pkgs.copyPathToStore ../../static}/;
           '';
         };
-        locations."/chunker/" = {
+        locations."/chunker/" = lib.mkIf hasChunker {
           proxyPass = "http://[::1]:8001/";
+        };
+        locations."/queue/" = lib.mkIf hasQueue {
+          proxyPass = "http://[::1]:8002/";
         };
       } // ssl;
       "intermittent-tracker.servo.org" = lib.mkIf hasIntermittentTracker ({
@@ -305,7 +310,7 @@
       };
     };
 
-    chunker = {
+    chunker = lib.mkIf hasChunker {
       # Wait for networking
       wants = ["network-online.target"];
       after = ["network-online.target"];
@@ -315,6 +320,24 @@
 
       script = ''
         ${monitor}/bin/chunker
+      '';
+
+      serviceConfig = {
+        WorkingDirectory = "/config/monitor";
+        Restart = "on-failure";
+      };
+    };
+
+    queue = lib.mkIf hasQueue {
+      # Wait for networking
+      wants = ["network-online.target"];
+      after = ["network-online.target"];
+
+      # Start on boot.
+      wantedBy = ["multi-user.target"];
+
+      script = ''
+        ${monitor}/bin/queue
       '';
 
       serviceConfig = {

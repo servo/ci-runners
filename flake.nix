@@ -24,6 +24,8 @@
         ipv6Address = "2a01:4f9:3071:3063::2";
         hugepages = 96;
         hasIntermittentTracker = true;
+        hasChunker = true;
+        hasQueue = true;
         monitor = self.packages.x86_64-linux.monitor;
       }) ];
     };
