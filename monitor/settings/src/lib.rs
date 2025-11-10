@@ -224,7 +224,8 @@ impl Toml {
     }
 
     pub fn dont_create_runners(&self) -> bool {
-        self.dont_create_runners.unwrap_or(false) || self.destroy_all_non_busy_runners()
+        self.dont_create_runners
+            .unwrap_or_else(|| self.destroy_all_non_busy_runners())
     }
 
     pub fn base_image_max_age(&self) -> Duration {
