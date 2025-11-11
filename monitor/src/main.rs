@@ -1,5 +1,6 @@
 mod dashboard;
 mod data;
+mod hypervisor;
 mod id;
 mod image;
 mod libvirt;
@@ -50,9 +51,9 @@ use web::{
 use crate::{
     dashboard::Dashboard,
     data::{get_profile_data_path, get_runner_data_path, run_migrations},
+    hypervisor::list_runner_guests,
     id::IdGen,
     image::{start_libvirt_guest, Rebuilds},
-    libvirt::list_runner_guests,
     policy::{Override, Policy, RunnerCounts},
     runner::{Runners, Status},
 };
