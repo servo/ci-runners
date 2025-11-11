@@ -11,6 +11,7 @@ use std::{
     mem::take,
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
+    sync::LazyLock,
     thread::{self, JoinHandle},
     time::Duration,
 };
@@ -26,10 +27,74 @@ use settings::{
 use tracing::{debug, error, info, warn};
 
 use crate::{
+    image::{macos13::Macos13, ubuntu2204::Ubuntu2204, windows10::Windows10},
     libvirt::{list_rebuild_guests, list_template_guests},
     policy::{runner_images_path, template_or_rebuild_images_path, Policy},
     shell::{log_output_as_info, reflink_or_copy_with_warning},
 };
+
+static IMAGES: LazyLock<BTreeMap<String, Box<dyn Image + Send + Sync>>> = LazyLock::new(|| {
+    let mut result: BTreeMap<String, Box<dyn Image + Send + Sync>> = BTreeMap::new();
+    result.insert(
+        "servo-macos13".to_owned(),
+        Box::new(Macos13::new(ByteSize::gib(90), Duration::from_secs(2000))),
+    );
+    result.insert(
+        "servo-macos14".to_owned(),
+        Box::new(Macos13::new(ByteSize::gib(90), Duration::from_secs(2000))),
+    );
+    result.insert(
+        "servo-macos15".to_owned(),
+        Box::new(Macos13::new(ByteSize::gib(90), Duration::from_secs(2000))),
+    );
+    result.insert(
+        "servo-ubuntu2204".to_owned(),
+        Box::new(Ubuntu2204::new(
+            ByteSize::gib(90),
+            Duration::from_secs(2000),
+        )),
+    );
+    result.insert(
+        "servo-ubuntu2204-bench".to_owned(),
+        Box::new(Ubuntu2204::new(
+            ByteSize::gib(90),
+            Duration::from_secs(1000),
+        )),
+    );
+    result.insert(
+        "servo-ubuntu2204-rust".to_owned(),
+        Box::new(Ubuntu2204::new(ByteSize::gib(20), Duration::from_secs(90))),
+    );
+    result.insert(
+        "servo-ubuntu2204-wpt".to_owned(),
+        Box::new(Ubuntu2204::new(
+            ByteSize::gib(90),
+            Duration::from_secs(2000),
+        )),
+    );
+    result.insert(
+        "servo-windows10".to_owned(),
+        Box::new(Windows10::new(ByteSize::gib(90), Duration::from_secs(3000))),
+    );
+    result
+});
+
+/// Image rebuild routines.
+///
+/// These may shared between similar images, like `servo-ubuntu2204` and `servo-ubuntu2204-wpt`.
+pub trait Image {
+    fn rebuild(&self, profile: &Profile, snapshot_name: &str) -> eyre::Result<()>;
+    fn delete_template(&self, profile: &Profile, snapshot_name: &str) -> eyre::Result<()>;
+    fn register_runner(&self, profile: &Profile, runner_guest_name: &str) -> eyre::Result<String>;
+    fn create_runner(
+        &self,
+        profile: &Profile,
+        snapshot_name: &str,
+        runner_guest_name: &str,
+        runner_id: usize,
+    ) -> eyre::Result<String>;
+    fn destroy_runner(&self, runner_guest_name: &str, runner_id: usize) -> eyre::Result<()>;
+}
 
 #[derive(Debug, Default)]
 pub struct Rebuilds {
@@ -211,67 +276,7 @@ fn rebuild_with_rust(
 ) -> Result<(), eyre::Error> {
     info!(?snapshot_name, "Starting image rebuild");
 
-    let base_images_path = create_template_or_rebuild_images_dir(&profile)?;
-
-    match match &*profile.profile_name {
-        "servo-macos13" => macos13::rebuild(
-            &base_images_path,
-            &profile,
-            snapshot_name,
-            ByteSize::gib(90),
-            Duration::from_secs(2000),
-        ),
-        "servo-macos14" => macos13::rebuild(
-            &base_images_path,
-            &profile,
-            snapshot_name,
-            ByteSize::gib(90),
-            Duration::from_secs(2000),
-        ),
-        "servo-macos15" => macos13::rebuild(
-            &base_images_path,
-            &profile,
-            snapshot_name,
-            ByteSize::gib(90),
-            Duration::from_secs(2000),
-        ),
-        "servo-ubuntu2204" => ubuntu2204::rebuild(
-            &base_images_path,
-            &profile,
-            snapshot_name,
-            ByteSize::gib(90),
-            Duration::from_secs(2000),
-        ),
-        "servo-ubuntu2204-bench" => ubuntu2204::rebuild(
-            &base_images_path,
-            &profile,
-            snapshot_name,
-            ByteSize::gib(90),
-            Duration::from_secs(1000),
-        ),
-        "servo-ubuntu2204-rust" => ubuntu2204::rebuild(
-            &base_images_path,
-            &profile,
-            snapshot_name,
-            ByteSize::gib(20),
-            Duration::from_secs(90),
-        ),
-        "servo-ubuntu2204-wpt" => ubuntu2204::rebuild(
-            &base_images_path,
-            &profile,
-            snapshot_name,
-            ByteSize::gib(90),
-            Duration::from_secs(2000),
-        ),
-        "servo-windows10" => windows10::rebuild(
-            &base_images_path,
-            &profile,
-            snapshot_name,
-            ByteSize::gib(90),
-            Duration::from_secs(3000),
-        ),
-        other => todo!("Rebuild not yet implemented: {other}"),
-    } {
+    match IMAGES[&profile.profile_name].rebuild(&profile, snapshot_name) {
         result @ Ok(()) => {
             prune_templates(&profile)?;
             result
@@ -285,31 +290,11 @@ fn rebuild_with_rust(
 }
 
 pub fn delete_template(profile: &Profile, snapshot_name: &str) -> eyre::Result<()> {
-    match &*profile.profile_name {
-        "servo-macos13" => macos13::delete_template(profile, snapshot_name),
-        "servo-macos14" => macos13::delete_template(profile, snapshot_name),
-        "servo-macos15" => macos13::delete_template(profile, snapshot_name),
-        "servo-ubuntu2204" => ubuntu2204::delete_template(profile, snapshot_name),
-        "servo-ubuntu2204-bench" => ubuntu2204::delete_template(profile, snapshot_name),
-        "servo-ubuntu2204-rust" => ubuntu2204::delete_template(profile, snapshot_name),
-        "servo-ubuntu2204-wpt" => ubuntu2204::delete_template(profile, snapshot_name),
-        "servo-windows10" => windows10::delete_template(profile, snapshot_name),
-        other => todo!("Image pruning not yet implemented: {other}"),
-    }
+    IMAGES[&profile.profile_name].delete_template(profile, snapshot_name)
 }
 
 pub fn register_runner(profile: &Profile, runner_guest_name: &str) -> eyre::Result<String> {
-    match &*profile.profile_name {
-        "servo-macos13" => macos13::register_runner(profile, runner_guest_name),
-        "servo-macos14" => macos13::register_runner(profile, runner_guest_name),
-        "servo-macos15" => macos13::register_runner(profile, runner_guest_name),
-        "servo-ubuntu2204" => ubuntu2204::register_runner(profile, runner_guest_name),
-        "servo-ubuntu2204-bench" => ubuntu2204::register_runner(profile, runner_guest_name),
-        "servo-ubuntu2204-rust" => ubuntu2204::register_runner(profile, runner_guest_name),
-        "servo-ubuntu2204-wpt" => ubuntu2204::register_runner(profile, runner_guest_name),
-        "servo-windows10" => windows10::register_runner(profile, runner_guest_name),
-        other => todo!("Runner registration not yet implemented: {other}"),
-    }
+    IMAGES[&profile.profile_name].register_runner(profile, runner_guest_name)
 }
 
 pub fn create_runner(
@@ -318,33 +303,12 @@ pub fn create_runner(
     runner_guest_name: &str,
     runner_id: usize,
 ) -> eyre::Result<String> {
-    match &*profile.profile_name {
-        "servo-macos13" => {
-            macos13::create_runner(profile, snapshot_name, runner_guest_name, runner_id)
-        }
-        "servo-macos14" => {
-            macos13::create_runner(profile, snapshot_name, runner_guest_name, runner_id)
-        }
-        "servo-macos15" => {
-            macos13::create_runner(profile, snapshot_name, runner_guest_name, runner_id)
-        }
-        "servo-ubuntu2204" => {
-            ubuntu2204::create_runner(profile, snapshot_name, runner_guest_name, runner_id)
-        }
-        "servo-ubuntu2204-bench" => {
-            ubuntu2204::create_runner(profile, snapshot_name, runner_guest_name, runner_id)
-        }
-        "servo-ubuntu2204-rust" => {
-            ubuntu2204::create_runner(profile, snapshot_name, runner_guest_name, runner_id)
-        }
-        "servo-ubuntu2204-wpt" => {
-            ubuntu2204::create_runner(profile, snapshot_name, runner_guest_name, runner_id)
-        }
-        "servo-windows10" => {
-            windows10::create_runner(profile, snapshot_name, runner_guest_name, runner_id)
-        }
-        other => todo!("Runner creation not yet implemented: {other}"),
-    }
+    IMAGES[&profile.profile_name].create_runner(
+        profile,
+        snapshot_name,
+        runner_guest_name,
+        runner_id,
+    )
 }
 
 pub fn destroy_runner(
@@ -352,17 +316,7 @@ pub fn destroy_runner(
     runner_guest_name: &str,
     runner_id: usize,
 ) -> eyre::Result<()> {
-    match &*profile.profile_name {
-        "servo-macos13" => macos13::destroy_runner(runner_guest_name, runner_id),
-        "servo-macos14" => macos13::destroy_runner(runner_guest_name, runner_id),
-        "servo-macos15" => macos13::destroy_runner(runner_guest_name, runner_id),
-        "servo-ubuntu2204" => ubuntu2204::destroy_runner(runner_guest_name, runner_id),
-        "servo-ubuntu2204-bench" => ubuntu2204::destroy_runner(runner_guest_name, runner_id),
-        "servo-ubuntu2204-rust" => ubuntu2204::destroy_runner(runner_guest_name, runner_id),
-        "servo-ubuntu2204-wpt" => ubuntu2204::destroy_runner(runner_guest_name, runner_id),
-        "servo-windows10" => windows10::destroy_runner(runner_guest_name, runner_id),
-        other => todo!("Runner destruction not yet implemented: {other}"),
-    }
+    IMAGES[&profile.profile_name].destroy_runner(runner_guest_name, runner_id)
 }
 
 pub(self) fn create_template_or_rebuild_images_dir(profile: &Profile) -> eyre::Result<PathBuf> {
