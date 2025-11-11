@@ -8,9 +8,8 @@ use std::{
 use cmd_lib::{run_fun, spawn_with_output};
 use jane_eyre::eyre;
 use settings::TOML;
+use shell::log_output_as_trace;
 use tracing::debug;
-
-use crate::shell::log_output_as_trace;
 
 pub fn list_template_guests() -> eyre::Result<Vec<String>> {
     // Output is not filtered by prefix, so we must filter it ourselves.

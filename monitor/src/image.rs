@@ -19,18 +19,18 @@ use std::{
 use bytesize::ByteSize;
 use chrono::{SecondsFormat, Utc};
 use cmd_lib::{run_cmd, run_fun, spawn_with_output};
+use hypervisor::{list_rebuild_guests, list_template_guests};
 use jane_eyre::eyre::{self, bail, OptionExt};
 use settings::{
     profile::{parse_rebuild_guest_name, parse_template_guest_name, Profile},
     TOML,
 };
+use shell::{log_output_as_info, reflink_or_copy_with_warning};
 use tracing::{debug, error, info, warn};
 
 use crate::{
     image::{macos13::Macos13, ubuntu2204::Ubuntu2204, windows10::Windows10},
-    libvirt::{list_rebuild_guests, list_template_guests},
     policy::{runner_images_path, template_or_rebuild_images_path, Policy},
-    shell::{log_output_as_info, reflink_or_copy_with_warning},
 };
 
 static IMAGES: LazyLock<BTreeMap<String, Box<dyn Image + Send + Sync>>> = LazyLock::new(|| {

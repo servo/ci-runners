@@ -8,6 +8,9 @@ use cmd_lib::run_cmd;
 use cmd_lib::spawn_with_output;
 use jane_eyre::eyre;
 use settings::profile::Profile;
+use shell::atomic_symlink;
+use shell::log_output_as_info;
+use shell::reflink_or_copy_with_warning;
 use tracing::info;
 use tracing::warn;
 
@@ -21,9 +24,6 @@ use crate::image::undefine_libvirt_guest;
 use crate::image::Image;
 use crate::policy::runner_image_path;
 use crate::policy::template_or_rebuild_image_path;
-use crate::shell::atomic_symlink;
-use crate::shell::log_output_as_info;
-use crate::shell::reflink_or_copy_with_warning;
 use crate::IMAGE_DEPS_DIR;
 
 use super::create_disk_image;
