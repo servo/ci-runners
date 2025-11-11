@@ -74,6 +74,34 @@ impl Image for Macos13 {
     }
 }
 
+#[derive(Default)]
+pub struct MacosUtm;
+
+#[expect(unused_variables)]
+impl Image for MacosUtm {
+    fn rebuild(&self, profile: &Profile, snapshot_name: &str) -> eyre::Result<()> {
+        todo!()
+    }
+    fn delete_template(&self, profile: &Profile, snapshot_name: &str) -> eyre::Result<()> {
+        todo!()
+    }
+    fn register_runner(&self, profile: &Profile, runner_guest_name: &str) -> eyre::Result<String> {
+        todo!()
+    }
+    fn create_runner(
+        &self,
+        profile: &Profile,
+        snapshot_name: &str,
+        runner_guest_name: &str,
+        runner_id: usize,
+    ) -> eyre::Result<String> {
+        todo!()
+    }
+    fn destroy_runner(&self, runner_guest_name: &str, runner_id: usize) -> eyre::Result<()> {
+        todo!()
+    }
+}
+
 pub(super) fn rebuild(
     profile: &Profile,
     snapshot_name: &str,
