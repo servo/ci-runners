@@ -1,3 +1,4 @@
+use jane_eyre::eyre::{self, OptionExt};
 use serde::{Deserialize, Serialize};
 
 use crate::{TOML, units::MemorySize};
@@ -20,8 +21,24 @@ pub enum ImageType {
 }
 
 impl Profile {
-    pub fn profile_guest_name(&self) -> String {
-        format!("{}", self.profile_name)
+    pub fn snapshot_path_slug(&self, snapshot_name: &str) -> String {
+        format!("{}@{snapshot_name}", self.profile_name)
+    }
+
+    pub fn template_guest_name(&self, snapshot_name: &str) -> String {
+        format!(
+            "{}-{}@{snapshot_name}",
+            TOML.libvirt_template_guest_prefix(),
+            self.profile_name
+        )
+    }
+
+    pub fn rebuild_guest_name(&self, snapshot_name: &str) -> String {
+        format!(
+            "{}-{}@{snapshot_name}",
+            TOML.libvirt_rebuild_guest_prefix(),
+            self.profile_name
+        )
     }
 
     pub fn runner_guest_name(&self, id: usize) -> String {
@@ -32,4 +49,24 @@ impl Profile {
             id
         )
     }
+}
+
+pub fn parse_template_guest_name(template_guest_name: &str) -> eyre::Result<(&str, &str)> {
+    let prefix = format!("{}-", TOML.libvirt_template_guest_prefix());
+    let (profile_key, snapshot_name) = template_guest_name
+        .strip_prefix(&prefix)
+        .ok_or_eyre("Failed to strip template guest prefix")?
+        .split_once("@")
+        .ok_or_eyre("Failed to split snapshot path slug into profile key and snapshot name")?;
+    Ok((profile_key, snapshot_name))
+}
+
+pub fn parse_rebuild_guest_name(rebuild_guest_name: &str) -> eyre::Result<(&str, &str)> {
+    let prefix = format!("{}-", TOML.libvirt_rebuild_guest_prefix());
+    let (profile_key, snapshot_name) = rebuild_guest_name
+        .strip_prefix(&prefix)
+        .ok_or_eyre("Failed to strip rebuild guest prefix")?
+        .split_once("@")
+        .ok_or_eyre("Failed to split snapshot path slug into profile key and snapshot name")?;
+    Ok((profile_key, snapshot_name))
 }
