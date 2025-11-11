@@ -149,7 +149,7 @@ impl Rebuilds {
                         info!("Servo update thread exited");
                         cached_servo_repo_was_just_updated = true;
                     }
-                    Ok(Err(report)) => error!(%report, "Servo update thread error"),
+                    Ok(Err(report)) => error!(?report, "Servo update thread error"),
                     Err(panic) => error!(?panic, "Servo update thread panic"),
                 };
             } else {
@@ -229,7 +229,7 @@ impl Rebuilds {
                         info!(profile_key, "Image rebuild thread exited");
                         policy.set_base_image_snapshot(&profile_key, &rebuild.snapshot_name)?;
                     }
-                    Ok(Err(report)) => error!(profile_key, %report, "Image rebuild thread error"),
+                    Ok(Err(report)) => error!(profile_key, ?report, "Image rebuild thread error"),
                     Err(panic) => error!(profile_key, ?panic, "Image rebuild thread panic"),
                 };
             } else {
