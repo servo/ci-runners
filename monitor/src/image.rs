@@ -4,10 +4,10 @@ pub mod windows10;
 
 use core::str;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     ffi::OsStr,
-    fs::{create_dir_all, read_dir, read_link, remove_file, set_permissions, File},
-    io::{ErrorKind, Seek, Write},
+    fs::{create_dir_all, read_dir, remove_file, set_permissions, File},
+    io::{Seek, Write},
     mem::take,
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
@@ -17,13 +17,17 @@ use std::{
 
 use bytesize::ByteSize;
 use chrono::{SecondsFormat, Utc};
-use cmd_lib::{run_cmd, spawn_with_output};
+use cmd_lib::{run_cmd, run_fun, spawn_with_output};
 use jane_eyre::eyre::{self, bail, OptionExt};
-use settings::{profile::Profile, TOML};
-use tracing::{debug, error, info, trace, warn};
+use settings::{
+    profile::{parse_rebuild_guest_name, parse_template_guest_name, Profile},
+    TOML,
+};
+use tracing::{debug, error, info, warn};
 
 use crate::{
-    policy::{base_images_path, runner_images_path, Policy},
+    libvirt::{list_rebuild_guests, list_template_guests},
+    policy::{runner_images_path, template_or_rebuild_images_path, Policy},
     shell::{log_output_as_info, reflink_or_copy_with_warning},
 };
 
@@ -37,10 +41,39 @@ pub struct Rebuilds {
 struct Rebuild {
     thread: JoinHandle<eyre::Result<()>>,
     snapshot_name: String,
+    guest_name: String,
 }
 
 impl Rebuilds {
     pub fn run(&mut self, policy: &mut Policy) -> eyre::Result<()> {
+        // Clean up any dangling resources from past rebuilds.
+        let current_known_rebuild_guest_names = self
+            .rebuild_guest_names()
+            .into_iter()
+            .map(|(_key, guest_name)| guest_name)
+            .collect::<BTreeSet<_>>();
+        for rebuild_guest_name in list_rebuild_guests()? {
+            if !current_known_rebuild_guest_names.contains(&rebuild_guest_name) {
+                undefine_libvirt_guest(&rebuild_guest_name)?;
+                let (profile_key, snapshot_name) =
+                    match parse_rebuild_guest_name(&rebuild_guest_name) {
+                        Ok(result) => result,
+                        Err(error) => {
+                            warn!(?error, "Failed to clean up bad image files");
+                            continue;
+                        }
+                    };
+                let Some(profile) = policy.profile(profile_key) else {
+                    warn!(
+                        ?profile_key,
+                        "Failed to clean up bad image files: Unknown profile"
+                    );
+                    continue;
+                };
+                delete_template(profile, snapshot_name)?;
+            }
+        }
+
         let mut profiles_needing_rebuild = BTreeMap::default();
         let mut cached_servo_repo_was_just_updated = false;
 
@@ -118,6 +151,7 @@ impl Rebuilds {
                 Rebuild {
                     thread,
                     snapshot_name: snapshot_name.clone(),
+                    guest_name: profile.rebuild_guest_name(&snapshot_name),
                 },
             );
         }
@@ -141,6 +175,13 @@ impl Rebuilds {
         self.rebuilds.extend(remaining_rebuilds);
 
         Ok(())
+    }
+
+    pub fn rebuild_guest_names(&self) -> BTreeMap<String, String> {
+        self.rebuilds
+            .iter()
+            .map(|(profile_key, rebuild)| (profile_key.clone(), rebuild.guest_name.clone()))
+            .collect()
     }
 }
 
@@ -170,10 +211,9 @@ fn rebuild_with_rust(
 ) -> Result<(), eyre::Error> {
     info!(?snapshot_name, "Starting image rebuild");
 
-    let base_images_path = create_base_images_dir(&profile)?;
-    undefine_libvirt_guest(&profile.profile_guest_name())?;
+    let base_images_path = create_template_or_rebuild_images_dir(&profile)?;
 
-    match match match &*profile.profile_name {
+    match match &*profile.profile_name {
         "servo-macos13" => macos13::rebuild(
             &base_images_path,
             &profile,
@@ -233,76 +273,27 @@ fn rebuild_with_rust(
         other => todo!("Rebuild not yet implemented: {other}"),
     } {
         result @ Ok(()) => {
-            prune_images(&profile)?;
+            prune_templates(&profile)?;
             result
         }
         Err(error) => {
             warn!(?error, "Image rebuild error");
-            delete_image(&profile, snapshot_name);
+            delete_template(&profile, snapshot_name)?;
             Err(error)
         }
-    } {
-        result => {
-            // After a rebuild attempt, the base guest should always use the symlinks to the last known good image.
-            // On success, these will be the new image files. On failure, these will be the old image files.
-            match &*profile.profile_name {
-                "servo-macos13" => {
-                    macos13::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
-                }
-                "servo-macos14" => {
-                    macos13::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
-                }
-                "servo-macos15" => {
-                    macos13::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
-                }
-                "servo-ubuntu2204" => {
-                    ubuntu2204::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
-                }
-                "servo-ubuntu2204-bench" => {
-                    ubuntu2204::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
-                }
-                "servo-ubuntu2204-rust" => {
-                    ubuntu2204::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
-                }
-                "servo-ubuntu2204-wpt" => {
-                    ubuntu2204::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
-                }
-                "servo-windows10" => {
-                    windows10::redefine_base_guest_with_symlinks(&base_images_path, &profile)?;
-                }
-                other => {
-                    todo!("Redefining base guest with symlinks not implemented: {other}")
-                }
-            }
-            result
-        }
     }
 }
 
-pub fn prune_images(profile: &Profile) -> eyre::Result<()> {
+pub fn delete_template(profile: &Profile, snapshot_name: &str) -> eyre::Result<()> {
     match &*profile.profile_name {
-        "servo-macos13" => macos13::prune_images(profile),
-        "servo-macos14" => macos13::prune_images(profile),
-        "servo-macos15" => macos13::prune_images(profile),
-        "servo-ubuntu2204" => ubuntu2204::prune_images(profile),
-        "servo-ubuntu2204-bench" => ubuntu2204::prune_images(profile),
-        "servo-ubuntu2204-rust" => ubuntu2204::prune_images(profile),
-        "servo-ubuntu2204-wpt" => ubuntu2204::prune_images(profile),
-        "servo-windows10" => windows10::prune_images(profile),
-        other => todo!("Image pruning not yet implemented: {other}"),
-    }
-}
-
-pub fn delete_image(profile: &Profile, snapshot_name: &str) {
-    match &*profile.profile_name {
-        "servo-macos13" => macos13::delete_image(profile, snapshot_name),
-        "servo-macos14" => macos13::delete_image(profile, snapshot_name),
-        "servo-macos15" => macos13::delete_image(profile, snapshot_name),
-        "servo-ubuntu2204" => ubuntu2204::delete_image(profile, snapshot_name),
-        "servo-ubuntu2204-bench" => ubuntu2204::delete_image(profile, snapshot_name),
-        "servo-ubuntu2204-rust" => ubuntu2204::delete_image(profile, snapshot_name),
-        "servo-ubuntu2204-wpt" => ubuntu2204::delete_image(profile, snapshot_name),
-        "servo-windows10" => windows10::delete_image(profile, snapshot_name),
+        "servo-macos13" => macos13::delete_template(profile, snapshot_name),
+        "servo-macos14" => macos13::delete_template(profile, snapshot_name),
+        "servo-macos15" => macos13::delete_template(profile, snapshot_name),
+        "servo-ubuntu2204" => ubuntu2204::delete_template(profile, snapshot_name),
+        "servo-ubuntu2204-bench" => ubuntu2204::delete_template(profile, snapshot_name),
+        "servo-ubuntu2204-rust" => ubuntu2204::delete_template(profile, snapshot_name),
+        "servo-ubuntu2204-wpt" => ubuntu2204::delete_template(profile, snapshot_name),
+        "servo-windows10" => windows10::delete_template(profile, snapshot_name),
         other => todo!("Image pruning not yet implemented: {other}"),
     }
 }
@@ -323,20 +314,35 @@ pub fn register_runner(profile: &Profile, runner_guest_name: &str) -> eyre::Resu
 
 pub fn create_runner(
     profile: &Profile,
+    snapshot_name: &str,
     runner_guest_name: &str,
     runner_id: usize,
 ) -> eyre::Result<String> {
     match &*profile.profile_name {
-        "servo-macos13" => macos13::create_runner(profile, runner_guest_name, runner_id),
-        "servo-macos14" => macos13::create_runner(profile, runner_guest_name, runner_id),
-        "servo-macos15" => macos13::create_runner(profile, runner_guest_name, runner_id),
-        "servo-ubuntu2204" => ubuntu2204::create_runner(profile, runner_guest_name, runner_id),
-        "servo-ubuntu2204-bench" => {
-            ubuntu2204::create_runner(profile, runner_guest_name, runner_id)
+        "servo-macos13" => {
+            macos13::create_runner(profile, snapshot_name, runner_guest_name, runner_id)
         }
-        "servo-ubuntu2204-rust" => ubuntu2204::create_runner(profile, runner_guest_name, runner_id),
-        "servo-ubuntu2204-wpt" => ubuntu2204::create_runner(profile, runner_guest_name, runner_id),
-        "servo-windows10" => windows10::create_runner(profile, runner_guest_name, runner_id),
+        "servo-macos14" => {
+            macos13::create_runner(profile, snapshot_name, runner_guest_name, runner_id)
+        }
+        "servo-macos15" => {
+            macos13::create_runner(profile, snapshot_name, runner_guest_name, runner_id)
+        }
+        "servo-ubuntu2204" => {
+            ubuntu2204::create_runner(profile, snapshot_name, runner_guest_name, runner_id)
+        }
+        "servo-ubuntu2204-bench" => {
+            ubuntu2204::create_runner(profile, snapshot_name, runner_guest_name, runner_id)
+        }
+        "servo-ubuntu2204-rust" => {
+            ubuntu2204::create_runner(profile, snapshot_name, runner_guest_name, runner_id)
+        }
+        "servo-ubuntu2204-wpt" => {
+            ubuntu2204::create_runner(profile, snapshot_name, runner_guest_name, runner_id)
+        }
+        "servo-windows10" => {
+            windows10::create_runner(profile, snapshot_name, runner_guest_name, runner_id)
+        }
         other => todo!("Runner creation not yet implemented: {other}"),
     }
 }
@@ -359,8 +365,8 @@ pub fn destroy_runner(
     }
 }
 
-pub(self) fn create_base_images_dir(profile: &Profile) -> eyre::Result<PathBuf> {
-    let base_images_path = base_images_path(profile);
+pub(self) fn create_template_or_rebuild_images_dir(profile: &Profile) -> eyre::Result<PathBuf> {
+    let base_images_path = template_or_rebuild_images_path(profile);
     debug!(?base_images_path, "Creating base images subdirectory");
     create_dir_all(&base_images_path)?;
 
@@ -375,67 +381,51 @@ pub(self) fn create_runner_images_dir() -> eyre::Result<PathBuf> {
     Ok(runner_images_path)
 }
 
-pub(self) fn prune_base_image_files(profile: &Profile, prefix: &str) -> eyre::Result<()> {
-    let base_images_path = base_images_path(profile);
+pub(self) fn prune_templates(profile: &Profile) -> eyre::Result<()> {
+    // Build a sorted list of template guest names for this profile.
+    let mut snapshot_names = vec![];
+    for template_guest_name in list_template_guests()? {
+        if let Ok((profile_key, snapshot_name)) = parse_template_guest_name(&template_guest_name) {
+            if profile_key == profile.profile_name {
+                snapshot_names.push(snapshot_name.to_owned());
+            }
+        } else {
+            undefine_libvirt_guest(&template_guest_name)?;
+        }
+    }
+    snapshot_names.sort();
+
+    // Delete all of those templates, except the three most recent.
+    // Since the snapshot names are RFC 3339 timestamps, we can use the sorted order (until year 10000).
+    let keep_snapshots = snapshot_names.clone().into_iter().rev().take(3);
+    let delete_snapshots = snapshot_names.iter().rev().skip(3);
+    for snapshot_name in delete_snapshots {
+        delete_template(profile, snapshot_name)?;
+    }
+
+    // Now delete any files that are not associated with a known snapshot.
+    let keep_snapshots = keep_snapshots.collect::<BTreeSet<_>>();
+    let base_images_path = template_or_rebuild_images_path(profile);
     info!(?base_images_path, "Pruning base image files");
     create_dir_all(&base_images_path)?;
 
-    let matches_prefix = |target: &str| {
-        target
-            .strip_prefix(prefix)
-            .and_then(move |f| f.strip_prefix("@"))
-            .is_some()
-    };
-
-    // Check the symlink target for the most recent successful build.
-    let mut symlink = match read_link(base_images_path.join(prefix)) {
-        Ok(result) => Some(result),
-        Err(error) if error.kind() == ErrorKind::NotFound => None,
-        Err(other) => Err(other)?,
-    };
-
-    // The symlink target should be of the form `{prefix}@{snapshot_name}`.
-    if let Some(target) = symlink.as_ref() {
-        let target = target.to_str().ok_or_eyre("Unsupported path")?;
-        if !matches_prefix(target) {
-            warn!(target, "Unexpected symlink target format");
-            symlink.take();
-        }
-    }
-
-    // Build a sorted list of filenames starting with `{prefix}@`.
-    let mut filenames = vec![];
     for entry in read_dir(&base_images_path)? {
         let filename = entry?.file_name();
         let filename = filename.to_str().ok_or_eyre("Unsupported path")?;
-        if matches_prefix(filename) {
-            filenames.push(filename.to_owned());
-        }
-    }
-    filenames.sort();
-
-    // Delete all of those files, except the most recent successful build and up to three builds before that.
-    // Since the snapshot names are RFC 3339 timestamps, we can use the sorted order (until year 10000).
-    // FIXME: past images may be bad, if the monitor was restarted during an image build.
-    let mut filenames = filenames.iter().rev();
-    while let Some(filename) = filenames.next() {
-        if let Some(target) = symlink.as_ref() {
-            if Path::new(filename) == target {
-                trace!(filename, "Keeping");
-                filenames.next();
-                filenames.next();
-                filenames.next();
-                continue;
+        if let Some((_base, snapshot_name)) = filename.split_once("@") {
+            if !keep_snapshots.contains(snapshot_name) {
+                delete_template_or_rebuild_image_file(profile, filename);
             }
+        } else {
+            delete_template_or_rebuild_image_file(profile, filename);
         }
-        delete_base_image_file(profile, filename);
     }
 
     Ok(())
 }
 
-pub(self) fn delete_base_image_file(profile: &Profile, filename: &str) {
-    let base_images_path = base_images_path(profile);
+pub(self) fn delete_template_or_rebuild_image_file(profile: &Profile, filename: &str) {
+    let base_images_path = template_or_rebuild_images_path(profile);
     let path = base_images_path.join(filename);
     info!(?path, "Deleting");
     if let Err(error) = remove_file(&path) {
@@ -537,10 +527,20 @@ pub fn start_libvirt_guest(guest_name: &str) -> eyre::Result<()> {
 
 pub(self) fn wait_for_guest(guest_name: &str, timeout: Duration) -> eyre::Result<()> {
     let timeout = timeout.as_secs();
-    info!("Waiting for guest to shut down (max {timeout} seconds)"); // normally ~37 seconds
+    info!("Waiting for guest to shut down (max {timeout} seconds)");
     if !run_cmd!(time virsh event --timeout $timeout -- $guest_name lifecycle).is_ok() {
         bail!("`virsh event` failed or timed out!");
     }
+    for _ in 0..100 {
+        if run_fun!(virsh domstate -- $guest_name)?.trim_ascii() == "shut off" {
+            return Ok(());
+        }
+    }
 
+    bail!("Guest did not shut down as expected")
+}
+
+pub(self) fn rename_guest(old_guest_name: &str, new_guest_name: &str) -> eyre::Result<()> {
+    run_cmd!(virsh domrename -- $old_guest_name $new_guest_name)?;
     Ok(())
 }

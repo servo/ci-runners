@@ -9,7 +9,7 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
-use cfg_if::cfg_if;
+use chrono::DateTime;
 use itertools::Itertools;
 use jane_eyre::eyre::{self, bail, Context, OptionExt};
 use mktemp::Temp;
@@ -265,7 +265,8 @@ impl Policy {
         profile: &Profile,
         id: usize,
     ) -> eyre::Result<JoinHandle<eyre::Result<String>>> {
-        if self.base_image_snapshot(&profile.profile_name).is_none() {
+        let Some(base_image_snapshot) = self.base_image_snapshot(&profile.profile_name).cloned()
+        else {
             bail!(
                 "Tried to create runner, but profile has no base image snapshot (profile {})",
                 profile.profile_name
@@ -299,7 +300,7 @@ impl Policy {
                             .write_all(github_api_registration.as_bytes())?;
                     }
 
-                    create_runner(&profile, &runner_guest_name, id)
+                    create_runner(&profile, &base_image_snapshot, &runner_guest_name, id)
                 }
             }
         }))
@@ -471,26 +472,9 @@ impl Policy {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .wrap_err("Failed to get current time")?;
-        let creation_time = match profile.image_type {
-            ImageType::Rust => {
-                let base_image_path = base_image_path(profile, &**base_image_snapshot);
-                let Some(mtime) = base_image_mtime(profile, &base_image_path) else {
-                    return Ok(None);
-                };
-                match mtime.duration_since(UNIX_EPOCH) {
-                    Ok(result) => result,
-                    Err(error) => {
-                        debug!(
-                            profile.profile_name,
-                            ?base_image_path,
-                            ?error,
-                            "Failed to calculate image age"
-                        );
-                        return Ok(None);
-                    }
-                }
-            }
-        };
+        let creation_time = DateTime::parse_from_rfc3339(&base_image_snapshot)?
+            .signed_duration_since(DateTime::UNIX_EPOCH)
+            .to_std()?;
 
         Ok(Some(now - creation_time))
     }
@@ -506,13 +490,16 @@ impl Policy {
         Ok(())
     }
 
-    pub fn update_ipv4_addresses_for_profile_guests(&mut self) {
-        for (key, profile) in self.profiles.iter() {
-            let ipv4_address = get_ipv4_address(&profile.profile_guest_name());
-            let entry = self.ipv4_addresses.entry(key.clone()).or_default();
+    pub fn update_ipv4_addresses_for_rebuild_guests(
+        &mut self,
+        rebuild_guest_names: &BTreeMap<String, String>,
+    ) {
+        for (profile_key, guest_name) in rebuild_guest_names {
+            let ipv4_address = get_ipv4_address(&guest_name);
+            let entry = self.ipv4_addresses.entry(profile_key.clone()).or_default();
             if ipv4_address != *entry {
                 info!(
-                    "IPv4 address changed for profile guest {key}: {:?} -> {:?}",
+                    "IPv4 address changed for profile guest {profile_key}: {:?} -> {:?}",
                     *entry, ipv4_address
                 );
             }
@@ -520,7 +507,7 @@ impl Policy {
         }
     }
 
-    pub fn boot_script_for_profile_guest(
+    pub fn boot_script_for_rebuild_guest(
         &self,
         remote_addr: web::auth::RemoteAddr,
     ) -> eyre::Result<Option<String>> {
@@ -571,24 +558,20 @@ impl Policy {
             .filter(|(_id, runner)| runner.status() == Status::Idle)
     }
 
-    pub fn update_screenshots(&self) {
+    pub fn update_screenshots(&self, rebuild_guest_names: &BTreeMap<String, String>) {
         if let Some(runners) = self.runners.as_ref() {
             runners.update_screenshots();
         }
-        for (_key, profile) in self.profiles() {
-            if let Err(error) = self.try_update_screenshot(profile) {
-                debug!(
-                    profile.profile_name,
-                    ?error,
-                    "Failed to update screenshot for profile guest"
-                );
+        for (profile_key, guest_name) in rebuild_guest_names {
+            if let Err(error) = self.try_update_screenshot(&profile_key, &guest_name) {
+                debug!(guest_name, ?error, "Failed to update screenshot for guest");
             }
         }
     }
 
-    fn try_update_screenshot(&self, profile: &Profile) -> eyre::Result<()> {
-        let output_dir = get_profile_data_path(&profile.profile_name, None)?;
-        update_screenshot(&profile.profile_guest_name(), &output_dir)?;
+    fn try_update_screenshot(&self, profile_key: &str, guest_name: &str) -> eyre::Result<()> {
+        let output_dir = get_profile_data_path(&profile_key, None)?;
+        update_screenshot(guest_name, &output_dir)?;
 
         Ok(())
     }
@@ -870,7 +853,7 @@ impl Policy {
     }
 }
 
-pub fn base_images_path(profile: &Profile) -> PathBuf {
+pub fn template_or_rebuild_images_path(profile: &Profile) -> PathBuf {
     Path::new("/var/lib/libvirt/images/base").join(&profile.profile_name)
 }
 
@@ -878,15 +861,12 @@ pub fn runner_images_path() -> PathBuf {
     PathBuf::from("/var/lib/libvirt/images/runner")
 }
 
-pub fn base_image_path<'snap>(
+pub fn template_or_rebuild_image_path(
     profile: &Profile,
-    snapshot_name: impl Into<Option<&'snap str>>,
+    snapshot_name: &str,
+    filename: impl AsRef<str>,
 ) -> PathBuf {
-    if let Some(snapshot_name) = snapshot_name.into() {
-        base_images_path(profile).join(format!("base.img@{snapshot_name}"))
-    } else {
-        base_images_path(profile).join("base.img")
-    }
+    template_or_rebuild_images_path(profile).join(format!("{}@{snapshot_name}", filename.as_ref()))
 }
 
 pub fn runner_image_path(runner_id: usize, filename: impl AsRef<str>) -> PathBuf {
@@ -894,72 +874,26 @@ pub fn runner_image_path(runner_id: usize, filename: impl AsRef<str>) -> PathBuf
 }
 
 fn read_base_image_snapshot(profile: &Profile) -> eyre::Result<Option<String>> {
-    let path = base_image_path(profile, None);
+    let path = get_profile_data_path(&profile.profile_name, Path::new("snapshot"))?;
     if let Ok(path) = read_link(path) {
-        let path = path.to_str().ok_or_eyre("Symlink target is unsupported")?;
-        let (_, snapshot_name) = path
-            .split_once("@")
-            .ok_or_eyre("Symlink target has no snapshot name")?;
+        let snapshot_name = path.to_str().ok_or_eyre("Symlink target is unsupported")?;
         return Ok(Some(snapshot_name.to_owned()));
     }
 
     Ok(None)
 }
 
-cfg_if! {
-    if #[cfg(not(test))] {
-        fn base_image_mtime(profile: &Profile, base_image_path: impl AsRef<Path>) -> Option<SystemTime> {
-            let base_image_path = base_image_path.as_ref();
-            let metadata = match std::fs::metadata(&base_image_path) {
-                Ok(result) => result,
-                Err(error) => {
-                    debug!(
-                        profile.profile_name,
-                        ?base_image_path,
-                        ?error,
-                        "Failed to get file metadata"
-                    );
-                    return None;
-                }
-            };
-
-            Some(metadata.modified().expect("Guaranteed by platform"))
-        }
-    } else {
-        use std::cell::RefCell;
-
-        thread_local! {
-            static BASE_IMAGE_MTIMES: RefCell<BTreeMap<String, SystemTime>> = RefCell::new(BTreeMap::new());
-        }
-
-        fn base_image_mtime(_profile: &Profile, base_image_path: impl AsRef<Path>) -> Option<SystemTime> {
-            let base_image_path = base_image_path.as_ref().to_str().expect("Unsupported path");
-
-            BASE_IMAGE_MTIMES.with_borrow(|mtimes| mtimes.get(base_image_path).copied())
-        }
-
-        fn set_base_image_mtime_for_test(base_image_path: &str, mtime: impl Into<Option<SystemTime>>) {
-            BASE_IMAGE_MTIMES.with_borrow_mut(|mtimes| {
-                if let Some(mtime) = mtime.into() {
-                    mtimes.insert(base_image_path.to_owned(), mtime);
-                } else {
-                    mtimes.remove(base_image_path);
-                }
-            });
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+    use chrono::{SecondsFormat, Utc};
     use jane_eyre::eyre;
     use monitor::github::{ApiRunner, ApiRunnerLabel};
     use settings::{profile::Profile, TOML};
 
     use crate::{
-        policy::{set_base_image_mtime_for_test, Override, RunnerChanges},
+        policy::{Override, RunnerChanges},
         runner::{set_runner_created_time_for_test, Runners, Status},
     };
 
@@ -1089,6 +1023,9 @@ mod test {
         Runners::new(registrations, guest_names)
     }
 
+    fn snapshot_now_minus_seconds(delta: u64) -> String {
+        (Utc::now() - Duration::from_secs(delta)).to_rfc3339_opts(SecondsFormat::Nanos, true)
+    }
     fn system_time_minus_seconds(delta: u64) -> SystemTime {
         SystemTime::now()
             .checked_sub(Duration::from_secs(delta))
@@ -1189,14 +1126,11 @@ mod test {
         );
 
         // Images need rebuild, because they are too old.
-        let too_old = system_time_minus_seconds(86500);
-        set_base_image_mtime_for_test("/var/lib/libvirt/images/base/linux/base.img@", too_old);
-        set_base_image_mtime_for_test("/var/lib/libvirt/images/base/macos/base.img@", too_old);
-        set_base_image_mtime_for_test("/var/lib/libvirt/images/base/windows/base.img@", too_old);
-        policy.set_base_image_snapshot("linux", "")?;
-        policy.set_base_image_snapshot("macos", "")?;
-        policy.set_base_image_snapshot("windows", "")?;
-        policy.set_base_image_snapshot("wpt", "")?;
+        let too_old = snapshot_now_minus_seconds(86500);
+        policy.set_base_image_snapshot("linux", &too_old)?;
+        policy.set_base_image_snapshot("macos", &too_old)?;
+        policy.set_base_image_snapshot("windows", &too_old)?;
+        policy.set_base_image_snapshot("wpt", &too_old)?;
         assert_eq!(
             policy.compute_runner_changes()?,
             RunnerChanges {
@@ -1212,10 +1146,10 @@ mod test {
         );
 
         // Empty state.
-        let fresh = system_time_minus_seconds(0);
-        set_base_image_mtime_for_test("/var/lib/libvirt/images/base/linux/base.img@", fresh);
-        set_base_image_mtime_for_test("/var/lib/libvirt/images/base/macos/base.img@", fresh);
-        set_base_image_mtime_for_test("/var/lib/libvirt/images/base/windows/base.img@", fresh);
+        let fresh = snapshot_now_minus_seconds(0);
+        policy.set_base_image_snapshot("linux", &fresh)?;
+        policy.set_base_image_snapshot("macos", &fresh)?;
+        policy.set_base_image_snapshot("windows", &fresh)?;
         assert_eq!(
             policy.compute_runner_changes()?,
             RunnerChanges {
@@ -1440,15 +1374,11 @@ mod test {
             ]
             .into(),
         )?;
-        let fresh = system_time_minus_seconds(0);
-        set_base_image_mtime_for_test("/var/lib/libvirt/images/base/linux/base.img@", fresh);
-        set_base_image_mtime_for_test("/var/lib/libvirt/images/base/macos/base.img@", fresh);
-        set_base_image_mtime_for_test("/var/lib/libvirt/images/base/windows/base.img@", fresh);
-        set_base_image_mtime_for_test("/var/lib/libvirt/images/base/wpt/base.img@", fresh);
-        policy.set_base_image_snapshot("linux", "")?;
-        policy.set_base_image_snapshot("macos", "")?;
-        policy.set_base_image_snapshot("windows", "")?;
-        policy.set_base_image_snapshot("wpt", "")?;
+        let fresh = snapshot_now_minus_seconds(0);
+        policy.set_base_image_snapshot("linux", &fresh)?;
+        policy.set_base_image_snapshot("macos", &fresh)?;
+        policy.set_base_image_snapshot("windows", &fresh)?;
+        policy.set_base_image_snapshot("wpt", &fresh)?;
 
         // Proposed create counts should be adjusted for critical runners, regardless of whether
         // those runners fit the current policy.
@@ -1482,21 +1412,10 @@ mod test {
             ]
             .into(),
         )?;
-        set_base_image_mtime_for_test(
-            "/var/lib/libvirt/images/base/linux/base.img@",
-            SystemTime::now(),
-        );
-        set_base_image_mtime_for_test(
-            "/var/lib/libvirt/images/base/windows/base.img@",
-            SystemTime::now(),
-        );
-        set_base_image_mtime_for_test(
-            "/var/lib/libvirt/images/base/macos/base.img@",
-            SystemTime::now(),
-        );
-        policy.set_base_image_snapshot("linux", "")?;
-        policy.set_base_image_snapshot("windows", "")?;
-        policy.set_base_image_snapshot("macos", "")?;
+        let now = snapshot_now_minus_seconds(0);
+        policy.set_base_image_snapshot("linux", &now)?;
+        policy.set_base_image_snapshot("windows", &now)?;
+        policy.set_base_image_snapshot("macos", &now)?;
 
         // If the runners are not yet known, refuse the request.
         assert!(policy.try_override([].into()).is_err());
@@ -1576,11 +1495,8 @@ mod test {
         );
 
         // The image is ready. Let’s create runners.
-        set_base_image_mtime_for_test(
-            "/var/lib/libvirt/images/base/wpt/base.img@",
-            SystemTime::now(),
-        );
-        policy.set_base_image_snapshot("wpt", "")?;
+        let now = snapshot_now_minus_seconds(0);
+        policy.set_base_image_snapshot("wpt", &now)?;
         assert_eq!(
             policy.compute_runner_changes()?,
             RunnerChanges {

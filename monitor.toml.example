@@ -52,6 +52,12 @@ base_image_max_age = 86400
 # Uncomment to skip cached Servo repo updates.
 # dont_update_cached_servo_repo = true
 
+# Create libvirt guests for profile templates as “ci-template-<profile_name>.0”. Namespace must not be used by anything else!
+# libvirt_template_guest_prefix = "ci-template"
+
+# Create libvirt guests for image rebuilds as “ci-rebuild-<profile_name>.0”. Namespace must not be used by anything else!
+# libvirt_rebuild_guest_prefix = "ci-rebuild"
+
 # Create libvirt guests for runners as “ci-runner-<profile_name>.0”. Namespace must not be used by anything else!
 # libvirt_runner_guest_prefix = "ci-runner"
 
