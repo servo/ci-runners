@@ -64,7 +64,6 @@ pub fn list_runner_guests() -> eyre::Result<Vec<String>> {
     Ok(rx.recv()??)
 }
 
-#[expect(dead_code)]
 pub fn delete_guest(guest_name: &str) -> eyre::Result<()> {
     let (tx, rx) = crossbeam_channel::bounded(0);
     UTM_REQUEST.sender.send(UtmRequest::DeleteGuest {
@@ -74,7 +73,6 @@ pub fn delete_guest(guest_name: &str) -> eyre::Result<()> {
     Ok(rx.recv()??)
 }
 
-#[expect(dead_code)]
 pub fn clone_guest(original_guest_name: &str, new_guest_name: &str) -> eyre::Result<()> {
     let (tx, rx) = crossbeam_channel::bounded(0);
     UTM_REQUEST.sender.send(UtmRequest::CloneGuest {

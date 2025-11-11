@@ -80,7 +80,10 @@ pub struct MacosUtm;
 #[expect(unused_variables)]
 impl Image for MacosUtm {
     fn rebuild(&self, profile: &Profile, snapshot_name: &str) -> eyre::Result<()> {
-        todo!()
+        let profile_name = &profile.profile_name;
+        let rebuild_guest_name = &profile.rebuild_guest_name(snapshot_name);
+        crate::utm::clone_guest(&format!("{profile_name}-clean"), rebuild_guest_name)?;
+        Ok(())
     }
     fn delete_template(&self, profile: &Profile, snapshot_name: &str) -> eyre::Result<()> {
         todo!()
