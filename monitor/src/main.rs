@@ -1,11 +1,13 @@
 mod dashboard;
 mod data;
+mod hypervisor;
 mod id;
 mod image;
 mod libvirt;
 mod policy;
 mod runner;
 mod shell;
+mod utm;
 
 use core::str;
 use std::{
@@ -15,7 +17,7 @@ use std::{
     path::Path,
     process::exit,
     sync::{LazyLock, RwLock},
-    thread::{self},
+    thread,
     time::Duration,
 };
 
@@ -50,11 +52,12 @@ use web::{
 use crate::{
     dashboard::Dashboard,
     data::{get_profile_data_path, get_runner_data_path, run_migrations},
+    hypervisor::list_runner_guests,
     id::IdGen,
     image::{start_libvirt_guest, Rebuilds},
-    libvirt::list_runner_guests,
-    policy::{base_image_path, Override, Policy, RunnerCounts},
+    policy::{Override, Policy, RunnerCounts},
     runner::{Runners, Status},
+    utm::handle_utm_request,
 };
 
 static DASHBOARD: RwLock<Option<Dashboard>> = RwLock::new(None);
@@ -374,8 +377,7 @@ fn boot_script_route(remote_addr: web::auth::RemoteAddr) -> rocket_eyre::Result<
     Ok(RawText(result))
 }
 
-#[rocket::main]
-async fn main() -> eyre::Result<()> {
+fn main() -> eyre::Result<()> {
     if env::var_os("RUST_LOG").is_none() {
         // EnvFilter Builder::with_default_directive doesn’t support multiple directives,
         // so we need to apply defaults ourselves.
@@ -384,24 +386,38 @@ async fn main() -> eyre::Result<()> {
     cli::init()?;
     run_migrations()?;
 
-    tokio::task::spawn(async move {
-        let thread = thread::spawn(monitor_thread);
-        loop {
-            if thread.is_finished() {
-                match thread.join() {
-                    Ok(Ok(())) => {
-                        info!("Monitor thread exited");
-                        exit(0);
-                    }
-                    Ok(Err(report)) => error!(%report, "Monitor thread error"),
-                    Err(panic) => error!(?panic, "Monitor thread panic"),
-                };
-                exit(1);
-            }
-            tokio::time::sleep(Duration::from_secs(1)).await;
-        }
-    });
+    let web_server_thread = thread::spawn(web_server_thread);
+    let monitor_thread = thread::spawn(monitor_thread);
 
+    loop {
+        if monitor_thread.is_finished() {
+            match monitor_thread.join() {
+                Ok(Ok(())) => {
+                    info!("Monitor thread exited");
+                    exit(0);
+                }
+                Ok(Err(report)) => error!(?report, "Monitor thread error"),
+                Err(panic) => error!(?panic, "Monitor thread panic"),
+            };
+            exit(1);
+        }
+        if web_server_thread.is_finished() {
+            match web_server_thread.join() {
+                Ok(Ok(())) => {
+                    info!("Web server thread exited");
+                    exit(0);
+                }
+                Ok(Err(report)) => error!(?report, "Web server thread error"),
+                Err(panic) => error!(?panic, "Web server thread panic"),
+            };
+            exit(1);
+        }
+        handle_utm_request()?;
+    }
+}
+
+#[rocket::main]
+async fn web_server_thread() -> eyre::Result<()> {
     let rocket = |listen_addr: &str| {
         rocket::custom(
             rocket::Config::figment()
@@ -457,6 +473,9 @@ async fn main() -> eyre::Result<()> {
 /// It handles one [`Request`] at a time, polling for updated resources before
 /// each request, then sends one response to the API server for each request.
 fn monitor_thread() -> eyre::Result<()> {
+    #[cfg(target_os = "macos")]
+    crate::utm::request_automation_permission()?;
+
     let mut id_gen = IdGen::new_load().unwrap_or_else(|error| {
         warn!(?error, "Failed to read last-runner-id: {error}");
         IdGen::new_empty()
@@ -499,24 +518,16 @@ fn monitor_thread() -> eyre::Result<()> {
             },
         ) in profile_runner_counts.iter()
         {
-            let profile = policy.profile(key).ok_or_eyre("Failed to get profile")?;
-            let image = policy
-                .base_image_snapshot(key)
-                .map(|snapshot| match profile.image_type {
-                    settings::profile::ImageType::Rust => base_image_path(profile, &**snapshot)
-                        .as_os_str()
-                        .to_str()
-                        .expect("Guaranteed by base_image_path()")
-                        .to_owned(),
-                });
-            info!("profile {key}: {healthy}/{target} healthy runners ({idle} idle, {reserved} reserved, {busy} busy, {started_or_crashed} started or crashed, {excess_healthy} excess healthy, {wanted} wanted), image {:?} age {image_age:?}", image);
+            let snapshot = policy.base_image_snapshot(key);
+            info!("profile {key}: {healthy}/{target} healthy runners ({idle} idle, {reserved} reserved, {busy} busy, {started_or_crashed} started or crashed, {excess_healthy} excess healthy, {wanted} wanted), snapshot {snapshot:?} age {image_age:?}");
         }
         for (_id, runner) in policy.runners() {
             runner.log_info();
         }
 
-        policy.update_screenshots();
-        policy.update_ipv4_addresses_for_profile_guests();
+        let rebuild_guest_names = image_rebuilds.rebuild_guest_names();
+        policy.update_screenshots(&rebuild_guest_names);
+        policy.update_ipv4_addresses_for_rebuild_guests(&rebuild_guest_names);
 
         if TOML.destroy_all_non_busy_runners() {
             let non_busy_runners = policy
@@ -684,14 +695,14 @@ fn monitor_thread() -> eyre::Result<()> {
                     // GET /github-jitconfig request both happen in step (2) without step (1) in between, we won’t know
                     // the IPv4 address, so let’s update the IPv4 addresses before continuing.
                     policy.update_ipv4_addresses_for_runner_guests()?;
-                    policy.update_ipv4_addresses_for_profile_guests();
+                    policy.update_ipv4_addresses_for_rebuild_guests(&rebuild_guest_names);
 
                     let result = policy
                         .boot_script_for_runner_guest(remote_addr.clone())
                         .transpose()
                         .or_else(|| {
                             policy
-                                .boot_script_for_profile_guest(remote_addr)
+                                .boot_script_for_rebuild_guest(remote_addr)
                                 .transpose()
                         })
                         .transpose()

@@ -12,6 +12,30 @@ use tracing::debug;
 
 use crate::shell::log_output_as_trace;
 
+pub fn list_template_guests() -> eyre::Result<Vec<String>> {
+    // Output is not filtered by prefix, so we must filter it ourselves.
+    let prefix = format!("{}-", TOML.libvirt_template_guest_prefix());
+    let result = run_fun!(virsh list --name --all)?;
+    let result = result
+        .split_terminator('\n')
+        .filter(|name| name.starts_with(&prefix))
+        .map(str::to_owned);
+
+    Ok(result.collect())
+}
+
+pub fn list_rebuild_guests() -> eyre::Result<Vec<String>> {
+    // Output is not filtered by prefix, so we must filter it ourselves.
+    let prefix = format!("{}-", TOML.libvirt_rebuild_guest_prefix());
+    let result = run_fun!(virsh list --name --all)?;
+    let result = result
+        .split_terminator('\n')
+        .filter(|name| name.starts_with(&prefix))
+        .map(str::to_owned);
+
+    Ok(result.collect())
+}
+
 pub fn list_runner_guests() -> eyre::Result<Vec<String>> {
     // Output is not filtered by prefix, so we must filter it ourselves.
     let prefix = format!("{}-", TOML.libvirt_runner_guest_prefix());

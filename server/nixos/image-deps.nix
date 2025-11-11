@@ -7,8 +7,8 @@
   writeText,
 }: let
   jammy-server-cloudimg-amd64_img = fetchurl {
-    url = "https://cloud-images.ubuntu.com/jammy/20250725/jammy-server-cloudimg-amd64.img";
-    hash = "sha256-sRmpeNy2YZR2FnTCOoYKdc23d46V4iK1HXozht/jySA=";
+    url = "https://cloud-images.ubuntu.com/jammy/20251023/jammy-server-cloudimg-amd64.img";
+    hash = "sha256-kzMDphmvdsDtFzTtGjK95VON4zbWhXhiiD7HyPUJoFw=";
   };
 in linkFarm "image-deps" {
   "cargo-config.toml" = writeText "cargo-config.toml" ''
@@ -82,7 +82,7 @@ in linkFarm "image-deps" {
   };
   "windows10/vs_community.exe" = fetchurl {
     url = "https://aka.ms/vs/17/release/vs_community.exe";
-    hash = "sha256-MV9hfmY2Rg+pMNhspUn7ur1Zj6QdAU1cXS2va4ZnuSA=";
+    hash = "sha256-0wiUkozw9+t9kkjWkQHVY1VygmVOqP+xpnze9G2T1VE=";
   };
   "windows10/rustup-init.exe" = fetchurl {
     url = "https://static.rust-lang.org/rustup/archive/1.28.1/x86_64-pc-windows-msvc/rustup-init.exe";
