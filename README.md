@@ -111,7 +111,9 @@ To get a GITHUB_TOKEN for testing the monitor service:
     - Token name: `servo ci monitor test`
     - Resource owner: your GitHub account
     - Expiration: **7 days**
-    - Repository access > **Only select repositories** > your clone of servo/servo
+    - Repository access > **Only select repositories**
+        - > Your clone of servo/ci-runners
+        - > Your clone of servo/servo
     - Repository permissions > **Administration** > Access: **Read and write** (unfortunately there is no separate permission for repository self-hosted runners)
 
 To set up the monitor service, connect over SSH (`mosh` recommended) and run the following:
