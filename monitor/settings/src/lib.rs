@@ -83,8 +83,9 @@ pub struct Toml {
     libvirt_runner_guest_prefix: Option<String>,
     pub available_1g_hugepages: usize,
     pub available_normal_memory: MemorySize,
-    profiles: BTreeMap<String, Profile>,
+    queue_member: Option<bool>,
     pub queue: Option<QueueConfig>,
+    profiles: BTreeMap<String, Profile>,
 }
 
 impl Dotenv {
@@ -235,6 +236,10 @@ impl Toml {
 
     pub fn dont_update_cached_servo_repo(&self) -> bool {
         self.dont_update_cached_servo_repo.unwrap_or(false)
+    }
+
+    pub fn queue_member(&self) -> bool {
+        self.queue_member.unwrap_or(false)
     }
 
     pub fn libvirt_runner_guest_prefix(&self) -> &str {

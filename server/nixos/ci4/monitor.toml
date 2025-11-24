@@ -53,7 +53,10 @@ base_image_max_age = 604800
 available_1g_hugepages = 24
 available_normal_memory = "16G"
 
-# Uncomment to enable global queue.
+# Uncomment to mark this server as a member of a global queue, disabling tokenless select (POST /select-runner).
+queue_member = true
+
+# Uncomment to run a global queue on this server.
 # [queue]
 # servers = ["https://ci0.servo.org", "https://ci1.servo.org", "https://ci2.servo.org", "https://ci3.servo.org", "https://ci4.servo.org"]
 
