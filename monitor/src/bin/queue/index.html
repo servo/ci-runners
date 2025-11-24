@@ -1,0 +1,71 @@
+<!doctype html><meta charset="utf-8">
+<style>
+    @import url("https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&display=swap");
+    *:not(xmp):not(pre):not(plaintext):not(tt):not(code):not(kbd):not(samp) {
+        font-family: Atkinson Hyperlegible;
+    }
+    #notice {
+        display: none;
+        position: fixed;
+        z-index: 2;
+        left: 0;
+        top: 0;
+        padding: 1em;
+        border: 1px solid red;
+        background: white;
+        font-family: monospace, monospace;
+        white-space: pre;
+    }
+    #notice.error {
+        display: block;
+        border: solid red;
+    }
+    #notice.stale {
+        display: block;
+        border: solid blue;
+    }
+    #notice.error ~ #noticeWash,
+    #notice.stale ~ #noticeWash {
+        position: fixed;
+        z-index: 1;
+        inset: 0;
+        background: white;
+        opacity: 0.5;
+    }
+    main pre {
+        font-family: monospace, monospace;
+    }
+</style>
+
+<div id="notice" hidden></div>
+<div id="noticeWash"></div>
+
+<main><pre></pre></main>
+
+<script>
+    const pollInterval = 1000;
+    const notice = document.querySelector("#notice");
+    const output = document.querySelector("main pre");
+    update();
+
+    async function update() {
+        try {
+            const response = await fetch("/dashboard.txt", { signal: AbortSignal.timeout(3000) });
+            if (response.status == 503) {
+                notice.className = "stale";
+                notice.textContent = "...";
+                setTimeout(update, pollInterval);
+                return;
+            } else if (!response.ok) {
+                throw `HTTP ${response.status}`;
+            }
+            output.innerHTML = await response.text();
+            notice.className = "";
+            notice.textContent = "";
+        } catch (e) {
+            notice.className = "error";
+            notice.textContent = `[${new Date().toTimeString().split(" ")[0]}] ${e}`;
+        }
+        setTimeout(update, pollInterval);
+    }
+</script>

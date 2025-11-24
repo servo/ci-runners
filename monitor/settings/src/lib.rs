@@ -1,6 +1,6 @@
 pub mod data;
-
 pub mod profile;
+pub mod queue;
 pub mod units;
 
 use std::{
@@ -17,7 +17,7 @@ use chrono::TimeDelta;
 use jane_eyre::eyre::{self, bail};
 use serde::Deserialize;
 
-use crate::{profile::Profile, units::MemorySize};
+use crate::{profile::Profile, queue::QueueConfig, units::MemorySize};
 
 pub static LIB_MONITOR_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
     if let Some(lib_monitor_dir) = env::var_os("LIB_MONITOR_DIR") {
@@ -83,6 +83,8 @@ pub struct Toml {
     libvirt_runner_guest_prefix: Option<String>,
     pub available_1g_hugepages: usize,
     pub available_normal_memory: MemorySize,
+    queue_member: Option<bool>,
+    pub queue: Option<QueueConfig>,
     profiles: BTreeMap<String, Profile>,
 }
 
@@ -234,6 +236,10 @@ impl Toml {
 
     pub fn dont_update_cached_servo_repo(&self) -> bool {
         self.dont_update_cached_servo_repo.unwrap_or(false)
+    }
+
+    pub fn queue_member(&self) -> bool {
+        self.queue_member.unwrap_or(false)
     }
 
     pub fn libvirt_runner_guest_prefix(&self) -> &str {

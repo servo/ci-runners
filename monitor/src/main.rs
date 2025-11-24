@@ -238,6 +238,11 @@ fn select_runner_route(
     qualified_repo: String,
     run_id: String,
 ) -> rocket_eyre::Result<RawJson<String>> {
+    if TOML.queue_member() {
+        Err(EyreReport::InternalServerError(eyre!(
+            "Tokenless select is disabled due to `queue_member` setting"
+        )))?;
+    }
     let profile_key = validate_tokenless_select(&unique_id, &qualified_repo, &run_id)?;
     let (response_tx, response_rx) = crossbeam_channel::bounded(0);
     REQUEST.sender.send_timeout(

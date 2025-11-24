@@ -1,0 +1,48 @@
+on: workflow_dispatch
+
+jobs:
+  runner-select:
+    runs-on: ubuntu-24.04
+    outputs:
+      unique-id: ${{ steps.select.outputs.unique-id }}
+      selected-runner-label: ${{ steps.select.outputs.selected-runner-label }}
+      runner-type-label: ${{ steps.select.outputs.runner-type-label }}
+      is-self-hosted: ${{ steps.select.outputs.is-self-hosted }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Runner select
+        id: select
+        uses: ./actions/runner-select
+        with:
+          GITHUB_TOKEN: ${{ github.token }}
+          # Before updating the GH action runner image for the nightly job, ensure
+          # that the system has a glibc version that is compatible with the one
+          # used by the wpt.fyi runners.
+          github-hosted-runner-label: windows-2022
+          self-hosted-image-name: servo-windows10
+          # You can disable self-hosted runners globally by creating a repository variable named
+          # NO_SELF_HOSTED_RUNNERS with any non-empty value.
+          # <https://github.com/servo/servo/settings/variables/actions>
+          NO_SELF_HOSTED_RUNNERS: ${{ vars.NO_SELF_HOSTED_RUNNERS }}
+          # Any other boolean conditions that disable self-hosted runners go here.
+          force-github-hosted-runner: ${{ inputs.upload || inputs.force-github-hosted-runner }}
+  runner-timeout:
+    needs:
+      - runner-select
+    if: ${{ fromJSON(needs.runner-select.outputs.is-self-hosted) }}
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Runner timeout
+        uses: ./actions/runner-timeout
+        with:
+          github_token: '${{ secrets.GITHUB_TOKEN }}'
+          unique-id: '${{ needs.runner-select.outputs.unique-id }}'
+
+  build:
+    needs:
+      - runner-select
+    name: build [${{ needs.runner-select.outputs.unique-id }}]
+    runs-on: ${{ needs.runner-select.outputs.selected-runner-label }}
+    steps:
+      - uses: actions/checkout@v4

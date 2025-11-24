@@ -107,28 +107,37 @@ runs:
           fall_back_to_github_hosted
         fi
 
-        for monitor_api_base_url in $(printf \%s\\n \
-          https://ci0.servo.org \
-          https://ci1.servo.org \
-          https://ci2.servo.org \
-          https://ci3.servo.org \
-          https://ci4.servo.org \
-        | shuf); do
-          # Use the monitor API to reserve a runner. If we get an object with
-          # runner details, we succeeded. If we get null, we failed.
-          take_runner_url=$monitor_api_base_url/select-runner\?unique_id=$unique_id\&qualified_repo=${{ github.repository }}\&run_id=${{ github.run_id }}
-          result=$(mktemp)
+        queue_api_base_url=https://ci0.servo.org/queue
+        # Use the queue API to enqueue this job.
+        enqueue_url=$queue_api_base_url/enqueue\?unique_id=$unique_id\&qualified_repo=${{ github.repository }}\&run_id=${{ github.run_id }}
+        result=$(mktemp)
+        echo
+        echo POST "$enqueue_url"
+        if ! curl -sS --fail-with-body --connect-timeout 5 --max-time 30 -X POST "$enqueue_url" > $result; then
+          cat $result
           echo
-          echo POST "$take_runner_url"
-          if curl -sS --fail-with-body --connect-timeout 5 --max-time 30 -X POST "$take_runner_url" > $result \
-              && jq -e . $result > /dev/null; then
-            echo
-            echo "selected_runner_label=reserved-for:$unique_id" | tee -a $GITHUB_OUTPUT
-            echo "runner_type_label=self-hosted-image:$self_hosted_image_name" | tee -a $GITHUB_OUTPUT
-            echo 'is_self_hosted=true' | tee -a $GITHUB_OUTPUT
-            exit 0
-          fi
-        done
+          echo
+          echo 'No self-hosted runners available!'
+          fall_back_to_github_hosted
+        fi
+
+        # Use the queue API to try to reserve a runner. If we get an object
+        # with runner details, we succeeded. If we get null, we failed.
+        take_url=$queue_api_base_url/take/$unique_id
+        take_url_with_token=$take_url\?token=$(cat $result)
+        result=$(mktemp)
+        echo
+        echo POST "$take_url"
+        # Retry for up to 3600 seconds, nominally once per second for up to 3600 times,
+        # but actually respecting Retry-After for up to 3600 times.
+        if curl -sS --fail-with-body --retry-max-time 3600 --retry 3600 --retry-delay 1 -X POST "$take_url_with_token" > $result \
+            && jq -e . $result > /dev/null; then
+          echo
+          echo "selected_runner_label=reserved-for:$unique_id" | tee -a $GITHUB_OUTPUT
+          echo "runner_type_label=self-hosted-image:$self_hosted_image_name" | tee -a $GITHUB_OUTPUT
+          echo 'is_self_hosted=true' | tee -a $GITHUB_OUTPUT
+          exit 0
+        fi
 
         cat $result
         echo
