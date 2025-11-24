@@ -67,6 +67,7 @@ in stdenv.mkDerivation rec {
     mkdir -p $out/bin
     ln -s ${monitorCrate}/bin/monitor $out/bin/monitor
     ln -s ${monitorCrate}/bin/chunker $out/bin/chunker
+    ln -s ${monitorCrate}/bin/queue $out/bin/queue
     mkdir -p $out/lib/monitor
     cp -R profiles $out/lib/monitor
     cp -R shared $out/lib/monitor
@@ -75,6 +76,9 @@ in stdenv.mkDerivation rec {
   postFixup = ''
     wrapProgram $out/bin/monitor --set PATH ${lib.makeBinPath buildInputs} \
       --set LIB_MONITOR_DIR $out/lib/monitor \
+      --set IMAGE_DEPS_DIR ${image-deps}
+    wrapProgram $out/bin/queue --set PATH ${lib.makeBinPath buildInputs} \
+      --set LIB_MONITOR_DIR $out/lib/queue \
       --set IMAGE_DEPS_DIR ${image-deps}
   '';
 }
