@@ -108,8 +108,7 @@ runs:
         fi
 
         queue_api_base_url=https://ci0.servo.org/queue
-        # Use the queue API to reserve a runner. If we get an object with
-        # runner details, we succeeded. If we get null, we failed.
+        # Use the queue API to enqueue this job.
         enqueue_url=$queue_api_base_url/enqueue\?unique_id=$unique_id\&qualified_repo=${{ github.repository }}\&run_id=${{ github.run_id }}
         result=$(mktemp)
         echo
@@ -122,6 +121,8 @@ runs:
           fall_back_to_github_hosted
         fi
 
+        # Use the queue API to try to reserve a runner. If we get an object
+        # with runner details, we succeeded. If we get null, we failed.
         take_url=$queue_api_base_url/take/$unique_id
         take_url_with_token=$take_url\?token=$(cat $result)
         result=$(mktemp)
