@@ -50,7 +50,7 @@
 
     async function update() {
         try {
-            const response = await fetch("/dashboard.txt", { signal: AbortSignal.timeout(3000) });
+            const response = await fetch("dashboard.txt", { signal: AbortSignal.timeout(3000) });
             if (response.status == 503) {
                 notice.className = "stale";
                 notice.textContent = "...";
