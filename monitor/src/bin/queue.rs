@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use settings::{DOTENV, TOML};
 use tokio::task::JoinSet;
-use tracing::{debug, error, info};
+use tracing::{error, info};
 use web::{
     auth::ApiKeyGuard,
     rocket_eyre::{self, EyreReport},
@@ -327,7 +327,6 @@ async fn queue_thread() -> eyre::Result<()> {
         for (server, result) in set.join_all().await {
             match result {
                 Ok(response) => {
-                    debug!(?server, ?response);
                     queue.servers.insert(
                         server,
                         ServerStatus {
