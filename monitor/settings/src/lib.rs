@@ -80,6 +80,8 @@ pub struct Toml {
     pub main_repo_path: String,
     base_image_max_age: u64,
     dont_update_cached_servo_repo: Option<bool>,
+    libvirt_template_guest_prefix: Option<String>,
+    libvirt_rebuild_guest_prefix: Option<String>,
     libvirt_runner_guest_prefix: Option<String>,
     pub available_1g_hugepages: usize,
     pub available_normal_memory: MemorySize,
@@ -240,6 +242,18 @@ impl Toml {
 
     pub fn queue_member(&self) -> bool {
         self.queue_member.unwrap_or(false)
+    }
+
+    pub fn libvirt_template_guest_prefix(&self) -> &str {
+        self.libvirt_template_guest_prefix
+            .as_deref()
+            .unwrap_or("ci-template")
+    }
+
+    pub fn libvirt_rebuild_guest_prefix(&self) -> &str {
+        self.libvirt_rebuild_guest_prefix
+            .as_deref()
+            .unwrap_or("ci-rebuild")
     }
 
     pub fn libvirt_runner_guest_prefix(&self) -> &str {
