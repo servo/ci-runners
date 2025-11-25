@@ -7,8 +7,8 @@
   writeText,
 }: let
   jammy-server-cloudimg-amd64_img = fetchurl {
-    url = "https://cloud-images.ubuntu.com/jammy/20250725/jammy-server-cloudimg-amd64.img";
-    hash = "sha256-sRmpeNy2YZR2FnTCOoYKdc23d46V4iK1HXozht/jySA=";
+    url = "https://cloud-images.ubuntu.com/jammy/20251023/jammy-server-cloudimg-amd64.img";
+    hash = "sha256-kzMDphmvdsDtFzTtGjK95VON4zbWhXhiiD7HyPUJoFw=";
   };
 in linkFarm "image-deps" {
   "cargo-config.toml" = writeText "cargo-config.toml" ''
@@ -21,8 +21,8 @@ in linkFarm "image-deps" {
     hash = "sha256-5LH57GE4YSMiR+DLY2HJuxqGUl1ijs1Ln+rcnvngwig=";
   };
   "macos13/actions-runner-osx-x64.tar.gz" = fetchurl {
-    url = "https://github.com/actions/runner/releases/download/v2.328.0/actions-runner-osx-x64-2.328.0.tar.gz";
-    hash = "sha256-kMMtxvKShVM5VjFI84WdxdQC8jfs31cBDIQd88jRLMg=";
+    url = "https://github.com/actions/runner/releases/download/v2.330.0/actions-runner-osx-x64-2.330.0.tar.gz";
+    hash = "sha256-QKMre4fiW3a1leIB4K83b8scO3g4/iFFKQl1YJBHPqk=";
   };
   "macos13/uv-installer.sh" = fetchurl {
     url = "https://github.com/astral-sh/uv/releases/download/0.8.17/uv-installer.sh";
@@ -45,8 +45,8 @@ in linkFarm "image-deps" {
     hash = "sha256-ozOfsATD0LuYYroLzgAYYf5cvenBDRZZHrPznubNPn8=";
   };
   "ubuntu2204/actions-runner-linux-x64.tar.gz" = fetchurl {
-    url = "https://github.com/actions/runner/releases/download/v2.328.0/actions-runner-linux-x64-2.328.0.tar.gz";
-    hash = "sha256-AQZvrTook+Y+bKiArjofrVv5Mp1g537hXyuXwUjDzU4=";
+    url = "https://github.com/actions/runner/releases/download/v2.330.0/actions-runner-linux-x64-2.330.0.tar.gz";
+    hash = "sha256-r1wz+pTzzDO46Xk3k5E2prBBl+ba38+ztuM64b9B55o=";
   };
   "ubuntu2204/uv-installer.sh" = fetchurl {
     url = "https://github.com/astral-sh/uv/releases/download/0.8.17/uv-installer.sh";
@@ -82,15 +82,15 @@ in linkFarm "image-deps" {
   };
   "windows10/vs_community.exe" = fetchurl {
     url = "https://aka.ms/vs/17/release/vs_community.exe";
-    hash = "sha256-MV9hfmY2Rg+pMNhspUn7ur1Zj6QdAU1cXS2va4ZnuSA=";
+    hash = "sha256-xvyuf9hYx1r6zFIe6cDsgT+uJOeOCsGzke5iXSNlBx8=";
   };
   "windows10/rustup-init.exe" = fetchurl {
     url = "https://static.rust-lang.org/rustup/archive/1.28.1/x86_64-pc-windows-msvc/rustup-init.exe";
     hash = "sha256-e4MDmhuTBbDFDyOy4vAzGbjXhZsoEG5JuoLAbYEonfY=";
   };
   "windows10/actions-runner-win-x64.zip" = fetchurl {
-    url = "https://github.com/actions/runner/releases/download/v2.328.0/actions-runner-win-x64-2.328.0.zip";
-    hash = "sha256-pzrhkriyt4Lh2QwIkjAwkwsLlu05T+VkE6BzzG9pSHc=";
+    url = "https://github.com/actions/runner/releases/download/v2.330.0/actions-runner-win-x64-2.330.0.zip";
+    hash = "sha256-p0aefylJZXMn/ddWiP2IWOE1IgKEfQJNaLk94DOZB3k=";
   };
   "windows10/Git-2.45.1-64-bit.exe" = fetchurl {
     url = "https://github.com/git-for-windows/git/releases/download/v2.45.1.windows.1/Git-2.45.1-64-bit.exe";
