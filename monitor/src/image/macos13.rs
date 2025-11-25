@@ -1,5 +1,6 @@
 use std::ffi::OsStr;
 use std::fs::copy;
+use std::fs::create_dir_all;
 use std::fs::remove_file;
 use std::path::Path;
 use std::time::Duration;
@@ -74,6 +75,57 @@ impl Image for Macos13 {
     }
 }
 
+pub struct MacosUtm {
+    wait_duration: Duration,
+}
+
+impl MacosUtm {
+    pub const fn new(wait_duration: Duration) -> Self {
+        Self { wait_duration }
+    }
+}
+
+#[expect(unused_variables)]
+impl Image for MacosUtm {
+    fn rebuild(&self, profile: &Profile, snapshot_name: &str) -> eyre::Result<()> {
+        let profile_name = &profile.profile_name;
+        let rebuild_guest_name = &profile.rebuild_guest_name(snapshot_name);
+        hypervisor::utm::clone_guest(&format!("{profile_name}-clean"), rebuild_guest_name)?;
+
+        start_guest(rebuild_guest_name)?;
+        wait_for_guest(rebuild_guest_name, self.wait_duration)?;
+
+        let template_guest_name = &profile.template_guest_name(snapshot_name);
+        rename_guest(rebuild_guest_name, template_guest_name)?;
+        create_dir_all(get_profile_data_path(&profile.profile_name, None)?)?;
+        let snapshot_symlink_path =
+            get_profile_data_path(&profile.profile_name, Path::new("snapshot"))?;
+        atomic_symlink(snapshot_name, snapshot_symlink_path)?;
+
+        Ok(())
+    }
+    fn delete_template(&self, profile: &Profile, snapshot_name: &str) -> eyre::Result<()> {
+        delete_guest(&profile.template_guest_name(snapshot_name))
+    }
+    fn register_runner(&self, profile: &Profile, runner_guest_name: &str) -> eyre::Result<String> {
+        register_runner(profile, runner_guest_name)
+    }
+    fn create_runner(
+        &self,
+        profile: &Profile,
+        snapshot_name: &str,
+        runner_guest_name: &str,
+        runner_id: usize,
+    ) -> eyre::Result<String> {
+        let template_guest_name = &profile.template_guest_name(snapshot_name);
+        hypervisor::utm::clone_guest(template_guest_name, runner_guest_name)?;
+        Ok(runner_guest_name.to_owned())
+    }
+    fn destroy_runner(&self, runner_guest_name: &str, _runner_id: usize) -> eyre::Result<()> {
+        delete_guest(runner_guest_name)
+    }
+}
+
 pub(super) fn rebuild(
     profile: &Profile,
     snapshot_name: &str,
@@ -104,6 +156,7 @@ pub(super) fn rebuild(
 
     let template_guest_name = &profile.template_guest_name(snapshot_name);
     rename_guest(rebuild_guest_name, template_guest_name)?;
+    create_dir_all(get_profile_data_path(&profile.profile_name, None)?)?;
     let snapshot_symlink_path =
         get_profile_data_path(&profile.profile_name, Path::new("snapshot"))?;
     atomic_symlink(snapshot_name, snapshot_symlink_path)?;

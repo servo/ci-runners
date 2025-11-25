@@ -28,7 +28,11 @@ use shell::{log_output_as_info, reflink_or_copy_with_warning};
 use tracing::{error, info, warn};
 
 use crate::{
-    image::{macos13::Macos13, ubuntu2204::Ubuntu2204, windows10::Windows10},
+    image::{
+        macos13::{Macos13, MacosUtm},
+        ubuntu2204::Ubuntu2204,
+        windows10::Windows10,
+    },
     policy::Policy,
 };
 
@@ -45,6 +49,10 @@ static IMAGES: LazyLock<BTreeMap<String, Box<dyn Image + Send + Sync>>> = LazyLo
     result.insert(
         "servo-macos15".to_owned(),
         Box::new(Macos13::new(ByteSize::gib(90), Duration::from_secs(2000))),
+    );
+    result.insert(
+        "servo-macos15-arm".to_owned(),
+        Box::new(MacosUtm::new(Duration::from_secs(2000))),
     );
     result.insert(
         "servo-ubuntu2204".to_owned(),
