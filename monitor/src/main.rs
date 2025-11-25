@@ -53,7 +53,7 @@ use crate::{
     id::IdGen,
     image::{start_libvirt_guest, Rebuilds},
     libvirt::list_runner_guests,
-    policy::{base_image_path, Override, Policy, RunnerCounts},
+    policy::{Override, Policy, RunnerCounts},
     runner::{Runners, Status},
 };
 
@@ -504,24 +504,16 @@ fn monitor_thread() -> eyre::Result<()> {
             },
         ) in profile_runner_counts.iter()
         {
-            let profile = policy.profile(key).ok_or_eyre("Failed to get profile")?;
-            let image = policy
-                .base_image_snapshot(key)
-                .map(|snapshot| match profile.image_type {
-                    settings::profile::ImageType::Rust => base_image_path(profile, &**snapshot)
-                        .as_os_str()
-                        .to_str()
-                        .expect("Guaranteed by base_image_path()")
-                        .to_owned(),
-                });
-            info!("profile {key}: {healthy}/{target} healthy runners ({idle} idle, {reserved} reserved, {busy} busy, {started_or_crashed} started or crashed, {excess_healthy} excess healthy, {wanted} wanted), image {:?} age {image_age:?}", image);
+            let snapshot = policy.base_image_snapshot(key);
+            info!("profile {key}: {healthy}/{target} healthy runners ({idle} idle, {reserved} reserved, {busy} busy, {started_or_crashed} started or crashed, {excess_healthy} excess healthy, {wanted} wanted), snapshot {snapshot:?} age {image_age:?}");
         }
         for (_id, runner) in policy.runners() {
             runner.log_info();
         }
 
-        policy.update_screenshots();
-        policy.update_ipv4_addresses_for_profile_guests();
+        let rebuild_guest_names = image_rebuilds.rebuild_guest_names();
+        policy.update_screenshots(&rebuild_guest_names);
+        policy.update_ipv4_addresses_for_rebuild_guests(&rebuild_guest_names);
 
         if TOML.destroy_all_non_busy_runners() {
             let non_busy_runners = policy
@@ -689,14 +681,14 @@ fn monitor_thread() -> eyre::Result<()> {
                     // GET /github-jitconfig request both happen in step (2) without step (1) in between, we won’t know
                     // the IPv4 address, so let’s update the IPv4 addresses before continuing.
                     policy.update_ipv4_addresses_for_runner_guests()?;
-                    policy.update_ipv4_addresses_for_profile_guests();
+                    policy.update_ipv4_addresses_for_rebuild_guests(&rebuild_guest_names);
 
                     let result = policy
                         .boot_script_for_runner_guest(remote_addr.clone())
                         .transpose()
                         .or_else(|| {
                             policy
-                                .boot_script_for_profile_guest(remote_addr)
+                                .boot_script_for_rebuild_guest(remote_addr)
                                 .transpose()
                         })
                         .transpose()
