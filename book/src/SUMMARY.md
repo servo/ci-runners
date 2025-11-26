@@ -11,6 +11,11 @@
 
 - [Hacking on the monitor locally](monitor/hacking.md)
 
+# Experimental features
+
+- [Global queue]()
+- [The chunker]()
+
 # As used by Servo
 
 - [Maintenance guide](servo/maintenance.md)
