@@ -3,7 +3,7 @@
 set -eu
 
 SERVO_GIT_HASH=$(git ls-remote https://github.com/servo/servo.git --branches refs/heads/main | awk '{ print $1}')
-GITHUB_ACTIONS_RUNNER_VERSION="2.329.0"
+GITHUB_ACTIONS_RUNNER_VERSION="2.330.0"
 RUST_VERSION="1.91.0"
 UV_VERSION="0.9.7"
 IMAGE_USERNAME=servo_ci
