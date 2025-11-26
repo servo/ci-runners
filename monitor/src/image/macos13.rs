@@ -7,6 +7,15 @@ use std::time::Duration;
 use bytesize::ByteSize;
 use cmd_lib::run_cmd;
 use cmd_lib::spawn_with_output;
+use hypervisor::delete_guest;
+use hypervisor::libvirt::create_runner_images_dir;
+use hypervisor::libvirt::create_template_or_rebuild_images_dir;
+use hypervisor::libvirt::delete_template_or_rebuild_image_file;
+use hypervisor::libvirt::libvirt_change_media;
+use hypervisor::libvirt::CdromImage;
+use hypervisor::rename_guest;
+use hypervisor::start_guest;
+use hypervisor::wait_for_guest;
 use jane_eyre::eyre;
 use jane_eyre::eyre::OptionExt;
 use settings::profile::Profile;
@@ -16,20 +25,11 @@ use shell::reflink_or_copy_with_warning;
 use tracing::warn;
 
 use crate::data::get_profile_data_path;
-use crate::image::create_runner_images_dir;
-use crate::image::create_template_or_rebuild_images_dir;
-use crate::image::delete_template_or_rebuild_image_file;
-use crate::image::libvirt_change_media;
-use crate::image::rename_guest;
-use crate::image::undefine_libvirt_guest;
-use crate::image::CdromImage;
 use crate::image::Image;
 use crate::policy::runner_image_path;
 use crate::policy::template_or_rebuild_image_path;
 
 use super::create_disk_image;
-use super::start_libvirt_guest;
-use super::wait_for_guest;
 
 pub struct Macos13 {
     base_image_size: ByteSize,
@@ -99,7 +99,7 @@ pub(super) fn rebuild(
     let ovmf_vars_path =
         format!("/var/lib/libvirt/images/OSX-KVM/OVMF_VARS.{snapshot_path_slug}.fd");
     copy(ovmf_vars_clean_path, ovmf_vars_path)?;
-    start_libvirt_guest(rebuild_guest_name)?;
+    start_guest(rebuild_guest_name)?;
     wait_for_guest(rebuild_guest_name, wait_duration)?;
 
     let template_guest_name = &profile.template_guest_name(snapshot_name);
@@ -131,7 +131,7 @@ fn define_base_guest(
 }
 
 pub(super) fn delete_template(profile: &Profile, snapshot_name: &str) -> eyre::Result<()> {
-    undefine_libvirt_guest(&profile.template_guest_name(snapshot_name))?;
+    delete_guest(&profile.template_guest_name(snapshot_name))?;
     delete_template_or_rebuild_image_file(profile, &format!("base.img@{snapshot_name}"));
     Ok(())
 }

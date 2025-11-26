@@ -6,6 +6,15 @@ use std::time::Duration;
 use bytesize::ByteSize;
 use cmd_lib::run_cmd;
 use cmd_lib::spawn_with_output;
+use hypervisor::delete_guest;
+use hypervisor::libvirt::create_runner_images_dir;
+use hypervisor::libvirt::create_template_or_rebuild_images_dir;
+use hypervisor::libvirt::define_libvirt_guest;
+use hypervisor::libvirt::delete_template_or_rebuild_image_file;
+use hypervisor::libvirt::CdromImage;
+use hypervisor::rename_guest;
+use hypervisor::start_guest;
+use hypervisor::wait_for_guest;
 use jane_eyre::eyre;
 use settings::profile::Profile;
 use shell::atomic_symlink;
@@ -16,21 +25,12 @@ use tracing::warn;
 
 use crate::data::get_profile_configuration_path;
 use crate::data::get_profile_data_path;
-use crate::image::create_runner_images_dir;
-use crate::image::create_template_or_rebuild_images_dir;
-use crate::image::delete_template_or_rebuild_image_file;
-use crate::image::rename_guest;
-use crate::image::undefine_libvirt_guest;
 use crate::image::Image;
 use crate::policy::runner_image_path;
 use crate::policy::template_or_rebuild_image_path;
 use crate::IMAGE_DEPS_DIR;
 
 use super::create_disk_image;
-use super::define_libvirt_guest;
-use super::start_libvirt_guest;
-use super::wait_for_guest;
-use super::CdromImage;
 
 pub struct Windows10 {
     base_image_size: ByteSize,
@@ -113,7 +113,7 @@ pub(super) fn rebuild(
             CdromImage::new("sdd", config_iso_path),
         ],
     )?;
-    start_libvirt_guest(rebuild_guest_name)?;
+    start_guest(rebuild_guest_name)?;
     wait_for_guest(rebuild_guest_name, wait_duration)?;
 
     let template_guest_name = &profile.template_guest_name(snapshot_name);
@@ -145,7 +145,7 @@ fn define_base_guest(
 }
 
 pub(super) fn delete_template(profile: &Profile, snapshot_name: &str) -> eyre::Result<()> {
-    undefine_libvirt_guest(&profile.template_guest_name(snapshot_name))?;
+    delete_guest(&profile.template_guest_name(snapshot_name))?;
     delete_template_or_rebuild_image_file(profile, &format!("config.iso@{snapshot_name}"));
     delete_template_or_rebuild_image_file(profile, &format!("base.img@{snapshot_name}"));
     Ok(())
