@@ -28,7 +28,11 @@ use shell::{log_output_as_info, reflink_or_copy_with_warning};
 use tracing::{error, info, warn};
 
 use crate::{
-    image::{macos13::Macos13, ubuntu2204::Ubuntu2204, windows10::Windows10},
+    image::{
+        macos13::{Macos13, MacosUtm},
+        ubuntu2204::Ubuntu2204,
+        windows10::Windows10,
+    },
     policy::Policy,
 };
 
@@ -45,6 +49,10 @@ static IMAGES: LazyLock<BTreeMap<String, Box<dyn Image + Send + Sync>>> = LazyLo
     result.insert(
         "servo-macos15".to_owned(),
         Box::new(Macos13::new(ByteSize::gib(90), Duration::from_secs(2000))),
+    );
+    result.insert(
+        "servo-macos15-arm".to_owned(),
+        Box::new(MacosUtm::new(Duration::from_secs(2000))),
     );
     result.insert(
         "servo-ubuntu2204".to_owned(),
@@ -149,7 +157,7 @@ impl Rebuilds {
                         info!("Servo update thread exited");
                         cached_servo_repo_was_just_updated = true;
                     }
-                    Ok(Err(report)) => error!(%report, "Servo update thread error"),
+                    Ok(Err(report)) => error!(?report, "Servo update thread error"),
                     Err(panic) => error!(?panic, "Servo update thread panic"),
                 };
             } else {
@@ -229,7 +237,7 @@ impl Rebuilds {
                         info!(profile_key, "Image rebuild thread exited");
                         policy.set_base_image_snapshot(&profile_key, &rebuild.snapshot_name)?;
                     }
-                    Ok(Err(report)) => error!(profile_key, %report, "Image rebuild thread error"),
+                    Ok(Err(report)) => error!(profile_key, ?report, "Image rebuild thread error"),
                     Err(panic) => error!(profile_key, ?panic, "Image rebuild thread panic"),
                 };
             } else {

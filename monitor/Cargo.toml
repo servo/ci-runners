@@ -12,7 +12,7 @@ cfg-if = "1.0.1"
 chrono = { workspace = true }
 cli = { workspace = true }
 cmd_lib = { workspace = true }
-crossbeam-channel = "0.5.13"
+crossbeam-channel = { workspace = true }
 dotenv = { workspace = true }
 http = "0.2"
 hypervisor = { workspace = true }
