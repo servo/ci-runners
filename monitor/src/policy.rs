@@ -10,6 +10,11 @@ use std::{
 };
 
 use chrono::DateTime;
+use hypervisor::{
+    get_ipv4_address,
+    libvirt::{runner_images_path, template_or_rebuild_images_path},
+    update_screenshot,
+};
 use itertools::Itertools;
 use jane_eyre::eyre::{self, bail, Context, OptionExt};
 use mktemp::Temp;
@@ -25,7 +30,6 @@ use tracing::{debug, info, info_span, warn};
 use crate::{
     data::{get_profile_configuration_path, get_profile_data_path, get_runner_data_path},
     image::{create_runner, destroy_runner, register_runner},
-    libvirt::{get_ipv4_address, update_screenshot},
     runner::{Runner, Runners, Status},
 };
 
@@ -851,14 +855,6 @@ impl Policy {
 
         runners.boot_script(remote_addr)
     }
-}
-
-pub fn template_or_rebuild_images_path(profile: &Profile) -> PathBuf {
-    Path::new("/var/lib/libvirt/images/base").join(&profile.profile_name)
-}
-
-pub fn runner_images_path() -> PathBuf {
-    PathBuf::from("/var/lib/libvirt/images/runner")
 }
 
 pub fn template_or_rebuild_image_path(

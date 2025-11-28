@@ -2,10 +2,8 @@ mod dashboard;
 mod data;
 mod id;
 mod image;
-mod libvirt;
 mod policy;
 mod runner;
-mod shell;
 
 use core::str;
 use std::{
@@ -22,6 +20,8 @@ use std::{
 use askama::Template;
 use askama_web::WebTemplate;
 use crossbeam_channel::{Receiver, Sender};
+use hypervisor::list_runner_guests;
+use hypervisor::start_guest;
 use jane_eyre::eyre::{self, eyre, Context, OptionExt};
 use mktemp::Temp;
 use monitor::{
@@ -51,8 +51,7 @@ use crate::{
     dashboard::Dashboard,
     data::{get_profile_data_path, get_runner_data_path, run_migrations},
     id::IdGen,
-    image::{start_libvirt_guest, Rebuilds},
-    libvirt::list_runner_guests,
+    image::Rebuilds,
     policy::{Override, Policy, RunnerCounts},
     runner::{Runners, Status},
 };
@@ -558,7 +557,7 @@ fn monitor_thread() -> eyre::Result<()> {
                         .join()
                         .map_err(|e| eyre!("Thread panicked: {e:?}"))
                         .and_then(|inner_result| inner_result)
-                        .and_then(|runner_guest_name| start_libvirt_guest(&runner_guest_name))
+                        .and_then(|runner_guest_name| start_guest(&runner_guest_name))
                     {
                         warn!(?error, "Failed to create runner: {error}");
                     }

@@ -896,6 +896,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "hypervisor"
+version = "0.1.0"
+dependencies = [
+ "cmd_lib",
+ "jane-eyre",
+ "settings",
+ "shell",
+ "tracing",
+]
+
+[[package]]
 name = "iana-time-zone"
 version = "0.1.61"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1231,16 +1242,17 @@ dependencies = [
  "crossbeam-channel",
  "dotenv",
  "http 0.2.12",
+ "hypervisor",
  "itertools",
  "jane-eyre",
  "mktemp",
  "rand 0.9.1",
- "reflink",
  "reqwest",
  "rocket",
  "serde",
  "serde_json",
  "settings",
+ "shell",
  "subprocess",
  "tokio",
  "toml",
@@ -1497,7 +1509,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls",
- "socket2 0.5.7",
+ "socket2 0.6.1",
  "thiserror",
  "tokio",
  "tracing",
@@ -1534,9 +1546,9 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.5.7",
+ "socket2 0.6.1",
  "tracing",
- "windows-sys 0.59.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1990,6 +2002,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f40ca3c46823713e0d4209592e8d6e826aa57e928f09752619fc696c499637f6"
 dependencies = [
  "lazy_static",
+]
+
+[[package]]
+name = "shell"
+version = "0.1.0"
+dependencies = [
+ "jane-eyre",
+ "mktemp",
+ "reflink",
+ "tracing",
 ]
 
 [[package]]

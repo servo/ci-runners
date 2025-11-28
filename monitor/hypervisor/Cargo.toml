@@ -1,0 +1,11 @@
+[package]
+name = "hypervisor"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cmd_lib.workspace = true
+jane-eyre.workspace = true
+settings.workspace = true
+shell.workspace = true
+tracing.workspace = true
