@@ -6,39 +6,84 @@ use std::time::Duration;
 use bytesize::ByteSize;
 use cmd_lib::run_cmd;
 use cmd_lib::spawn_with_output;
+use hypervisor::delete_guest;
+use hypervisor::libvirt::create_runner_images_dir;
+use hypervisor::libvirt::create_template_or_rebuild_images_dir;
+use hypervisor::libvirt::define_libvirt_guest;
+use hypervisor::libvirt::delete_template_or_rebuild_image_file;
+use hypervisor::libvirt::CdromImage;
+use hypervisor::rename_guest;
+use hypervisor::start_guest;
+use hypervisor::wait_for_guest;
 use jane_eyre::eyre;
 use settings::profile::Profile;
+use shell::atomic_symlink;
+use shell::log_output_as_info;
+use shell::reflink_or_copy_with_warning;
 use tracing::info;
 use tracing::warn;
 
 use crate::data::get_profile_configuration_path;
 use crate::data::get_profile_data_path;
-use crate::image::create_runner_images_dir;
-use crate::image::delete_template_or_rebuild_image_file;
-use crate::image::rename_guest;
-use crate::image::undefine_libvirt_guest;
+use crate::image::Image;
 use crate::policy::runner_image_path;
 use crate::policy::template_or_rebuild_image_path;
-use crate::shell::atomic_symlink;
-use crate::shell::log_output_as_info;
-use crate::shell::reflink_or_copy_with_warning;
 use crate::IMAGE_DEPS_DIR;
 
 use super::create_disk_image;
-use super::define_libvirt_guest;
-use super::start_libvirt_guest;
-use super::wait_for_guest;
-use super::CdromImage;
+
+pub struct Ubuntu2204 {
+    base_image_size: ByteSize,
+    wait_duration: Duration,
+}
+
+impl Ubuntu2204 {
+    pub const fn new(base_image_size: ByteSize, wait_duration: Duration) -> Self {
+        Self {
+            base_image_size,
+            wait_duration,
+        }
+    }
+}
+
+impl Image for Ubuntu2204 {
+    fn rebuild(&self, profile: &Profile, snapshot_name: &str) -> eyre::Result<()> {
+        rebuild(
+            profile,
+            snapshot_name,
+            self.base_image_size,
+            self.wait_duration,
+        )
+    }
+    fn delete_template(&self, profile: &Profile, snapshot_name: &str) -> eyre::Result<()> {
+        delete_template(profile, snapshot_name)
+    }
+    fn register_runner(&self, profile: &Profile, runner_guest_name: &str) -> eyre::Result<String> {
+        register_runner(profile, runner_guest_name)
+    }
+    fn create_runner(
+        &self,
+        profile: &Profile,
+        snapshot_name: &str,
+        runner_guest_name: &str,
+        runner_id: usize,
+    ) -> eyre::Result<String> {
+        create_runner(profile, snapshot_name, runner_guest_name, runner_id)
+    }
+    fn destroy_runner(&self, runner_guest_name: &str, runner_id: usize) -> eyre::Result<()> {
+        destroy_runner(runner_guest_name, runner_id)
+    }
+}
 
 pub(super) fn rebuild(
-    base_images_path: impl AsRef<Path>,
     profile: &Profile,
     snapshot_name: &str,
     base_image_size: ByteSize,
     wait_duration: Duration,
 ) -> eyre::Result<()> {
-    let base_images_path = base_images_path.as_ref();
+    let base_images_path = create_template_or_rebuild_images_dir(&profile)?;
     let rebuild_guest_name = &profile.rebuild_guest_name(snapshot_name);
+
     let profile_configuration_path = get_profile_configuration_path(&profile, None)?;
     let config_iso_filename = format!("config.iso@{snapshot_name}");
     let config_iso_path = base_images_path.join(&config_iso_filename);
@@ -62,7 +107,7 @@ pub(super) fn rebuild(
         &base_image_path,
         &[CdromImage::new("sda", config_iso_path)],
     )?;
-    start_libvirt_guest(rebuild_guest_name)?;
+    start_guest(rebuild_guest_name)?;
     wait_for_guest(rebuild_guest_name, wait_duration)?;
 
     let template_guest_name = &profile.template_guest_name(snapshot_name);
@@ -94,7 +139,7 @@ fn define_base_guest(
 }
 
 pub(super) fn delete_template(profile: &Profile, snapshot_name: &str) -> eyre::Result<()> {
-    undefine_libvirt_guest(&profile.template_guest_name(snapshot_name))?;
+    delete_guest(&profile.template_guest_name(snapshot_name))?;
     delete_template_or_rebuild_image_file(profile, &format!("config.iso@{snapshot_name}"));
     delete_template_or_rebuild_image_file(profile, &format!("base.img@{snapshot_name}"));
     Ok(())

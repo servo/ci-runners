@@ -1,16 +1,19 @@
 use core::str;
 use std::{
-    fs::{create_dir_all, rename},
+    collections::BTreeSet,
+    fs::{create_dir_all, read_dir, rename},
     net::Ipv4Addr,
     path::Path,
+    time::Duration,
 };
 
-use cmd_lib::{run_fun, spawn_with_output};
-use jane_eyre::eyre;
-use settings::TOML;
-use tracing::debug;
+use cmd_lib::{run_cmd, run_fun, spawn_with_output};
+use jane_eyre::eyre::{self, OptionExt, bail};
+use settings::{TOML, profile::Profile};
+use shell::log_output_as_trace;
+use tracing::{debug, info};
 
-use crate::shell::log_output_as_trace;
+use crate::libvirt::{delete_template_or_rebuild_image_file, template_or_rebuild_images_path};
 
 pub fn list_template_guests() -> eyre::Result<Vec<String>> {
     // Output is not filtered by prefix, so we must filter it ourselves.
@@ -70,6 +73,66 @@ pub fn get_ipv4_address(guest_name: &str) -> Option<Ipv4Addr> {
     virsh_domifaddr(guest_name, "lease")
         .or_else(|| virsh_domifaddr(guest_name, "arp"))
         .or_else(|| virsh_domifaddr(guest_name, "agent"))
+}
+
+pub fn start_guest(guest_name: &str) -> eyre::Result<()> {
+    info!(?guest_name, "Starting guest");
+    run_cmd!(virsh start -- $guest_name)?;
+
+    Ok(())
+}
+
+pub fn wait_for_guest(guest_name: &str, timeout: Duration) -> eyre::Result<()> {
+    let timeout = timeout.as_secs();
+    info!("Waiting for guest to shut down (max {timeout} seconds)");
+    if !run_cmd!(time virsh event --timeout $timeout -- $guest_name lifecycle).is_ok() {
+        bail!("`virsh event` failed or timed out!");
+    }
+    for _ in 0..100 {
+        if run_fun!(virsh domstate -- $guest_name)?.trim_ascii() == "shut off" {
+            return Ok(());
+        }
+    }
+
+    bail!("Guest did not shut down as expected")
+}
+
+pub fn rename_guest(old_guest_name: &str, new_guest_name: &str) -> eyre::Result<()> {
+    run_cmd!(virsh domrename -- $old_guest_name $new_guest_name)?;
+    Ok(())
+}
+
+pub fn delete_guest(guest_name: &str) -> eyre::Result<()> {
+    if run_cmd!(virsh domstate -- $guest_name).is_ok() {
+        // FIXME make this idempotent in a less noisy way?
+        let _ = run_cmd!(virsh destroy -- $guest_name);
+        run_cmd!(virsh undefine --nvram -- $guest_name)?;
+    }
+
+    Ok(())
+}
+
+pub fn prune_base_image_files(
+    profile: &Profile,
+    keep_snapshots: BTreeSet<String>,
+) -> eyre::Result<()> {
+    let base_images_path = template_or_rebuild_images_path(profile);
+    info!(?base_images_path, "Pruning base image files");
+    create_dir_all(&base_images_path)?;
+
+    for entry in read_dir(&base_images_path)? {
+        let filename = entry?.file_name();
+        let filename = filename.to_str().ok_or_eyre("Unsupported path")?;
+        if let Some((_base, snapshot_name)) = filename.split_once("@") {
+            if !keep_snapshots.contains(snapshot_name) {
+                delete_template_or_rebuild_image_file(profile, filename);
+            }
+        } else {
+            delete_template_or_rebuild_image_file(profile, filename);
+        }
+    }
+
+    Ok(())
 }
 
 fn virsh_domifaddr(guest_name: &str, source: &str) -> Option<Ipv4Addr> {

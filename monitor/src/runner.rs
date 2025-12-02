@@ -9,6 +9,7 @@ use std::{
 };
 
 use cfg_if::cfg_if;
+use hypervisor::{get_ipv4_address, take_screenshot, update_screenshot};
 use itertools::Itertools;
 use jane_eyre::eyre::{self, bail};
 use mktemp::Temp;
@@ -17,10 +18,7 @@ use serde::{Deserialize, Serialize};
 use settings::{profile::ImageType, TOML};
 use tracing::{error, info, trace, warn};
 
-use crate::{
-    data::get_runner_data_path,
-    libvirt::{get_ipv4_address, take_screenshot, update_screenshot},
-};
+use crate::data::get_runner_data_path;
 
 #[derive(Debug, Serialize)]
 pub struct Runners {
