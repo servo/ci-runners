@@ -13,7 +13,7 @@
 
 # Runner images
 
-- [Minimal test images](images/minimal.md)
+- [Minimal base images](images/minimal.md)
 
 # Experimental features
 

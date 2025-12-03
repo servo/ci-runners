@@ -121,9 +121,9 @@ target_count = 1
 requires_1g_hugepages = 24
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
 
-[profiles.test-ubuntu2204]
-profile_name = "test-ubuntu2204"
-github_runner_label = "self-hosted-image:test-ubuntu2204"
+[profiles.base-ubuntu2204]
+profile_name = "base-ubuntu2204"
+github_runner_label = "self-hosted-image:base-ubuntu2204"
 target_count = 0
 requires_1g_hugepages = 12
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
