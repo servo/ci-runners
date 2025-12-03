@@ -62,7 +62,7 @@ queue_member = true
 
 [profiles.servo-ubuntu2204-bench]
 profile_name = "servo-ubuntu2204-bench"
-github_runner_label = "self-hosted-image:ubuntu2204-bench"
+github_runner_label = "self-hosted-image:servo-ubuntu2204-bench"
 target_count = 1
 image_type = "Rust"
 requires_1g_hugepages = 24
