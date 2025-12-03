@@ -4,4 +4,4 @@ A useful image for hacking on the monitor locally, since it only takes around a 
 
 This is a **libvirt/KVM**-based image, compatible with Linux amd64 servers only:
 
-- `servo-ubuntu2204-rust`
+- `test-ubuntu2204`

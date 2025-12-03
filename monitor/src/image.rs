@@ -249,7 +249,7 @@ fn rebuild_with_rust(
             ByteSize::gib(90),
             Duration::from_secs(1000),
         ),
-        "servo-ubuntu2204-rust" => ubuntu2204::rebuild(
+        "test-ubuntu2204" => ubuntu2204::rebuild(
             &base_images_path,
             &profile,
             snapshot_name,
@@ -291,7 +291,7 @@ pub fn delete_template(profile: &Profile, snapshot_name: &str) -> eyre::Result<(
         "servo-macos15" => macos13::delete_template(profile, snapshot_name),
         "servo-ubuntu2204" => ubuntu2204::delete_template(profile, snapshot_name),
         "servo-ubuntu2204-bench" => ubuntu2204::delete_template(profile, snapshot_name),
-        "servo-ubuntu2204-rust" => ubuntu2204::delete_template(profile, snapshot_name),
+        "test-ubuntu2204" => ubuntu2204::delete_template(profile, snapshot_name),
         "servo-ubuntu2204-wpt" => ubuntu2204::delete_template(profile, snapshot_name),
         "servo-windows10" => windows10::delete_template(profile, snapshot_name),
         other => todo!("Image pruning not yet implemented: {other}"),
@@ -305,7 +305,7 @@ pub fn register_runner(profile: &Profile, runner_guest_name: &str) -> eyre::Resu
         "servo-macos15" => macos13::register_runner(profile, runner_guest_name),
         "servo-ubuntu2204" => ubuntu2204::register_runner(profile, runner_guest_name),
         "servo-ubuntu2204-bench" => ubuntu2204::register_runner(profile, runner_guest_name),
-        "servo-ubuntu2204-rust" => ubuntu2204::register_runner(profile, runner_guest_name),
+        "test-ubuntu2204" => ubuntu2204::register_runner(profile, runner_guest_name),
         "servo-ubuntu2204-wpt" => ubuntu2204::register_runner(profile, runner_guest_name),
         "servo-windows10" => windows10::register_runner(profile, runner_guest_name),
         other => todo!("Runner registration not yet implemented: {other}"),
@@ -334,7 +334,7 @@ pub fn create_runner(
         "servo-ubuntu2204-bench" => {
             ubuntu2204::create_runner(profile, snapshot_name, runner_guest_name, runner_id)
         }
-        "servo-ubuntu2204-rust" => {
+        "test-ubuntu2204" => {
             ubuntu2204::create_runner(profile, snapshot_name, runner_guest_name, runner_id)
         }
         "servo-ubuntu2204-wpt" => {
@@ -358,7 +358,7 @@ pub fn destroy_runner(
         "servo-macos15" => macos13::destroy_runner(runner_guest_name, runner_id),
         "servo-ubuntu2204" => ubuntu2204::destroy_runner(runner_guest_name, runner_id),
         "servo-ubuntu2204-bench" => ubuntu2204::destroy_runner(runner_guest_name, runner_id),
-        "servo-ubuntu2204-rust" => ubuntu2204::destroy_runner(runner_guest_name, runner_id),
+        "test-ubuntu2204" => ubuntu2204::destroy_runner(runner_guest_name, runner_id),
         "servo-ubuntu2204-wpt" => ubuntu2204::destroy_runner(runner_guest_name, runner_id),
         "servo-windows10" => windows10::destroy_runner(runner_guest_name, runner_id),
         other => todo!("Runner destruction not yet implemented: {other}"),
