@@ -9,6 +9,10 @@ inputs:
   self-hosted-image-name:
     required: true
     type: string
+  self-hosted-runner-count:
+    required: false
+    type: number
+    default: 1
   force-github-hosted-runner:
     required: false
     type: boolean
@@ -38,6 +42,7 @@ runs:
       run: |
         github_hosted_runner_label='${{ inputs.github-hosted-runner-label }}'
         self_hosted_image_name='${{ inputs.self-hosted-image-name }}'
+        self_hosted_runner_count='${{ inputs.self-hosted-runner-count }}'
 
         set -euo pipefail
 
@@ -72,6 +77,7 @@ runs:
 
         echo "unique_id=$unique_id" | tee -a "$artifact_path"
         echo "self_hosted_image_name=$self_hosted_image_name" | tee -a "$artifact_path"
+        echo "self_hosted_runner_count=$self_hosted_runner_count" | tee -a "$artifact_path"
         echo "qualified_repo=${{ github.repository }}" | tee -a "$artifact_path"
         echo "run_id=${{ github.run_id }}" | tee -a "$artifact_path"
 
