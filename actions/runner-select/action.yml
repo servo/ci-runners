@@ -32,6 +32,8 @@ outputs:
     value: ${{ steps.decision.outputs.selected_runner_label }}
   selected-runner-count:
     value: ${{ steps.decision.outputs.selected_runner_count }}
+  selected-runner-indices:
+    value: ${{ steps.decision.outputs.selected_runner_indices }}
   runner-type-label:
     value: ${{ steps.decision.outputs.runner_type_label }}
   is-self-hosted:
@@ -109,10 +111,23 @@ runs:
 
         set -euo pipefail
 
+        print_indices_array() {
+          i=0; while [ $i -lt $1 ]; do
+            if [ $i -eq 0 ]; then
+              printf '[%s' $i
+            else
+              printf ',%s' $i
+            fi
+            i=$((i + 1))
+          done
+          printf ']'
+        }
+
         fall_back_to_github_hosted() {
           echo 'Falling back to GitHub-hosted runner'
           echo "selected_runner_label=$github_hosted_runner_label" | tee -a $GITHUB_OUTPUT
           echo "selected_runner_count=$github_hosted_runner_count" | tee -a $GITHUB_OUTPUT
+          echo "selected_runner_indices=$(print_indices_array $github_hosted_runner_count)" | tee -a $GITHUB_OUTPUT
           echo "runner_type_label=$github_hosted_runner_label" | tee -a $GITHUB_OUTPUT
           echo 'is_self_hosted=false' | tee -a $GITHUB_OUTPUT
           exit 0
@@ -150,6 +165,7 @@ runs:
           echo
           echo "selected_runner_label=reserved-for:$unique_id" | tee -a $GITHUB_OUTPUT
           echo "selected_runner_count=$self_hosted_runner_count" | tee -a $GITHUB_OUTPUT
+          echo "selected_runner_indices=$(print_indices_array $self_hosted_runner_count)" | tee -a $GITHUB_OUTPUT
           echo "runner_type_label=self-hosted-image:$self_hosted_image_name" | tee -a $GITHUB_OUTPUT
           echo 'is_self_hosted=true' | tee -a $GITHUB_OUTPUT
           exit 0
