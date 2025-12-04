@@ -243,7 +243,7 @@ fn select_runner_route(
             "Tokenless select is disabled due to `queue_member` setting"
         )))?;
     }
-    let profile_key = validate_tokenless_select(&unique_id, &qualified_repo, &run_id)?;
+    let (profile_key, runner_count) = validate_tokenless_select(&unique_id, &qualified_repo, &run_id)?;
     let (response_tx, response_rx) = crossbeam_channel::bounded(0);
     REQUEST.sender.send_timeout(
         Request::TakeRunners {
@@ -254,7 +254,7 @@ fn select_runner_route(
                 qualified_repo,
                 run_id,
             },
-            count: 1,
+            count: runner_count,
         },
         TOML.monitor_thread_send_timeout(),
     )?;
