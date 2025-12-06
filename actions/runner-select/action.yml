@@ -1,5 +1,11 @@
 name: Select Self-hosted Runner
 inputs:
+  forge-is-forgejo:
+    required: true
+    type: boolean
+  queue-api-base-url:
+    required: true
+    type: string
   GITHUB_TOKEN:
     required: true
     type: string
@@ -41,6 +47,19 @@ runs:
 
         set -euo pipefail
 
+        apt_install() {
+            # Install distro packages, but only if one or more are not already installed.
+            # Update the package lists first, to avoid failures when rebaking old images.
+            if ! dpkg -s "$@" > /dev/null 2>&1; then
+                apt update
+                # DEBIAN_FRONTEND needed to avoid hang when installing tshark
+                DEBIAN_FRONTEND=noninteractive apt install -y "$@"
+            fi
+        }
+
+        # Already installed on GitHub ubuntu-24.04, but not Codeberg codeberg-tiny.
+        apt_install uuid-runtime
+
         # Generate a unique id that allows the workload job to find the runner
         # we are reserving for it (via runner labels), and allows the timeout
         # job to find the workload job run (via the job’s friendly name), even
@@ -78,7 +97,7 @@ runs:
     - id: artifact
       name: Publish artifact with args
       if: ${{ !fromJSON(steps.init.outputs.disabled) }}
-      uses: actions/upload-artifact@v4
+      uses: ${{ inputs.forge-is-forgejo && 'forgejo/upload-artifact@v4' || 'actions/upload-artifact@v4' }}
       with:
         name: servo-ci-runners_${{ steps.init.outputs.unique_id }}
         path: ${{ steps.init.outputs.artifact_path }}
@@ -88,6 +107,7 @@ runs:
       name: Find a server and reserve a runner
       shell: bash
       run: |
+        queue_api_base_url='${{ inputs.queue-api-base-url }}'
         github_hosted_runner_label='${{ inputs.github-hosted-runner-label }}'
         self_hosted_image_name='${{ inputs.self-hosted-image-name }}'
         disabled='${{ steps.init.outputs.disabled }}'
@@ -107,7 +127,6 @@ runs:
           fall_back_to_github_hosted
         fi
 
-        queue_api_base_url=https://ci0.servo.org/queue
         # Use the queue API to enqueue this job.
         enqueue_url=$queue_api_base_url/enqueue\?unique_id=$unique_id\&qualified_repo=${{ github.repository }}\&run_id=${{ github.run_id }}
         result=$(mktemp)
