@@ -1,5 +1,5 @@
 <domain type='kvm'>
-  <name>test-ubuntu2204.init</name>
+  <name>base-ubuntu2204.init</name>
   <uuid>ec747b67-ffb4-47cc-a27b-43156ca1724f</uuid>
   <metadata>
     <libosinfo:libosinfo xmlns:libosinfo="http://libosinfo.org/xmlns/libvirt/domain/1.0">
