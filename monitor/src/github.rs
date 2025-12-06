@@ -7,7 +7,7 @@ use chrono::{DateTime, FixedOffset};
 use cmd_lib::{run_cmd, run_fun};
 use jane_eyre::eyre::{self, Context};
 use serde::{Deserialize, Serialize};
-use settings::TOML;
+use settings::{DOTENV, TOML};
 use tracing::trace;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -107,10 +107,19 @@ impl<Response: Clone + Debug> Cache<Response> {
 }
 
 fn list_registered_runners() -> eyre::Result<Vec<ApiRunner>> {
-    let github_api_scope = &TOML.github_api_scope;
-    let result = run_fun!(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
-    "$github_api_scope/actions/runners" --paginate -q ".runners[]"
-    | jq -s .)?;
+    let github_or_forgejo_token = &DOTENV.github_or_forgejo_token;
+    let github_api_scope_url = &TOML.github_api_scope_url;
+    let result = if TOML.github_api_is_forgejo {
+        // FIXME: this leaks the token in logs when the command fails
+        run_fun!(curl -fsSH "Authorization: token $github_or_forgejo_token"
+            "$github_api_scope_url/actions/runners" // TODO: pagination?
+            | jq -er ".runners")?
+    } else {
+        run_fun!(GITHUB_TOKEN=$github_or_forgejo_token gh api
+            -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
+            "$github_api_scope_url/actions/runners" --paginate -q ".runners[]"
+            | jq -s .)?
+    };
 
     Ok(serde_json::from_str(&result).wrap_err("Failed to parse JSON")?)
 }
@@ -127,20 +136,37 @@ pub fn list_registered_runners_for_host() -> eyre::Result<Vec<ApiRunner>> {
 }
 
 pub fn register_runner(runner_name: &str, label: &str, work_folder: &str) -> eyre::Result<String> {
+    let github_or_forgejo_token = &DOTENV.github_or_forgejo_token;
+    let github_api_scope_url = &TOML.github_api_scope_url;
     let github_api_suffix = &TOML.github_api_suffix;
-    let github_api_scope = &TOML.github_api_scope;
-    let result = run_fun!(gh api --method POST -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
-    "$github_api_scope/actions/runners/generate-jitconfig"
-    -f "name=$runner_name@$github_api_suffix" -F "runner_group_id=1" -f "work_folder=$work_folder"
-    -f "labels[]=self-hosted" -f "labels[]=X64" -f "labels[]=$label")?;
+    let result = if TOML.github_api_is_forgejo {
+        // FIXME: this leaks the token in logs when the command fails
+        // TODO: this doesn’t actually register a runner, it just gets a registration token
+        run_fun!(curl -fsSH "Authorization: token $github_or_forgejo_token"
+            -X POST "$github_api_scope_url/actions/runners/registration-token/TODO")?
+    } else {
+        run_fun!(GITHUB_TOKEN=$github_or_forgejo_token gh api
+            -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
+            --method POST "$github_api_scope_url/actions/runners/generate-jitconfig"
+            -f "name=$runner_name@$github_api_suffix" -F "runner_group_id=1" -f "work_folder=$work_folder"
+            -f "labels[]=self-hosted" -f "labels[]=X64" -f "labels[]=$label")?
+    };
 
     Ok(result)
 }
 
 pub fn unregister_runner(id: usize) -> eyre::Result<()> {
-    let github_api_scope = &TOML.github_api_scope;
-    run_cmd!(gh api --method DELETE -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
-        "$github_api_scope/actions/runners/$id")?;
+    let github_or_forgejo_token = &DOTENV.github_or_forgejo_token;
+    let github_api_scope_url = &TOML.github_api_scope_url;
+    if TOML.github_api_is_forgejo {
+        // FIXME: this leaks the token in logs when the command fails
+        run_cmd!(curl -fsSH "Authorization: token $github_or_forgejo_token"
+            -X DELETE "$github_api_scope_url/actions/runners/$id")?;
+    } else {
+        run_cmd!(GITHUB_TOKEN=$github_or_forgejo_token gh api
+            -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
+            --method DELETE "$github_api_scope_url/actions/runners/$id")?;
+    }
 
     Ok(())
 }
@@ -151,13 +177,19 @@ pub fn reserve_runner(
     reserved_since: SystemTime,
     reserved_by: &str,
 ) -> eyre::Result<()> {
-    let github_api_scope = &TOML.github_api_scope;
+    let github_or_forgejo_token = &DOTENV.github_or_forgejo_token;
+    let github_api_scope_url = &TOML.github_api_scope_url;
     let reserved_since = reserved_since.duration_since(UNIX_EPOCH)?.as_secs();
-    run_cmd!(gh api --method POST -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
-        "$github_api_scope/actions/runners/$id/labels"
-        -f "labels[]=reserved-for:$unique_id"
-        -f "labels[]=reserved-since:$reserved_since"
-        -f "labels[]=reserved-by:$reserved_by")?;
+    if TOML.github_api_is_forgejo {
+        todo!()
+    } else {
+        run_cmd!(GITHUB_TOKEN=$github_or_forgejo_token gh api
+            -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
+            --method POST "$github_api_scope_url/actions/runners/$id/labels"
+            -f "labels[]=reserved-for:$unique_id"
+            -f "labels[]=reserved-since:$reserved_since"
+            -f "labels[]=reserved-by:$reserved_by")?;
+    }
 
     Ok(())
 }
