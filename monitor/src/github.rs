@@ -7,6 +7,7 @@ use chrono::{DateTime, FixedOffset};
 use cmd_lib::{run_cmd, run_fun};
 use jane_eyre::eyre::{self, Context};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use settings::{DOTENV, TOML};
 use tracing::trace;
 
@@ -141,15 +142,72 @@ pub fn register_runner(runner_name: &str, label: &str, work_folder: &str) -> eyr
     let github_api_suffix = &TOML.github_api_suffix;
     let result = if TOML.github_api_is_forgejo {
         // FIXME: this leaks the token in logs when the command fails
-        // TODO: this doesn’t actually register a runner, it just gets a registration token
-        run_fun!(curl -fsSH "Authorization: token $github_or_forgejo_token"
-            -X POST "$github_api_scope_url/actions/runners/registration-token/TODO")?
+        let registration_token = run_fun!(curl -fsSH "Authorization: token $github_or_forgejo_token"
+            -X POST "$github_api_scope_url/actions/runners/registration-token"
+            | jq -er .token)?;
+
+        // Hit the internal(?) registration API using JSON instead of protobuf (<https://connectrpc.com>):
+        // <https://code.forgejo.org/forgejo/actions-proto/src/commit/1b2c1084d34619fbb6cb768741a9321c49956032/proto/runner/v1/messages.proto>
+        // <https://codeberg.org/forgejo/forgejo/src/commit/ffbd500600d45fd86805004694086faaf68ecbdb/routers/api/actions/runner/runner.go>
+        #[derive(Clone, Debug, Deserialize, Serialize)]
+        struct RegisterRequest {
+            name: String,
+            token: String,
+            version: String,
+            labels: Vec<String>,
+            ephemeral: bool,
+        }
+        #[derive(Clone, Debug, Deserialize, Serialize)]
+        struct ForgejoApiRegisterResponse {
+            runner: ForgejoApiRegisterResponseRunner,
+        }
+        #[derive(Clone, Debug, Deserialize, Serialize)]
+        struct ForgejoApiRegisterResponseRunner {
+            id: String,
+            uuid: String,
+            token: String,
+            name: String,
+            version: String,
+            labels: Vec<String>,
+        }
+        impl ForgejoApiRegisterResponseRunner {
+            /// Convert the runner to the `.runner` format expected by forgejo-runner.
+            fn to_forgejo_dot_runner(&self) -> eyre::Result<String> {
+                let id = usize::from_str_radix(&self.id, 10)?;
+                let address = TOML.github_api_scope_url.join("/")?.to_string();
+                let address = address.strip_suffix("/").expect("Guaranteed by argument");
+                Ok(serde_json::to_string(&json!({
+                    "id": id,
+                    "uuid": self.uuid,
+                    "name": self.name,
+                    "token": self.token,
+                    "address": address,
+                    "labels": self.labels,
+                }))?)
+            }
+        }
+        let request = RegisterRequest {
+            name: format!("{runner_name}@{github_api_suffix}"),
+            token: registration_token,
+            version: "ServoCI".to_owned(),
+            labels: vec!["self-hosted".to_owned(), label.to_owned()],
+            ephemeral: true,
+        };
+        let request = serde_json::to_string(&request)?;
+        let register_url =
+            github_api_scope_url.join("/api/actions/runner.v1.RunnerService/Register")?;
+        let response = run_fun!(curl -fsSH "Content-Type: application/json"
+            --data-raw $request "$register_url")?;
+        let response: ForgejoApiRegisterResponse = serde_json::from_str(&response)?;
+        response.runner.to_forgejo_dot_runner()?
     } else {
-        run_fun!(GITHUB_TOKEN=$github_or_forgejo_token gh api
+        let response = run_fun!(GITHUB_TOKEN=$github_or_forgejo_token gh api
             -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
             --method POST "$github_api_scope_url/actions/runners/generate-jitconfig"
             -f "name=$runner_name@$github_api_suffix" -F "runner_group_id=1" -f "work_folder=$work_folder"
-            -f "labels[]=self-hosted" -f "labels[]=X64" -f "labels[]=$label")?
+            -f "labels[]=self-hosted" -f "labels[]=X64" -f "labels[]=$label")?;
+        let response: ApiGenerateJitconfigResponse = serde_json::from_str(&response)?;
+        response.encoded_jit_config
     };
 
     Ok(result)
