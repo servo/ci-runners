@@ -116,9 +116,11 @@ fn list_registered_runners() -> eyre::Result<Vec<ApiRunner>> {
 }
 
 pub fn list_registered_runners_for_host() -> eyre::Result<Vec<ApiRunner>> {
+    let prefix = format!("{}-", TOML.libvirt_runner_guest_prefix());
     let suffix = format!("@{}", TOML.github_api_suffix);
     let result = list_registered_runners()?
         .into_iter()
+        .filter(|runner| runner.name.starts_with(&prefix))
         .filter(|runner| runner.name.ends_with(&suffix));
 
     Ok(result.collect())
