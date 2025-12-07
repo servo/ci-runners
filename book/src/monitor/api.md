@@ -33,8 +33,8 @@ Requests to these endpoints need to prove you know that token:
 Authorization: Bearer <monitor API token>
 ```
 
-Some of the endpoints below **may require cranking the backend**.
-While requests to other endpoints are guaranteed to be cheap, requests to *these* endpoints can be a bit expensive when successful, because they’re processed *one at a time* in a backend known as the **monitor thread**.
+Some of the endpoints below **may require sequential processing in the backend**.
+While requests to other endpoints are guaranteed to be cheap, requests to *these* endpoints can be a bit expensive when successful, because they’re processed *one at a time* in the **monitor thread**.
 
 The monitor thread interacts with external resources like the GitHub API and the hypervisor, and it runs a loop that looks like the pseudocode below:
 
@@ -69,7 +69,7 @@ Alternatively you can use the monitor API token, which for workflows means you w
 
 ### <span class="_method">POST</span> /select-runner <br>— Reserve one runner for a job using an artifact { #POST/select-runner }
 
-- **May require cranking the backend**
+- **May require sequential processing in the backend**
 
 <dl>
 <dt>?<var>unique_id</var> (required; <span class="_type">UUIDv4</span>)</dt>
@@ -83,7 +83,7 @@ Alternatively you can use the monitor API token, which for workflows means you w
 ### <span class="_method">POST</span> /profile/<var>profile_key</var>/take <br>— Reserve one runner for a job using the monitor API token { #POST/profile/.../take }
 
 - **Requires monitor API token**
-- **May require cranking the backend**
+- **May require sequential processing in the backend**
 - **Response:** application/json — `{"id", "runner"}` | `null`
 
 <dl>
@@ -100,7 +100,7 @@ Alternatively you can use the monitor API token, which for workflows means you w
 ### <span class="_method">POST</span> /profile/<var>profile_key</var>/take/<var>count</var> <br>— Reserve runners for a set of jobs using the monitor API token { #POST/profile/.../take/... }
 
 - **Requires monitor API token**
-- **May require cranking the backend**
+- **May require sequential processing in the backend**
 - **Response:** application/json — `[{"id", "runner"}]` | `null`
 
 <dl>
@@ -120,12 +120,12 @@ Alternatively you can use the monitor API token, which for workflows means you w
 
 ### <span class="_method">GET</span> /github-jitconfig <br>— Get the ephemeral runner token for this runner { #GET/github-jitconfig }
 
-- **May require cranking the backend**
+- **May require sequential processing in the backend**
 - **Response:** application/json
 
 ### <span class="_method">GET</span> /boot <br>— Get the boot script for this runner { #GET/boot }
 
-- **May require cranking the backend**
+- **May require sequential processing in the backend**
 - **Response:** text/plain
 
 ## Dashboard internals
@@ -148,7 +148,7 @@ Alternatively you can use the monitor API token, which for workflows means you w
 
 ### <span class="_method">GET</span> /runner/<var>runner_id</var>/screenshot/now <br>— Take a screenshot of a runner guest immediately { #GET/runner/.../screenshot/now }
 
-- **May require cranking the backend**
+- **May require sequential processing in the backend**
 - **Response:** image/png
 
 ## Policy overrides (EXPERIMENTAL)
