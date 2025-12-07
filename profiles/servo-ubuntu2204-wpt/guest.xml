@@ -6,8 +6,8 @@
       <libosinfo:os id="http://ubuntu.com/ubuntu/22.04"/>
     </libosinfo:libosinfo>
   </metadata>
-  <memory unit='KiB'>25165824</memory>
-  <currentMemory unit='KiB'>25165824</currentMemory>
+  <memory unit='GiB'>48</memory>
+  <currentMemory unit='GiB'>48</currentMemory>
   <memoryBacking>
     <hugepages/>
   </memoryBacking>

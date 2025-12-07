@@ -75,55 +75,55 @@ available_normal_memory = "16G"
 [profiles.servo-windows10]
 profile_name = "servo-windows10"
 github_runner_label = "self-hosted-image:servo-windows10"
-target_count = 1
+target_count = 0
 requires_1g_hugepages = 24
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
 
 [profiles.servo-macos13]
 profile_name = "servo-macos13"
 github_runner_label = "self-hosted-image:servo-macos13"
-target_count = 1
+target_count = 0
 requires_1g_hugepages = 24
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
 
 [profiles.servo-macos14]
 profile_name = "servo-macos14"
 github_runner_label = "self-hosted-image:servo-macos14"
-target_count = 1
+target_count = 0
 requires_1g_hugepages = 24
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
 
 [profiles.servo-macos15]
 profile_name = "servo-macos15"
 github_runner_label = "self-hosted-image:servo-macos15"
-target_count = 1
+target_count = 0
 requires_1g_hugepages = 24
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
 
 [profiles.servo-ubuntu2204]
 profile_name = "servo-ubuntu2204"
 github_runner_label = "self-hosted-image:servo-ubuntu2204"
-target_count = 1
+target_count = 0
 requires_1g_hugepages = 24
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
 
 [profiles.servo-ubuntu2204-bench]
 profile_name = "servo-ubuntu2204-bench"
 github_runner_label = "self-hosted-image:servo-ubuntu2204-bench"
-target_count = 1
+target_count = 0
 requires_1g_hugepages = 24
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
 
 [profiles.servo-ubuntu2204-wpt]
 profile_name = "servo-ubuntu2204-wpt"
 github_runner_label = "self-hosted-image:servo-ubuntu2204-wpt"
-target_count = 1
-requires_1g_hugepages = 24
+target_count = 0
+requires_1g_hugepages = 48
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
 
 [profiles.base-ubuntu2204]
 profile_name = "base-ubuntu2204"
 github_runner_label = "self-hosted-image:base-ubuntu2204"
-target_count = 0
+target_count = 1
 requires_1g_hugepages = 12
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
