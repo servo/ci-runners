@@ -9,6 +9,7 @@
 
 # The monitor
 
+- [Monitor API](monitor/api.md)
 - [Hacking on the monitor locally](monitor/hacking.md)
 
 # Runner images
