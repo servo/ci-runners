@@ -122,7 +122,7 @@ enum Request {
 
 #[derive(Debug)]
 enum TakeResult {
-    Success(eyre::Result<String>),
+    Success(usize),
     TryAgain(Duration),
 }
 
@@ -165,6 +165,41 @@ async fn profile_enqueue_route(
                 qualified_repo,
                 run_id,
                 profile_key,
+                runner_count: 1,
+            },
+        },
+        TOML.monitor_thread_send_timeout(),
+    )?;
+    let result = response_rx.recv_timeout(TOML.monitor_thread_recv_timeout())??;
+
+    Ok(RawText(result))
+}
+
+/// Enqueue a job requiring multiple runners, tokenful version.
+///
+/// Returns a random token that the client needs to send in its `/take` requests.
+///
+/// There are currently no validation checks, but you need to send the monitor API token as
+/// `Authorization: Bearer <token>`.
+#[post("/profile/<profile_key>/enqueue/<runner_count>?<unique_id>&<qualified_repo>&<run_id>")]
+async fn profile_enqueue_multiple_route(
+    unique_id: UniqueId,
+    qualified_repo: String,
+    run_id: String,
+    profile_key: String,
+    runner_count: usize,
+    _auth: ApiKeyGuard<'_>,
+) -> rocket_eyre::Result<RawText<String>> {
+    let (response_tx, response_rx) = crossbeam_channel::bounded(0);
+    REQUEST.sender.send_timeout(
+        Request::Enqueue {
+            response_tx,
+            entry: QueueEntry {
+                unique_id,
+                qualified_repo,
+                run_id,
+                profile_key,
+                runner_count,
             },
         },
         TOML.monitor_thread_send_timeout(),
@@ -187,7 +222,8 @@ async fn enqueue_route(
     qualified_repo: String,
     run_id: String,
 ) -> rocket_eyre::Result<RawText<String>> {
-    let profile_key = validate_tokenless_select(&unique_id.to_string(), &qualified_repo, &run_id)?;
+    let (profile_key, runner_count) =
+        validate_tokenless_select(&unique_id.to_string(), &qualified_repo, &run_id)?;
     let (response_tx, response_rx) = crossbeam_channel::bounded(0);
     REQUEST.sender.send_timeout(
         Request::Enqueue {
@@ -197,6 +233,7 @@ async fn enqueue_route(
                 qualified_repo,
                 run_id,
                 profile_key,
+                runner_count,
             },
         },
         TOML.monitor_thread_send_timeout(),
@@ -242,7 +279,7 @@ async fn take_route(unique_id: String, token: String) -> rocket_eyre::Result<Raw
         TOML.monitor_thread_send_timeout(),
     )?;
     let result = match response_rx.recv_timeout(TOML.monitor_thread_recv_timeout())?? {
-        TakeResult::Success(result) => result?,
+        TakeResult::Success(result) => result.to_string(),
         TakeResult::TryAgain(duration) => Err(EyreReport::TryAgain(duration))?,
     };
     Ok(RawJson(result))
@@ -282,6 +319,7 @@ async fn main() -> eyre::Result<()> {
                 index_route,
                 dashboard_text_route,
                 profile_enqueue_route,
+                profile_enqueue_multiple_route,
                 enqueue_route,
                 take_route,
             ],
@@ -420,6 +458,7 @@ struct QueueEntry {
     qualified_repo: String,
     run_id: String,
     profile_key: String,
+    runner_count: usize,
 }
 
 impl QueueEntry {
@@ -467,33 +506,40 @@ impl Queue {
 
     async fn try_take(&mut self, unique_id: &UniqueId) -> eyre::Result<TakeResult> {
         if let Some(entry) = self.get_entry(unique_id) {
-            // If we can find a server with idle runners for the requested profile, forward the
-            // request to the queue thread of that server.
-            if let Some(server) = self.pick_server(&entry) {
+            // If we can find enough servers with enough idle runners for the requested profile,
+            // forward the request to the queue thread of those servers.
+            if let Some(servers) = self.pick_servers(&entry) {
                 self.remove_entry(unique_id);
                 let QueueEntry {
                     unique_id,
                     qualified_repo,
                     run_id,
                     profile_key,
+                    runner_count,
                 } = entry;
-                Ok(TakeResult::Success(
-                    (async || {
-                        Ok(client(DOWNSTREAM_TAKE_REQUEST_TIMEOUT)?
-                            .post(format!("{server}/profile/{profile_key}/take"))
-                            .query(&[
-                                ("unique_id", unique_id.to_string()),
-                                ("qualified_repo", qualified_repo),
-                                ("run_id", run_id),
-                            ])
-                            .bearer_auth(&*DOTENV.monitor_api_token_raw_value)
-                            .send()
-                            .await?
-                            .text()
-                            .await?)
-                    })()
-                    .await,
-                ))
+                let mut actual_runner_count = 0;
+                for (server, server_runner_count) in servers {
+                    let result = client(DOWNSTREAM_TAKE_REQUEST_TIMEOUT)?
+                        .post(format!(
+                            "{server}/profile/{profile_key}/take/{server_runner_count}"
+                        ))
+                        .query(&[
+                            ("unique_id", unique_id.to_string()),
+                            ("qualified_repo", qualified_repo.clone()),
+                            ("run_id", run_id.clone()),
+                        ])
+                        .bearer_auth(&*DOTENV.monitor_api_token_raw_value)
+                        .send()
+                        .await?
+                        .json::<Value>()
+                        .await?;
+                    actual_runner_count += result.as_array().map_or(0, |a| a.len());
+                }
+                if actual_runner_count == runner_count {
+                    Ok(TakeResult::Success(runner_count))
+                } else {
+                    bail!("Failed to take enough runners: expected {runner_count}, actual {actual_runner_count}");
+                }
             } else {
                 Ok(TakeResult::TryAgain(TAKE_RESPONSE_RETRY_AFTER))
             }
@@ -533,7 +579,7 @@ impl Queue {
 
     fn quick_lookup_info(&self, entry: &QueueEntry) -> Option<CachedEntry> {
         let token = self.tokens.get(&entry.unique_id)?.clone();
-        let status = match self.pick_server(entry) {
+        let status = match self.pick_servers(entry) {
             Some(_) => ReadyToTake::Maybe,
             None => ReadyToTake::No,
         };
@@ -543,7 +589,9 @@ impl Queue {
         })
     }
 
-    fn pick_server(&self, entry: &QueueEntry) -> Option<Server> {
+    fn pick_servers(&self, entry: &QueueEntry) -> Option<BTreeMap<Server, usize>> {
+        let mut result = BTreeMap::default();
+        let mut remaining_runner_count = entry.runner_count;
         let mut servers = self.servers.clone().into_iter().collect::<Vec<_>>();
         let mut rng = rand::rng();
         servers.shuffle(&mut rng);
@@ -552,12 +600,23 @@ impl Queue {
                 if let Some(runner_counts) = response.profile_runner_counts.get(&entry.profile_key)
                 {
                     if runner_counts.idle >= 1 {
-                        return Some(server);
+                        let this_server_count = runner_counts.idle.min(remaining_runner_count);
+                        result.insert(server, this_server_count);
+                        remaining_runner_count -= this_server_count;
+                    }
+                    if remaining_runner_count <= 0 {
+                        assert_eq!(remaining_runner_count, 0);
+                        break;
                     }
                 }
             }
         }
-        None
+        if remaining_runner_count == 0 {
+            assert_eq!(result.values().sum::<usize>(), entry.runner_count);
+            Some(result)
+        } else {
+            None
+        }
     }
 
     fn fresh_servers(&self) -> impl Iterator<Item = (&Server, &MonitorResponse)> {

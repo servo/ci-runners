@@ -13,7 +13,7 @@ pub fn validate_tokenless_select(
     unique_id: &str,
     qualified_repo: &str,
     run_id: &str,
-) -> rocket_eyre::Result<String> {
+) -> rocket_eyre::Result<(String, usize)> {
     if !qualified_repo.starts_with(&TOML.allowed_qualified_repo_prefix) {
         Err(EyreReport::InternalServerError(eyre!(
             "Not allowed on this `qualified_repo`"
@@ -62,5 +62,9 @@ pub fn validate_tokenless_select(
             "Wrong run_id in artifact"
         )))?
     };
-    Ok(profile_key.to_owned())
+    let runner_count = args
+        .remove("self_hosted_runner_count")
+        .unwrap_or("1")
+        .parse::<usize>()?;
+    Ok((profile_key.to_owned(), runner_count))
 }
