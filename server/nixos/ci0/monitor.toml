@@ -70,6 +70,13 @@ requires_normal_memory = "1G"  # Arbitrary non-zero guess
 [profiles.servo-ubuntu2204]
 profile_name = "servo-ubuntu2204"
 github_runner_label = "self-hosted-image:servo-ubuntu2204"
-target_count = 3
+target_count = 1
 requires_1g_hugepages = 24
+requires_normal_memory = "1G"  # Arbitrary non-zero guess
+
+[profiles.servo-ubuntu2204-wpt]
+profile_name = "servo-ubuntu2204-wpt"
+github_runner_label = "self-hosted-image:servo-ubuntu2204-wpt"
+target_count = 1
+requires_1g_hugepages = 48
 requires_normal_memory = "1G"  # Arbitrary non-zero guess
