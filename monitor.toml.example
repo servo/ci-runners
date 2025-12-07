@@ -4,8 +4,14 @@ listen_on = ["::1", "192.168.100.1"]
 # Prepend this to any internal URL in our own responses. Must end with trailing slash.
 external_base_url = "http://[::1]:8000/"
 
-# GitHub Actions runner scope (`/repos/<owner>/<repo>` or `/orgs/<owner>`).
-github_api_scope = "/repos/delan/servo"
+# GitHub Actions runner scope, as a full URL including the domain of the forge. For example:
+# - `https://api.github.com/repos/<owner>/<repo>`
+# - `https://api.github.com/orgs/<org>`
+# - `https://codeberg.org/api/v1/repos/<owner>/<repo>`
+# - `https://codeberg.org/api/v1/orgs/<org>`
+# - `https://codeberg.org/api/v1/user`
+github_api_scope_url = "https://api.github.com/repos/delan/servo"
+github_api_is_forgejo = false
 
 # For tokenless runner select, qualified repos must start with this prefix.
 allowed_qualified_repo_prefix = "delan/"
