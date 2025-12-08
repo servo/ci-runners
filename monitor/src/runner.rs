@@ -16,6 +16,7 @@ use monitor::github::{reserve_runner, ApiRunner};
 use serde::{Deserialize, Serialize};
 use settings::{profile::ImageType, TOML};
 use tracing::{error, info, trace, warn};
+use uuid::Uuid;
 
 use crate::{
     data::get_runner_data_path,
@@ -43,6 +44,7 @@ pub struct Runner {
 #[derive(Debug, Default, Deserialize, Serialize, Clone)]
 pub struct RunnerDetails {
     image_type: ImageType,
+    runner_uuid: Uuid,
 }
 
 #[derive(Clone, Debug, PartialEq)]

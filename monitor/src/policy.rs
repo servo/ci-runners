@@ -21,6 +21,7 @@ use settings::{
     TOML,
 };
 use tracing::{debug, info, info_span, warn};
+use uuid::Uuid;
 
 use crate::{
     data::{get_profile_configuration_path, get_profile_data_path, get_runner_data_path},
@@ -283,16 +284,18 @@ impl Policy {
             match profile.image_type {
                 ImageType::Rust => {
                     create_dir(get_runner_data_path(id, None)?)?;
+                    let runner_uuid = Uuid::new_v4();
                     let mut runner_toml =
                         File::create_new(get_runner_data_path(id, Path::new("runner.toml"))?)?;
                     writeln!(runner_toml, r#"image_type = "Rust""#)?;
+                    writeln!(runner_toml, r#"runner_uuid = "{}""#, runner_uuid)?;
                     symlink(
                         get_profile_configuration_path(&profile, Path::new("boot-script"))?,
                         get_runner_data_path(id, Path::new("boot-script"))?,
                     )?;
                     if !TOML.dont_register_runners() {
                         let github_api_registration =
-                            register_runner(&profile, &runner_guest_name)?;
+                            register_runner(&profile, &runner_guest_name, runner_uuid)?;
                         let mut github_api_registration_file = File::create_new(
                             get_runner_data_path(id, Path::new("github-api-registration"))?,
                         )?;
