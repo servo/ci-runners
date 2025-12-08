@@ -2,7 +2,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{Debug, Display},
     fs::File,
-    io::Read,
+    io::{Read, Write},
     net::Ipv4Addr,
     path::Path,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -12,10 +12,11 @@ use cfg_if::cfg_if;
 use itertools::Itertools;
 use jane_eyre::eyre::{self, bail};
 use mktemp::Temp;
-use monitor::github::{reserve_runner, ApiRunner};
+use monitor::github::ApiRunner;
 use serde::{Deserialize, Serialize};
 use settings::{profile::ImageType, TOML};
 use tracing::{error, info, trace, warn};
+use uuid::Uuid;
 
 use crate::{
     data::get_runner_data_path,
@@ -37,12 +38,14 @@ pub struct Runner {
     ipv4_address: Option<Ipv4Addr>,
     #[serde(skip)]
     github_jitconfig: Option<String>,
+    reservation: Option<Reservation>,
     details: RunnerDetails,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize, Clone)]
 pub struct RunnerDetails {
     image_type: ImageType,
+    runner_uuid: Uuid,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -53,6 +56,13 @@ pub enum Status {
     Reserved,
     Busy,
     DoneOrUnregistered,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Reservation {
+    reserved_since: u64,
+    unique_id: String,
+    run_url: String,
 }
 
 impl Runners {
@@ -138,8 +148,19 @@ impl Runners {
             bail!("Tried to reserve an unregistered runner");
         };
         info!(runner_id = id, registration.id, "Reserving runner");
-        let reserved_by = format!("{qualified_repo}/actions/runs/{run_id}");
-        reserve_runner(registration.id, unique_id, SystemTime::now(), &reserved_by)
+        let mut reservation =
+            File::create_new(get_runner_data_path(id, Path::new("reservation.toml"))?)?;
+        writeln!(
+            reservation,
+            r#"reserved_since = {}"#,
+            SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs()
+        )?;
+        writeln!(reservation, r#"unique_id = "{unique_id}""#)?;
+        writeln!(
+            reservation,
+            r#"run_url = "{qualified_repo}/actions/runs/{run_id}""#
+        )?;
+        Ok(())
     }
 
     pub fn screenshot_runner(&self, id: usize) -> eyre::Result<Temp> {
@@ -238,6 +259,13 @@ impl Runner {
                 None
             }
         };
+        let reservation = match read_reservation(id) {
+            Ok(result) => result,
+            Err(error) => {
+                warn!(?error, "Failed to read `reserved-by`");
+                None
+            }
+        };
 
         let details = runner_details(id)?;
 
@@ -248,6 +276,7 @@ impl Runner {
             guest_name: None,
             ipv4_address: None,
             github_jitconfig: github_jitconfig,
+            reservation,
             details,
         })
     }
@@ -281,12 +310,16 @@ impl Runner {
                     registration.labels().join(","),
                 );
             }
-            if let Some(workflow_run) = registration.label_with_key("reserved-by") {
-                info!(
-                    "[{}] - workflow run page: https://github.com/{}",
-                    self.id, workflow_run
-                );
-            }
+        }
+        if let Some(reservation) = self.reservation.as_ref() {
+            info!(
+                "[{}] - reserved for unique id: {}",
+                self.id, reservation.unique_id
+            );
+            info!(
+                "[{}] - run url: https://github.com/{}",
+                self.id, reservation.run_url
+            );
         }
     }
 
@@ -295,12 +328,9 @@ impl Runner {
     }
 
     pub fn reserved_since(&self) -> eyre::Result<Option<Duration>> {
-        if let Some(registration) = &self.registration {
-            if let Some(reserved_since) = registration.label_with_key("reserved-since") {
-                let reserved_since = reserved_since.parse::<u64>()?;
-                let reserved_since = UNIX_EPOCH + Duration::from_secs(reserved_since);
-                return Ok(Some(reserved_since.elapsed()?));
-            }
+        if let Some(reservation) = self.reservation.as_ref() {
+            let reserved_since = UNIX_EPOCH + Duration::from_secs(reservation.reserved_since);
+            return Ok(Some(reserved_since.elapsed()?));
         }
 
         Ok(None)
@@ -316,7 +346,7 @@ impl Runner {
         if registration.busy {
             return Status::Busy;
         }
-        if registration.label_with_key("reserved-for").is_some() {
+        if self.reservation.is_some() {
             return Status::Reserved;
         }
         if registration.status == "online" {
@@ -364,6 +394,16 @@ cfg_if! {
             Ok(result.encoded_jit_config)
         }
 
+        fn read_reservation(id: usize) -> eyre::Result<Option<Reservation>> {
+            let path = get_runner_data_path(id, Path::new("reservation.toml"))?;
+            let result = match std::fs::read_to_string(path) {
+                Ok(result) => Ok(result),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+                Err(error) => Err(error),
+            }?;
+            Ok(Some(toml::from_str(&result)?))
+        }
+
         fn runner_created_time(id: usize) -> eyre::Result<SystemTime> {
             let created_time_path = get_runner_data_path(id, Path::new("created-time"))?;
             let runner_toml_path = get_runner_data_path(id, Path::new("runner.toml"))?;
@@ -395,6 +435,7 @@ cfg_if! {
         use jane_eyre::eyre::OptionExt;
 
         thread_local! {
+            static RUNNER_RESERVED_SINCE: RefCell<BTreeMap<usize, u64>> = RefCell::new(BTreeMap::new());
             static RUNNER_CREATED_TIMES: RefCell<BTreeMap<usize, SystemTime>> = RefCell::new(BTreeMap::new());
         }
 
@@ -402,10 +443,31 @@ cfg_if! {
             Ok("".to_owned())
         }
 
+        fn read_reservation(id: usize) -> eyre::Result<Option<Reservation>> {
+            let Some(reserved_since) = RUNNER_RESERVED_SINCE.with_borrow(|reserved_since_times| {
+                reserved_since_times.get(&id).copied()
+            }) else { return Ok(None) };
+            Ok(Some(Reservation { reserved_since, unique_id: "".to_owned(), run_url: "".to_owned() }))
+        }
+
         fn runner_created_time(id: usize) -> eyre::Result<SystemTime> {
             RUNNER_CREATED_TIMES.with_borrow(|created_times| {
                 created_times.get(&id).copied().ok_or_eyre("Failed to check runner created time (fake)")
             })
+        }
+
+        pub(crate) fn clear_runner_reserved_since_for_test() {
+            RUNNER_RESERVED_SINCE.with_borrow_mut(|reserved_since_map| reserved_since_map.clear());
+        }
+
+        pub(crate) fn set_runner_reserved_since_for_test(id: usize, reserved_since: u64) {
+            RUNNER_RESERVED_SINCE.with_borrow_mut(|reserved_since_map| {
+                if let Some(reserved_since) = reserved_since.into() {
+                    reserved_since_map.insert(id, reserved_since);
+                } else {
+                    reserved_since_map.remove(&id);
+                }
+            });
         }
 
         pub(crate) fn set_runner_created_time_for_test(id: usize, created_time: impl Into<Option<SystemTime>>) {

@@ -21,6 +21,7 @@ use settings::{
     TOML,
 };
 use tracing::{debug, info, info_span, warn};
+use uuid::Uuid;
 
 use crate::{
     data::{get_profile_configuration_path, get_profile_data_path, get_runner_data_path},
@@ -283,16 +284,18 @@ impl Policy {
             match profile.image_type {
                 ImageType::Rust => {
                     create_dir(get_runner_data_path(id, None)?)?;
+                    let runner_uuid = Uuid::new_v4();
                     let mut runner_toml =
                         File::create_new(get_runner_data_path(id, Path::new("runner.toml"))?)?;
                     writeln!(runner_toml, r#"image_type = "Rust""#)?;
+                    writeln!(runner_toml, r#"runner_uuid = "{}""#, runner_uuid)?;
                     symlink(
                         get_profile_configuration_path(&profile, Path::new("boot-script"))?,
                         get_runner_data_path(id, Path::new("boot-script"))?,
                     )?;
                     if !TOML.dont_register_runners() {
                         let github_api_registration =
-                            register_runner(&profile, &runner_guest_name)?;
+                            register_runner(&profile, &runner_guest_name, runner_uuid)?;
                         let mut github_api_registration_file = File::create_new(
                             get_runner_data_path(id, Path::new("github-api-registration"))?,
                         )?;
@@ -889,12 +892,15 @@ mod test {
 
     use chrono::{SecondsFormat, Utc};
     use jane_eyre::eyre;
-    use monitor::github::{ApiRunner, ApiRunnerLabel};
+    use monitor::github::ApiRunner;
     use settings::{profile::Profile, TOML};
 
     use crate::{
         policy::{Override, RunnerChanges},
-        runner::{set_runner_created_time_for_test, Runners, Status},
+        runner::{
+            clear_runner_reserved_since_for_test, set_runner_created_time_for_test,
+            set_runner_reserved_since_for_test, Runners, Status,
+        },
     };
 
     use super::Policy;
@@ -981,6 +987,7 @@ mod test {
 
         let mut registrations = vec![];
         let mut guest_names = vec![];
+        clear_runner_reserved_since_for_test();
         for fake in fake_runners {
             let (runner_id, guest_name) = make_runner_id_and_guest_name(fake.profile_key);
             set_runner_created_time_for_test(runner_id, fake.created_time);
@@ -994,18 +1001,11 @@ mod test {
                     guest_names.push(guest_name);
                 }
                 Status::Reserved => {
-                    let mut api_runner = make_registration(&guest_name);
-                    api_runner.labels.push(ApiRunnerLabel {
-                        name: "reserved-for:".to_owned(), // any value
-                    });
-                    if let Some(reserved_since) = fake.reserved_since {
-                        let reserved_since = reserved_since.as_secs();
-                        api_runner.labels.push(ApiRunnerLabel {
-                            name: format!("reserved-since:{reserved_since}"),
-                        });
-                    }
-                    registrations.push(api_runner);
+                    registrations.push(make_registration(&guest_name));
                     guest_names.push(guest_name);
+                    if let Some(reserved_since) = fake.reserved_since {
+                        set_runner_reserved_since_for_test(runner_id, reserved_since.as_secs());
+                    }
                 }
                 Status::Idle => {
                     let mut api_runner = make_registration(&guest_name);

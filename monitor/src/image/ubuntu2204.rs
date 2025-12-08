@@ -100,8 +100,8 @@ pub(super) fn delete_template(profile: &Profile, snapshot_name: &str) -> eyre::R
     Ok(())
 }
 
-pub fn register_runner(profile: &Profile, runner_guest_name: &str) -> eyre::Result<String> {
-    monitor::github::register_runner(runner_guest_name, &profile.github_runner_label, "/a")
+pub fn register_runner(runner_guest_name: &str, labels: &[String]) -> eyre::Result<String> {
+    monitor::github::register_runner(runner_guest_name, "/a", labels)
 }
 
 pub fn create_runner(

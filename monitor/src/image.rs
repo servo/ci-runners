@@ -24,6 +24,7 @@ use settings::{
     TOML,
 };
 use tracing::{debug, error, info, warn};
+use uuid::Uuid;
 
 use crate::{
     libvirt::{list_rebuild_guests, list_template_guests},
@@ -298,16 +299,28 @@ pub fn delete_template(profile: &Profile, snapshot_name: &str) -> eyre::Result<(
     }
 }
 
-pub fn register_runner(profile: &Profile, runner_guest_name: &str) -> eyre::Result<String> {
+pub fn register_runner(
+    profile: &Profile,
+    runner_guest_name: &str,
+    runner_uuid: Uuid,
+) -> eyre::Result<String> {
+    let labels = vec![
+        format!("self-hosted-profile:{}", profile.profile_name),
+        format!(
+            "self-hosted-runner:{}@{}",
+            runner_guest_name, TOML.github_api_suffix
+        ),
+        format!("self-hosted-uuid:{}", runner_uuid),
+    ];
     match &*profile.profile_name {
-        "servo-macos13" => macos13::register_runner(profile, runner_guest_name),
-        "servo-macos14" => macos13::register_runner(profile, runner_guest_name),
-        "servo-macos15" => macos13::register_runner(profile, runner_guest_name),
-        "servo-ubuntu2204" => ubuntu2204::register_runner(profile, runner_guest_name),
-        "servo-ubuntu2204-bench" => ubuntu2204::register_runner(profile, runner_guest_name),
-        "base-ubuntu2204" => ubuntu2204::register_runner(profile, runner_guest_name),
-        "servo-ubuntu2204-wpt" => ubuntu2204::register_runner(profile, runner_guest_name),
-        "servo-windows10" => windows10::register_runner(profile, runner_guest_name),
+        "servo-macos13" => macos13::register_runner(runner_guest_name, &labels),
+        "servo-macos14" => macos13::register_runner(runner_guest_name, &labels),
+        "servo-macos15" => macos13::register_runner(runner_guest_name, &labels),
+        "servo-ubuntu2204" => ubuntu2204::register_runner(runner_guest_name, &labels),
+        "servo-ubuntu2204-bench" => ubuntu2204::register_runner(runner_guest_name, &labels),
+        "base-ubuntu2204" => ubuntu2204::register_runner(runner_guest_name, &labels),
+        "servo-ubuntu2204-wpt" => ubuntu2204::register_runner(runner_guest_name, &labels),
+        "servo-windows10" => windows10::register_runner(runner_guest_name, &labels),
         other => todo!("Runner registration not yet implemented: {other}"),
     }
 }

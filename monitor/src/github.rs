@@ -1,6 +1,6 @@
 use std::{
     fmt::Debug,
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant},
 };
 
 use chrono::{DateTime, FixedOffset};
@@ -124,13 +124,21 @@ pub fn list_registered_runners_for_host() -> eyre::Result<Vec<ApiRunner>> {
     Ok(result.collect())
 }
 
-pub fn register_runner(runner_name: &str, label: &str, work_folder: &str) -> eyre::Result<String> {
+pub fn register_runner(
+    runner_name: &str,
+    work_folder: &str,
+    labels: &[String],
+) -> eyre::Result<String> {
     let github_api_suffix = &TOML.github_api_suffix;
     let github_api_scope = &TOML.github_api_scope;
+    let label_options = labels
+        .into_iter()
+        .flat_map(|label| ["-f".to_owned(), format!("labels[]={label}")])
+        .collect::<Vec<_>>();
     let result = run_fun!(gh api --method POST -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
     "$github_api_scope/actions/runners/generate-jitconfig"
     -f "name=$runner_name@$github_api_suffix" -F "runner_group_id=1" -f "work_folder=$work_folder"
-    -f "labels[]=self-hosted" -f "labels[]=X64" -f "labels[]=$label")?;
+    -f "labels[]=self-hosted" $[label_options])?;
 
     Ok(result)
 }
@@ -139,23 +147,6 @@ pub fn unregister_runner(id: usize) -> eyre::Result<()> {
     let github_api_scope = &TOML.github_api_scope;
     run_cmd!(gh api --method DELETE -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
         "$github_api_scope/actions/runners/$id")?;
-
-    Ok(())
-}
-
-pub fn reserve_runner(
-    id: usize,
-    unique_id: &str,
-    reserved_since: SystemTime,
-    reserved_by: &str,
-) -> eyre::Result<()> {
-    let github_api_scope = &TOML.github_api_scope;
-    let reserved_since = reserved_since.duration_since(UNIX_EPOCH)?.as_secs();
-    run_cmd!(gh api --method POST -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
-        "$github_api_scope/actions/runners/$id/labels"
-        -f "labels[]=reserved-for:$unique_id"
-        -f "labels[]=reserved-since:$reserved_since"
-        -f "labels[]=reserved-by:$reserved_by")?;
 
     Ok(())
 }
