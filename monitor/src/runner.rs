@@ -310,12 +310,16 @@ impl Runner {
                     registration.labels().join(","),
                 );
             }
-            if let Some(workflow_run) = registration.label_with_key("reserved-by") {
-                info!(
-                    "[{}] - workflow run page: https://github.com/{}",
-                    self.id, workflow_run
-                );
-            }
+        }
+        if let Some(reservation) = self.reservation.as_ref() {
+            info!(
+                "[{}] - reserved for unique id: {}",
+                self.id, reservation.unique_id
+            );
+            info!(
+                "[{}] - run url: https://github.com/{}",
+                self.id, reservation.run_url
+            );
         }
     }
 
@@ -324,12 +328,9 @@ impl Runner {
     }
 
     pub fn reserved_since(&self) -> eyre::Result<Option<Duration>> {
-        if let Some(registration) = &self.registration {
-            if let Some(reserved_since) = registration.label_with_key("reserved-since") {
-                let reserved_since = reserved_since.parse::<u64>()?;
-                let reserved_since = UNIX_EPOCH + Duration::from_secs(reserved_since);
-                return Ok(Some(reserved_since.elapsed()?));
-            }
+        if let Some(reservation) = self.reservation.as_ref() {
+            let reserved_since = UNIX_EPOCH + Duration::from_secs(reservation.reserved_since);
+            return Ok(Some(reserved_since.elapsed()?));
         }
 
         Ok(None)
@@ -345,7 +346,7 @@ impl Runner {
         if registration.busy {
             return Status::Busy;
         }
-        if registration.label_with_key("reserved-for").is_some() {
+        if self.reservation.is_some() {
             return Status::Reserved;
         }
         if registration.status == "online" {
@@ -434,6 +435,7 @@ cfg_if! {
         use jane_eyre::eyre::OptionExt;
 
         thread_local! {
+            static RUNNER_RESERVED_SINCE: RefCell<BTreeMap<usize, u64>> = RefCell::new(BTreeMap::new());
             static RUNNER_CREATED_TIMES: RefCell<BTreeMap<usize, SystemTime>> = RefCell::new(BTreeMap::new());
         }
 
@@ -441,14 +443,31 @@ cfg_if! {
             Ok("".to_owned())
         }
 
-        fn read_reservation(_id: usize) -> eyre::Result<Option<Reservation>> {
-            Ok(None)
+        fn read_reservation(id: usize) -> eyre::Result<Option<Reservation>> {
+            let Some(reserved_since) = RUNNER_RESERVED_SINCE.with_borrow(|reserved_since_times| {
+                reserved_since_times.get(&id).copied()
+            }) else { return Ok(None) };
+            Ok(Some(Reservation { reserved_since, unique_id: "".to_owned(), run_url: "".to_owned() }))
         }
 
         fn runner_created_time(id: usize) -> eyre::Result<SystemTime> {
             RUNNER_CREATED_TIMES.with_borrow(|created_times| {
                 created_times.get(&id).copied().ok_or_eyre("Failed to check runner created time (fake)")
             })
+        }
+
+        pub(crate) fn clear_runner_reserved_since_for_test() {
+            RUNNER_RESERVED_SINCE.with_borrow_mut(|reserved_since_map| reserved_since_map.clear());
+        }
+
+        pub(crate) fn set_runner_reserved_since_for_test(id: usize, reserved_since: u64) {
+            RUNNER_RESERVED_SINCE.with_borrow_mut(|reserved_since_map| {
+                if let Some(reserved_since) = reserved_since.into() {
+                    reserved_since_map.insert(id, reserved_since);
+                } else {
+                    reserved_since_map.remove(&id);
+                }
+            });
         }
 
         pub(crate) fn set_runner_created_time_for_test(id: usize, created_time: impl Into<Option<SystemTime>>) {

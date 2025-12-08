@@ -892,12 +892,15 @@ mod test {
 
     use chrono::{SecondsFormat, Utc};
     use jane_eyre::eyre;
-    use monitor::github::{ApiRunner, ApiRunnerLabel};
+    use monitor::github::ApiRunner;
     use settings::{profile::Profile, TOML};
 
     use crate::{
         policy::{Override, RunnerChanges},
-        runner::{set_runner_created_time_for_test, Runners, Status},
+        runner::{
+            clear_runner_reserved_since_for_test, set_runner_created_time_for_test,
+            set_runner_reserved_since_for_test, Runners, Status,
+        },
     };
 
     use super::Policy;
@@ -984,6 +987,7 @@ mod test {
 
         let mut registrations = vec![];
         let mut guest_names = vec![];
+        clear_runner_reserved_since_for_test();
         for fake in fake_runners {
             let (runner_id, guest_name) = make_runner_id_and_guest_name(fake.profile_key);
             set_runner_created_time_for_test(runner_id, fake.created_time);
@@ -997,18 +1001,11 @@ mod test {
                     guest_names.push(guest_name);
                 }
                 Status::Reserved => {
-                    let mut api_runner = make_registration(&guest_name);
-                    api_runner.labels.push(ApiRunnerLabel {
-                        name: "reserved-for:".to_owned(), // any value
-                    });
-                    if let Some(reserved_since) = fake.reserved_since {
-                        let reserved_since = reserved_since.as_secs();
-                        api_runner.labels.push(ApiRunnerLabel {
-                            name: format!("reserved-since:{reserved_since}"),
-                        });
-                    }
-                    registrations.push(api_runner);
+                    registrations.push(make_registration(&guest_name));
                     guest_names.push(guest_name);
+                    if let Some(reserved_since) = fake.reserved_since {
+                        set_runner_reserved_since_for_test(runner_id, reserved_since.as_secs());
+                    }
                 }
                 Status::Idle => {
                     let mut api_runner = make_registration(&guest_name);
