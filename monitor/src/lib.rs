@@ -57,7 +57,7 @@ pub fn validate_tokenless_select(
             "Wrong run_id in artifact"
         )))?;
     }
-    let Some(profile_key) = args.remove("self_hosted_image_name") else {
+    let Some(profile_key) = args.remove("self_hosted_profile") else {
         Err(EyreReport::InternalServerError(eyre!(
             "Wrong run_id in artifact"
         )))?
