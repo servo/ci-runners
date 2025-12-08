@@ -2,7 +2,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::{Debug, Display},
     fs::File,
-    io::Read,
+    io::{Read, Write},
     net::Ipv4Addr,
     path::Path,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -12,7 +12,7 @@ use cfg_if::cfg_if;
 use itertools::Itertools;
 use jane_eyre::eyre::{self, bail};
 use mktemp::Temp;
-use monitor::github::{reserve_runner, ApiRunner};
+use monitor::github::ApiRunner;
 use serde::{Deserialize, Serialize};
 use settings::{profile::ImageType, TOML};
 use tracing::{error, info, trace, warn};
@@ -38,6 +38,7 @@ pub struct Runner {
     ipv4_address: Option<Ipv4Addr>,
     #[serde(skip)]
     github_jitconfig: Option<String>,
+    reservation: Option<Reservation>,
     details: RunnerDetails,
 }
 
@@ -55,6 +56,13 @@ pub enum Status {
     Reserved,
     Busy,
     DoneOrUnregistered,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Reservation {
+    reserved_since: u64,
+    unique_id: String,
+    run_url: String,
 }
 
 impl Runners {
@@ -140,8 +148,19 @@ impl Runners {
             bail!("Tried to reserve an unregistered runner");
         };
         info!(runner_id = id, registration.id, "Reserving runner");
-        let reserved_by = format!("{qualified_repo}/actions/runs/{run_id}");
-        reserve_runner(registration.id, unique_id, SystemTime::now(), &reserved_by)
+        let mut reservation =
+            File::create_new(get_runner_data_path(id, Path::new("reservation.toml"))?)?;
+        writeln!(
+            reservation,
+            r#"reserved_since = {}"#,
+            SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs()
+        )?;
+        writeln!(reservation, r#"unique_id = "{unique_id}""#)?;
+        writeln!(
+            reservation,
+            r#"run_url = "{qualified_repo}/actions/runs/{run_id}""#
+        )?;
+        Ok(())
     }
 
     pub fn screenshot_runner(&self, id: usize) -> eyre::Result<Temp> {
@@ -240,6 +259,13 @@ impl Runner {
                 None
             }
         };
+        let reservation = match read_reservation(id) {
+            Ok(result) => result,
+            Err(error) => {
+                warn!(?error, "Failed to read `reserved-by`");
+                None
+            }
+        };
 
         let details = runner_details(id)?;
 
@@ -250,6 +276,7 @@ impl Runner {
             guest_name: None,
             ipv4_address: None,
             github_jitconfig: github_jitconfig,
+            reservation,
             details,
         })
     }
@@ -366,6 +393,16 @@ cfg_if! {
             Ok(result.encoded_jit_config)
         }
 
+        fn read_reservation(id: usize) -> eyre::Result<Option<Reservation>> {
+            let path = get_runner_data_path(id, Path::new("reservation.toml"))?;
+            let result = match std::fs::read_to_string(path) {
+                Ok(result) => Ok(result),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+                Err(error) => Err(error),
+            }?;
+            Ok(Some(toml::from_str(&result)?))
+        }
+
         fn runner_created_time(id: usize) -> eyre::Result<SystemTime> {
             let created_time_path = get_runner_data_path(id, Path::new("created-time"))?;
             let runner_toml_path = get_runner_data_path(id, Path::new("runner.toml"))?;
@@ -402,6 +439,10 @@ cfg_if! {
 
         fn read_github_jitconfig(_id: usize) -> eyre::Result<String> {
             Ok("".to_owned())
+        }
+
+        fn read_reservation(_id: usize) -> eyre::Result<Option<Reservation>> {
+            Ok(None)
         }
 
         fn runner_created_time(id: usize) -> eyre::Result<SystemTime> {

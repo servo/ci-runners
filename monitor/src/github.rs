@@ -1,6 +1,6 @@
 use std::{
     fmt::Debug,
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant},
 };
 
 use chrono::{DateTime, FixedOffset};
@@ -147,23 +147,6 @@ pub fn unregister_runner(id: usize) -> eyre::Result<()> {
     let github_api_scope = &TOML.github_api_scope;
     run_cmd!(gh api --method DELETE -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
         "$github_api_scope/actions/runners/$id")?;
-
-    Ok(())
-}
-
-pub fn reserve_runner(
-    id: usize,
-    unique_id: &str,
-    reserved_since: SystemTime,
-    reserved_by: &str,
-) -> eyre::Result<()> {
-    let github_api_scope = &TOML.github_api_scope;
-    let reserved_since = reserved_since.duration_since(UNIX_EPOCH)?.as_secs();
-    run_cmd!(gh api --method POST -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
-        "$github_api_scope/actions/runners/$id/labels"
-        -f "labels[]=reserved-for:$unique_id"
-        -f "labels[]=reserved-since:$reserved_since"
-        -f "labels[]=reserved-by:$reserved_by")?;
 
     Ok(())
 }
