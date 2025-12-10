@@ -222,6 +222,8 @@ fn main() -> anyhow::Result<()> {
         let prev = EXITING.fetch_add(1, Ordering::Release);
         if prev == 2 {
             std::process::exit(-1);
+        } else {
+            println!("Will exit when all runners have stopped");
         }
     })
     .context("Failed to setup signal handler")?;
