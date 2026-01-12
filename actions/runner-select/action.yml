@@ -17,10 +17,6 @@ inputs:
     required: false
     type: number
     default: 1
-  first-runner-index:
-    required: false
-    type: number
-    default: 0
   force-github-hosted-runner:
     required: false
     type: boolean
@@ -110,21 +106,18 @@ runs:
         github_hosted_runner_count='${{ inputs.github-hosted-runner-count }}'
         self_hosted_image_name='${{ inputs.self-hosted-image-name }}'
         self_hosted_runner_count='${{ inputs.self-hosted-runner-count }}'
-        first_runner_index='${{ inputs.first-runner-index }}'
         disabled='${{ steps.init.outputs.disabled }}'
         unique_id='${{ steps.init.outputs.unique_id }}'
 
         set -euo pipefail
 
         print_indices_array() {
-          runner_index=$first_runner_index
-          i=0; while [ $i -lt $1 ]; do
-            if [ $i -eq 0 ]; then
-              printf '[%s' $runner_index
+          i=1; while [ $i -le $1 ]; do
+            if [ $i -eq 1 ]; then
+              printf '[%s' $i
             else
-              printf ',%s' $runner_index
+              printf ',%s' $i
             fi
-            runner_index=$((runner_index + 1))
             i=$((i + 1))
           done
           printf ']'
