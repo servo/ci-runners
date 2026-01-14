@@ -1,9 +1,8 @@
 use serde_json::Value;
 use std::{
-    process::{self, Command, ExitStatus},
+    process::{self, Command},
     string::FromUtf8Error,
     sync::atomic::{AtomicU32, AtomicU64, Ordering},
-    thread,
     time::Duration,
 };
 use thiserror::Error;
