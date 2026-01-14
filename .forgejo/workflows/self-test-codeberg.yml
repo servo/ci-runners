@@ -2,7 +2,7 @@ on: workflow_dispatch
 
 jobs:
   runner-select:
-    runs-on: ubuntu-24.04
+    runs-on: codeberg-tiny
     outputs:
       unique-id: ${{ steps.select.outputs.unique-id }}
       selected-runner-label: ${{ steps.select.outputs.selected-runner-label }}
@@ -14,14 +14,14 @@ jobs:
         id: select
         uses: ./actions/runner-select
         with:
-          forge-is-forgejo: false
-          queue-api-base-url: https://ci0.servo.org/queue
+          forge-is-forgejo: true
+          queue-api-base-url: http://home.daz.cat:8002
           GITHUB_TOKEN: ${{ github.token }}
           # Before updating the GH action runner image for the nightly job, ensure
           # that the system has a glibc version that is compatible with the one
           # used by the wpt.fyi runners.
-          github-hosted-runner-label: windows-2022
-          self-hosted-image-name: servo-windows10
+          github-hosted-runner-label: codeberg-tiny
+          self-hosted-image-name: base-ubuntu2204
           # You can disable self-hosted runners globally by creating a repository variable named
           # NO_SELF_HOSTED_RUNNERS with any non-empty value.
           # <https://github.com/servo/servo/settings/variables/actions>
@@ -32,7 +32,7 @@ jobs:
     needs:
       - runner-select
     if: ${{ fromJSON(needs.runner-select.outputs.is-self-hosted) }}
-    runs-on: ubuntu-24.04
+    runs-on: codeberg-tiny
     steps:
       - uses: actions/checkout@v4
       - name: Runner timeout
