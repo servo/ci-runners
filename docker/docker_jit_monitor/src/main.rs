@@ -20,7 +20,11 @@ fn gethostname() -> Option<String> {
         .arg("-n")
         .output()
         .ok()
-        .and_then(|output| std::str::from_utf8(output.stdout.trim_ascii_end()).ok().map(|s| s.to_owned()))
+        .and_then(|output| {
+            std::str::from_utf8(output.stdout.trim_ascii_end())
+                .ok()
+                .map(|s| s.to_owned())
+        })
 }
 
 #[derive(Parser, Debug)]
