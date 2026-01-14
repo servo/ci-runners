@@ -14,6 +14,19 @@ use log::{debug, error, info, warn};
 static RUNNER_ID: AtomicU64 = AtomicU64::new(0);
 static EXITING: AtomicU32 = AtomicU32::new(0);
 
+/// Returns the hostname or None.
+fn gethostname() -> Option<String> {
+    Command::new("/usr/bin/uname")
+        .arg("-n")
+        .output()
+        .ok()
+        .and_then(|output| {
+            std::str::from_utf8(output.stdout.trim_ascii_end())
+                .ok()
+                .map(|s| s.to_owned())
+        })
+}
+
 #[derive(Parser, Debug)]
 #[clap(version)]
 struct Args {
@@ -43,8 +56,9 @@ impl RunnerConfig {
         RunnerConfig {
             servo_ci_scope: servo_ci_scope.to_string(),
             name: format!(
-                "dresden-hos-builder.{}",
-                RUNNER_ID.fetch_add(1, Ordering::Relaxed)
+                "dresden-hos-builder.{}-{}",
+                gethostname().unwrap_or_default(),
+                RUNNER_ID.fetch_add(1, Ordering::Relaxed),
             ),
             runner_group_id: 1,
             labels: vec!["self-hosted".into(), OS_TAG.into(), "hos-builder".into()],
@@ -85,7 +99,8 @@ impl RunnerConfig {
         Ok(RunnerConfig {
             servo_ci_scope: servo_ci_scope.to_string(),
             name: format!(
-                "dresden-hos-runner.{}",
+                "dresden-hos-runner.{}-{}",
+                gethostname().unwrap_or_default(),
                 RUNNER_ID.fetch_add(1, Ordering::Relaxed)
             ),
             runner_group_id: 1,
@@ -225,7 +240,9 @@ fn main() -> anyhow::Result<()> {
         if running_hos_builders.len() < args.concurrent_builders.into() && exiting == 0 {
             match spawn_runner(&RunnerConfig::new_hos_builder(&servo_ci_scope)) {
                 Ok(child) => running_hos_builders.push(child),
-                Err(SpawnRunnerError::GhApiError(_, message)) if message.contains("gh: Already exists") => {
+                Err(SpawnRunnerError::GhApiError(_, message))
+                    if message.contains("gh: Already exists") =>
+                {
                     // Might happen if containers were not killed properly after a forced exit.
                     info!("Runner name already taken - Will retry with new name later.")
                 }
@@ -239,7 +256,9 @@ fn main() -> anyhow::Result<()> {
         if running_hos_runners.len() < MAX_HOS_RUNNERS && exiting == 0 {
             match RunnerConfig::new_hos_runner(&servo_ci_scope).and_then(|cfg| spawn_runner(&cfg)) {
                 Ok(child) => running_hos_runners.push(child),
-                Err(SpawnRunnerError::GhApiError(_, message)) if message.contains("gh: Already exists") => {
+                Err(SpawnRunnerError::GhApiError(_, message))
+                    if message.contains("gh: Already exists") =>
+                {
                     // Might happen if containers were not killed properly after a forced exit.
                     info!("Runner name already taken - Will retry with new name later.")
                 }
