@@ -13,5 +13,3 @@ thiserror = "2.0.11"
 serde_json = "1.0.135"
 ctrlc = "3.4.5"
 cyme = "1.7"
-# this does not exist in the std library currently.
-gethostname = "1.1.0"
