@@ -16,17 +16,11 @@ static EXITING: AtomicU32 = AtomicU32::new(0);
 
 /// Returns the hostname or None.
 fn gethostname() -> Option<String> {
-    let Some(mut hostname_and_newline) = Command::new("/usr/bin/uname")
+    Command::new("/usr/bin/uname")
         .arg("-n")
         .output()
         .ok()
-        .and_then(|output| String::from_utf8(output.stdout).ok())
-    else {
-        return None;
-    };
-
-    hostname_and_newline.pop();
-    Some(hostname_and_newline)
+        .and_then(|output| std::str::from_utf8(output.stdout.trim_ascii_end()).ok().map(|s| s.to_owned()))
 }
 
 #[derive(Parser, Debug)]
@@ -59,7 +53,7 @@ impl RunnerConfig {
             servo_ci_scope: servo_ci_scope.to_string(),
             name: format!(
                 "dresden-hos-builder.{}-{}",
-                gethostname().unwrap_or(String::new()),
+                gethostname().unwrap_or_default(),
                 RUNNER_ID.fetch_add(1, Ordering::Relaxed),
             ),
             runner_group_id: 1,
@@ -102,7 +96,7 @@ impl RunnerConfig {
             servo_ci_scope: servo_ci_scope.to_string(),
             name: format!(
                 "dresden-hos-runner.{}-{}",
-                gethostname().unwrap_or(String::new()),
+                gethostname().unwrap_or_default(),
                 RUNNER_ID.fetch_add(1, Ordering::Relaxed)
             ),
             runner_group_id: 1,
