@@ -1,7 +1,7 @@
 ARG GITHUB_ACTIONS_RUNNER_VERSION
 ARG HOS_COMMANDLINE_TOOLS_VERSION
 
-FROM ubuntu:20.04 AS rust
+FROM ubuntu:22.04 AS rust
 RUN apt update && apt install -y curl build-essential
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
         | sh -s -- -y --default-toolchain stable \
