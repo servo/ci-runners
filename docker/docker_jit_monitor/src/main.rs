@@ -1,6 +1,6 @@
 use serde_json::Value;
 use std::{
-    process::{self, Command},
+    process::{self, Command, ExitStatus},
     string::FromUtf8Error,
     sync::atomic::{AtomicU32, AtomicU64, Ordering},
     thread,
@@ -13,6 +13,9 @@ use clap::Parser;
 use log::{debug, error, info, warn};
 static RUNNER_ID: AtomicU64 = AtomicU64::new(0);
 static EXITING: AtomicU32 = AtomicU32::new(0);
+const MAX_SPAWN_RETRIES: u32 = 10;
+/// How long the loop will sleep in seconds.
+const LOOP_SLEEP: u64 = 30;
 
 /// Returns the hostname or None.
 fn gethostname() -> Option<String> {
@@ -94,7 +97,7 @@ impl RunnerConfig {
                 )
             })
             .collect();
-        let device = devices.get(0).ok_or(SpawnRunnerError::NoHdcDeviceFound)?;
+        let device = devices.first().ok_or(SpawnRunnerError::NoHdcDeviceFound)?;
 
         Ok(RunnerConfig {
             servo_ci_scope: servo_ci_scope.to_string(),
@@ -209,12 +212,21 @@ fn spawn_runner(config: &RunnerConfig) -> Result<process::Child, SpawnRunnerErro
 #[cfg(target_os = "linux")]
 const OS_TAG: &str = "Linux";
 
+/// Check if we spawned multiple times without getting.
+fn check_and_inc_retries(retries: &mut u32) {
+    *retries += 1;
+    if *retries > MAX_SPAWN_RETRIES {
+        println!("We had {retries} many times to spawn a runner/builder. It is not happening.");
+        std::process::exit(-1);
+    }
+}
+
 fn main() -> anyhow::Result<()> {
     env_logger::init();
     info!("Starting monitor for selfhosted docker-based github runners!");
 
     let args = Args::parse();
-    println!("{:?}", args);
+    println!("{args:?}");
 
     let servo_ci_scope = std::env::var("SERVO_CI_GITHUB_API_SCOPE")
         .context("SERVO_CI_GITHUB_API_SCOPE must be set.")?;
@@ -232,6 +244,11 @@ fn main() -> anyhow::Result<()> {
 
     let mut running_hos_builders = vec![];
     let mut running_hos_runners = vec![];
+
+    let mut retries_builder = 0;
+    let mut retries_runner = 0;
+    let mut crashed_builders = 0;
+    let mut crashed_runners = 0;
     // Todo: implement something to reserve devices for the duration of the docker run child process.
     const MAX_HOS_RUNNERS: usize = 1;
 
@@ -239,7 +256,10 @@ fn main() -> anyhow::Result<()> {
         let exiting = EXITING.load(Ordering::Relaxed);
         if running_hos_builders.len() < args.concurrent_builders.into() && exiting == 0 {
             match spawn_runner(&RunnerConfig::new_hos_builder(&servo_ci_scope)) {
-                Ok(child) => running_hos_builders.push(child),
+                Ok(child) => {
+                    retries_builder = 0;
+                    running_hos_builders.push(child)
+                }
                 Err(SpawnRunnerError::GhApiError(_, message))
                     if message.contains("gh: Already exists") =>
                 {
@@ -248,14 +268,17 @@ fn main() -> anyhow::Result<()> {
                 }
                 Err(e) => {
                     error!("Failed to spawn JIT runner: {e:?}");
-                    thread::sleep(Duration::from_millis(500));
+                    check_and_inc_retries(&mut retries_builder);
                     // todo: abort if we retying likely wont solve the issue!
                 }
             };
         }
         if running_hos_runners.len() < MAX_HOS_RUNNERS && exiting == 0 {
             match RunnerConfig::new_hos_runner(&servo_ci_scope).and_then(|cfg| spawn_runner(&cfg)) {
-                Ok(child) => running_hos_runners.push(child),
+                Ok(child) => {
+                    retries_runner = 0;
+                    running_hos_runners.push(child)
+                }
                 Err(SpawnRunnerError::GhApiError(_, message))
                     if message.contains("gh: Already exists") =>
                 {
@@ -264,7 +287,7 @@ fn main() -> anyhow::Result<()> {
                 }
                 Err(e) => {
                     error!("Failed to spawn JIT runner with HOS device: {e:?}");
-                    thread::sleep(Duration::from_millis(500));
+                    check_and_inc_retries(&mut retries_runner);
                     // todo: abort if we retying likely wont solve the issue!
                 }
             };
@@ -272,8 +295,11 @@ fn main() -> anyhow::Result<()> {
         let mut still_running = vec![];
         for mut builder in running_hos_builders {
             match builder.try_wait() {
-                Ok(Some(exit_status)) => {
+                Ok(Some(exit_status)) if exit_status.success() => {
                     debug!("hos-builder finished with {exit_status:?}")
+                }
+                Ok(Some(_)) => {
+                    check_and_inc_retries(&mut crashed_builders);
                 }
                 Ok(None) => still_running.push(builder),
                 Err(e) => {
@@ -287,8 +313,11 @@ fn main() -> anyhow::Result<()> {
         let mut still_running = vec![];
         for mut builder in running_hos_runners {
             match builder.try_wait() {
-                Ok(Some(exit_status)) => {
+                Ok(Some(exit_status)) if exit_status.success() => {
                     debug!("hos-runner finished with {exit_status:?}")
+                }
+                Ok(Some(_)) => {
+                    check_and_inc_retries(&mut crashed_runners);
                 }
                 Ok(None) => still_running.push(builder),
                 Err(e) => {
@@ -318,8 +347,9 @@ fn main() -> anyhow::Result<()> {
             return Err(anyhow!("Exiting after receiving multiple Ctrl+c"));
         } else if running_hos_builders.len() >= args.concurrent_builders.into() {
             // Limit our spinning if we anyway wouldn't have capacity for a new builder.
-            thread::sleep(Duration::from_millis(500));
         }
+
+        std::thread::sleep(Duration::from_secs(LOOP_SLEEP))
     }
 
     info!("Exiting....");
