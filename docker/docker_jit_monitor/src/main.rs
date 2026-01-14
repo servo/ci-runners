@@ -43,8 +43,9 @@ impl RunnerConfig {
         RunnerConfig {
             servo_ci_scope: servo_ci_scope.to_string(),
             name: format!(
-                "dresden-hos-builder.{}",
-                RUNNER_ID.fetch_add(1, Ordering::Relaxed)
+                "dresden-hos-builder.{}-{}",
+                gethostname::gethostname(),
+                RUNNER_ID.fetch_add(1, Ordering::Relaxed),
             ),
             runner_group_id: 1,
             labels: vec!["self-hosted".into(), OS_TAG.into(), "hos-builder".into()],
@@ -85,7 +86,8 @@ impl RunnerConfig {
         Ok(RunnerConfig {
             servo_ci_scope: servo_ci_scope.to_string(),
             name: format!(
-                "dresden-hos-runner.{}",
+                "dresden-hos-runner.{}-{}",
+                gethostname::gethostname(),
                 RUNNER_ID.fetch_add(1, Ordering::Relaxed)
             ),
             runner_group_id: 1,
