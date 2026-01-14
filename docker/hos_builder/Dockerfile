@@ -110,6 +110,6 @@ ENV OHOS_SDK_NATIVE=/data/commandline-tools/sdk/default/openharmony/native
 RUN cd /data/servo/servo && ./mach bootstrap --skip-platform
 
 
-FROM servo_base AS servo_cooked_ohos_release 
+FROM servo_base AS servo_cooked_ohos_release
 
-RUN ./mach build --ohos --profile=release --no-package --no-default-features --features=tracing-hitrace 
+RUN ./mach build --ohos --profile=release --no-package --no-default-features --features=tracing,tracing-hitrace
