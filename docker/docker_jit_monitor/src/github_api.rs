@@ -1,9 +1,9 @@
-use std::process::{self, Command, Output};
+use std::process::{Command, Output};
 
 use log::{debug, warn};
 use serde_json::Value;
 
-use crate::{RunnerConfig, SpawnRunnerError};
+use crate::{DockerContainer, RunnerConfig, SpawnRunnerError};
 
 /// Function to call the github api.
 ///
@@ -41,7 +41,8 @@ fn call_github_runner_api(
     Ok(output)
 }
 
-pub(crate) fn spawn_runner(config: &RunnerConfig) -> Result<process::Child, SpawnRunnerError> {
+
+pub(crate) fn spawn_runner(config: RunnerConfig) -> Result<DockerContainer, SpawnRunnerError> {
     let mut raw_fields = config
         .labels
         .iter()
@@ -95,5 +96,9 @@ pub(crate) fn spawn_runner(config: &RunnerConfig) -> Result<process::Child, Spaw
         .arg(encoded_jit_config);
 
     let runner = cmd.spawn().map_err(SpawnRunnerError::SpawnDockerError)?;
-    Ok(runner)
+    Ok(DockerContainer {
+        name: config.name,
+        process: runner,
+        container_type: config.container_type,
+    })
 }
