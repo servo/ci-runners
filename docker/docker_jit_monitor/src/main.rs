@@ -157,6 +157,14 @@ impl ContainerType {
             finished: false,
         }
     }
+
+    /// The number of concurrent instances we allow for this container type
+    fn concurrent_number(&self, args: &Args) -> usize {
+        match self {
+            ContainerType::Builder => args.concurrent_builders as usize,
+            ContainerType::Runner => 1,
+        }
+    }
 }
 
 struct ContainerTypeIterator {
@@ -228,7 +236,7 @@ fn main() -> anyhow::Result<()> {
                 .iter()
                 .filter(|container| container.container_type == container_type)
                 .count()
-                < args.concurrent_builders as usize
+                < container_type.concurrent_number(&args)
                 && exiting == 0
             {
                 let config = match container_type {
