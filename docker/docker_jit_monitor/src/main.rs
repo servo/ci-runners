@@ -1,15 +1,15 @@
 use std::{
-    process::Command,
+    process::{Child, Command},
     string::FromUtf8Error,
     sync::atomic::{AtomicU32, AtomicU64, Ordering},
-    thread,
+    thread::{self},
     time::Duration,
 };
 use thiserror::Error;
 
 use anyhow::{anyhow, Context};
 use clap::Parser;
-use log::{debug, error, info, warn};
+use log::{error, info, warn};
 
 use crate::github_api::spawn_runner;
 
@@ -48,11 +48,16 @@ struct RunnerConfig {
     servo_ci_scope: String,
     name: String,
     runner_group_id: u64,
+    container_type: ContainerType,
     labels: Vec<String>,
     docker_image_and_tag: String,
     work_folder: String,
     /// Map a device into the docker container
     map_device: Option<String>,
+    /// Do we map volumes in the docker container
+    map_volume: Option<(String, String)>,
+    /// The binary inside the docker container to run
+    binary_to_run: String,
 }
 
 impl RunnerConfig {
@@ -66,9 +71,12 @@ impl RunnerConfig {
             ),
             runner_group_id: 1,
             labels: vec!["self-hosted".into(), OS_TAG.into(), "hos-builder".into()],
+            container_type: ContainerType::Builder,
             docker_image_and_tag: "servo_gha_hos_builder:latest".into(),
             work_folder: "/data".to_string(),
             map_device: None,
+            map_volume: None,
+            binary_to_run: "/home/servo_ci/runner/run.sh".into(),
         }
     }
 
@@ -100,6 +108,12 @@ impl RunnerConfig {
             .collect();
         let device = devices.get(0).ok_or(SpawnRunnerError::NoHdcDeviceFound)?;
 
+
+        if !std::path::PathBuf::from("/home/servo_ci/mitmdump/dump-current").exists() {
+            error!("Dump file does not exist. Mitmdump will have a weird error message.");
+            return Err(SpawnRunnerError::MitmProxyDump)
+        }
+
         Ok(RunnerConfig {
             servo_ci_scope: servo_ci_scope.to_string(),
             name: format!(
@@ -109,9 +123,12 @@ impl RunnerConfig {
             ),
             runner_group_id: 1,
             labels: vec!["self-hosted".into(), OS_TAG.into(), "hos-runner".into()],
+            container_type: ContainerType::Runner,
             docker_image_and_tag: "servo_gha_hos_runner:latest".into(),
             work_folder: "/data".to_string(),
             map_device: Some(device.clone()),
+            map_volume: Some(("/home/servo_ci/mitmdump".into(), "/mitmdump".into())),
+            binary_to_run: "/usr/bin/run_mitmproxy_and_gh.sh".into(),
         })
     }
 }
@@ -134,18 +151,74 @@ enum SpawnRunnerError {
     NoHdcDeviceFound,
     #[error("Failed to list USB devices")]
     LsUsbError,
+    #[error("Dump file not found")]
+    MitmProxyDump,
 }
 
 // Note: For now we assume linux x64. Compilation will fail on other platforms to remind us of that.
 #[cfg(target_os = "linux")]
 const OS_TAG: &str = "Linux";
 
+#[derive(Clone, Debug, PartialEq)]
+enum ContainerType {
+    Builder,
+    Runner,
+}
+
+impl ContainerType {
+    /// This iterator will go from Builder -> Runner and then stop.
+    fn iter() -> ContainerTypeIterator {
+        ContainerTypeIterator {
+            current: None,
+            finished: false,
+        }
+    }
+}
+
+struct ContainerTypeIterator {
+    current: Option<ContainerType>,
+    finished: bool,
+}
+
+impl Iterator for ContainerTypeIterator {
+    type Item = ContainerType;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.finished {
+            return None;
+        }
+        self.current = match self.current {
+            None => Some(ContainerType::Builder),
+            Some(ContainerType::Builder) => Some(ContainerType::Runner),
+            Some(ContainerType::Runner) => {
+                self.finished = true;
+                None
+            }
+        };
+        self.current.clone()
+    }
+}
+
+#[test]
+fn iter_test() {
+    let mut it = ContainerType::iter();
+    assert_eq!(it.next(), Some(ContainerType::Builder));
+    assert_eq!(it.next(), Some(ContainerType::Runner));
+    assert_eq!(it.next(), None);
+}
+
+struct DockerContainer {
+    #[allow(unused)]
+    name: String,
+    process: Child,
+    container_type: ContainerType,
+}
+
 fn main() -> anyhow::Result<()> {
     env_logger::init();
     info!("Starting monitor for selfhosted docker-based github runners!");
 
     let args = Args::parse();
-    println!("{:?}", args);
 
     let servo_ci_scope = std::env::var("SERVO_CI_GITHUB_API_SCOPE")
         .context("SERVO_CI_GITHUB_API_SCOPE must be set.")?;
@@ -161,96 +234,69 @@ fn main() -> anyhow::Result<()> {
     })
     .context("Failed to setup signal handler")?;
 
-    let mut running_hos_builders = vec![];
-    let mut running_hos_runners = vec![];
+    let mut running_containers: Vec<DockerContainer> = vec![];
     // Todo: implement something to reserve devices for the duration of the docker run child process.
-    const MAX_HOS_RUNNERS: usize = 1;
 
     loop {
         let exiting = EXITING.load(Ordering::Relaxed);
-        if running_hos_builders.len() < args.concurrent_builders.into() && exiting == 0 {
-            match spawn_runner(&RunnerConfig::new_hos_builder(&servo_ci_scope)) {
-                Ok(child) => running_hos_builders.push(child),
-                Err(SpawnRunnerError::GhApiError(_, message))
-                    if message.contains("gh: Already exists") =>
-                {
-                    // Might happen if containers were not killed properly after a forced exit.
-                    info!("Runner name already taken - Will retry with new name later.")
-                }
-                Err(e) => {
-                    error!("Failed to spawn JIT runner: {e:?}");
-                    thread::sleep(Duration::from_millis(500));
-                    // todo: abort if we retying likely wont solve the issue!
-                }
-            };
-        }
-        if running_hos_runners.len() < MAX_HOS_RUNNERS && exiting == 0 {
-            match RunnerConfig::new_hos_runner(&servo_ci_scope).and_then(|cfg| spawn_runner(&cfg)) {
-                Ok(child) => running_hos_runners.push(child),
-                Err(SpawnRunnerError::GhApiError(_, message))
-                    if message.contains("gh: Already exists") =>
-                {
-                    // Might happen if containers were not killed properly after a forced exit.
-                    info!("Runner name already taken - Will retry with new name later.")
-                }
-                Err(e) => {
-                    error!("Failed to spawn JIT runner with HOS device: {e:?}");
-                    thread::sleep(Duration::from_millis(500));
-                    // todo: abort if we retying likely wont solve the issue!
-                }
-            };
-        }
-        let mut still_running = vec![];
-        for mut builder in running_hos_builders {
-            match builder.try_wait() {
-                Ok(Some(exit_status)) => {
-                    debug!("hos-builder finished with {exit_status:?}")
-                }
-                Ok(None) => still_running.push(builder),
-                Err(e) => {
-                    error!("Failed to check the exit status of hos-builder process: {e:?}");
-                    // lets just forget about this builder for now.
+        for container_type in ContainerType::iter() {
+            if running_containers
+                .iter()
+                .filter(|container| container.container_type == container_type)
+                .count()
+                < args.concurrent_builders as usize
+                && exiting == 0
+            {
+                let config = match container_type {
+                    ContainerType::Builder => RunnerConfig::new_hos_builder(&servo_ci_scope),
+                    ContainerType::Runner => match RunnerConfig::new_hos_runner(&servo_ci_scope) {
+                        Ok(config) => config,
+                        Err(e) => {
+                            error!("Failed to do runner config ({e:?})");
+                            break;
+                        }
+                    },
+                };
+
+                match spawn_runner(config) {
+                    Ok(container) => running_containers.push(container),
+                    Err(SpawnRunnerError::GhApiError(_, message))
+                        if message.contains("gh: Already exists") =>
+                    {
+                        info!("Runner name already taken - Will retry with new name later")
+                    }
+                    Err(e) => {
+                        error!("Failed to spawn JIT runner: {e:?}");
+                    }
                 }
             }
         }
-        running_hos_builders = still_running;
 
         let mut still_running = vec![];
-        for mut builder in running_hos_runners {
-            match builder.try_wait() {
-                Ok(Some(exit_status)) => {
-                    debug!("hos-runner finished with {exit_status:?}")
-                }
-                Ok(None) => still_running.push(builder),
+        for mut container in running_containers {
+            match container.process.try_wait() {
+                Ok(Some(_exit_status)) => {}
+                Ok(None) => still_running.push(container),
                 Err(e) => {
-                    error!("Failed to check the exit status of hos-builder process: {e:?}");
-                    // lets just forget about this builder for now.
+                    error!("Failed to check the exit status of hos-container: {e:?}");
                 }
             }
         }
-        running_hos_runners = still_running;
 
-        if running_hos_builders.is_empty()
-            && running_hos_runners.is_empty()
-            && EXITING.load(Ordering::Relaxed) > 0
-        {
+        if still_running.is_empty() && EXITING.load(Ordering::Relaxed) > 0 {
             break;
         } else if EXITING.load(Ordering::Relaxed) >= 2 {
-            let mut failed_count = 0;
-            for mut builder in running_hos_builders.into_iter().chain(running_hos_runners) {
-                if let Err(e) = builder.kill() {
+            for mut container in still_running {
+                if let Err(e) = container.process.kill() {
                     warn!("Failed to kill process due to {e:?}");
-                    failed_count += 1;
+                    error!("Failed to kill some processes. Check for zombie processes.")
                 }
             }
-            if failed_count > 0 {
-                error!("Failed to kill {failed_count} builders. Check for zombie processes.");
-            }
             return Err(anyhow!("Exiting after receiving multiple Ctrl+c"));
-        } else if running_hos_builders.len() >= args.concurrent_builders.into() {
-            // Limit our spinning if we anyway wouldn't have capacity for a new builder.
-            thread::sleep(Duration::from_millis(500));
         }
+
+        running_containers = still_running;
+        thread::sleep(Duration::from_millis(500));
     }
 
     info!("Exiting....");
