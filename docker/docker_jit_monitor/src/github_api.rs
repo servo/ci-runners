@@ -5,12 +5,10 @@ use serde_json::Value;
 
 use crate::{RunnerConfig, SpawnRunnerError};
 
-/// Function to call the api. Raw just is used spawnrunner.
-/// This gives you the _executed_ cmd.
-/// Notice that the api_endpoint needs a slash before it. The api is very peculious
-/// with slashes and this is the easiest
-/// Note: octocrab apparently requires more coarse grained tokens compared
-/// to `gh`, so we use `gh`.
+/// Function to call the github api.
+///
+/// Notice that the api_endpoint needs to _not_ have the slash at the start.
+/// raw_fields are given to the api via the '--raw-field' and fields via the 'field'.
 fn call_github_runner_api(
     ci_scope: &str,
     method: &str,
@@ -43,7 +41,6 @@ fn call_github_runner_api(
     Ok(output)
 }
 
-// todo: add arg for optional device to pass into the runner
 pub(crate) fn spawn_runner(config: &RunnerConfig) -> Result<process::Child, SpawnRunnerError> {
     let mut raw_fields = config
         .labels
@@ -81,7 +78,7 @@ pub(crate) fn spawn_runner(config: &RunnerConfig) -> Result<process::Child, Spaw
     if let Some(id) = registration_info.get("runner").and_then(|v| v.get("id")) {
         debug!("The GitHub runner id: is {id} ");
     } else {
-        warn!("Couldn't find runner.id in the GitHub API answer");
+        warn!("Couldn't find runner id in the GitHub API answer");
     }
 
     let mut cmd = std::process::Command::new("docker");
