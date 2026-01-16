@@ -8,7 +8,7 @@ use crate::{RunnerConfig, SpawnRunnerError};
 /// Function to call the github api.
 ///
 /// Notice that the api_endpoint needs to _not_ have the slash at the start.
-/// raw_fields are given to the api via the '--raw-field' and fields via the 'field'.
+/// raw_fields are given to the api via '--raw-field' and fields via '--field'.
 fn call_github_runner_api(
     ci_scope: &str,
     method: &str,
