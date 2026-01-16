@@ -1,6 +1,5 @@
-use serde_json::Value;
 use std::{
-    process::{self, Command},
+    process::Command,
     string::FromUtf8Error,
     sync::atomic::{AtomicU32, AtomicU64, Ordering},
     thread,
@@ -11,6 +10,11 @@ use thiserror::Error;
 use anyhow::{anyhow, Context};
 use clap::Parser;
 use log::{debug, error, info, warn};
+
+use crate::github_api::spawn_runner;
+
+mod github_api;
+
 static RUNNER_ID: AtomicU64 = AtomicU64::new(0);
 static EXITING: AtomicU32 = AtomicU32::new(0);
 
@@ -130,79 +134,6 @@ enum SpawnRunnerError {
     NoHdcDeviceFound,
     #[error("Failed to list USB devices")]
     LsUsbError,
-}
-
-// todo: add arg for optional device to pass into the runner
-fn spawn_runner(config: &RunnerConfig) -> Result<process::Child, SpawnRunnerError> {
-    // Note: octocrab apparently requires more coarse grained tokens compared to `gh`, so we use `gh`.
-    let mut cmd = Command::new("gh");
-    let api_endpoint = format!(
-        "{}/actions/runners/generate-jitconfig",
-        config.servo_ci_scope
-    );
-    cmd.args([
-        "api",
-        "--method",
-        "POST",
-        "-H",
-        "Accept: application/vnd.github+json",
-        "-H",
-        "X-GitHub-Api-Version: 2022-11-28",
-        &api_endpoint,
-    ]);
-    for label in &config.labels {
-        cmd.arg("--raw-field").arg(format!("labels[]={label}"));
-    }
-    cmd.arg("--raw-field")
-        // Todo: perhaps have a count here? Or add information if it has a device or not
-        .arg(format!("name={}", config.name))
-        .arg("--raw-field")
-        .arg(format!("work_folder={}", config.work_folder))
-        .arg("--field")
-        .arg(format!("runner_group_id={}", config.runner_group_id));
-
-    let output = cmd
-        .output()
-        .map_err(|e| SpawnRunnerError::SpawnGhError(e))?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        return Err(SpawnRunnerError::GhApiError(
-            output.status.code().unwrap_or(-1),
-            stderr,
-        ));
-    }
-
-    let registration_info = String::from_utf8(output.stdout)?;
-    let registration_info: Value = serde_json::from_str(&registration_info)?;
-    let Some(encoded_jit_config) = &registration_info
-        .get("encoded_jit_config")
-        .and_then(|v| v.as_str())
-    else {
-        return Err(SpawnRunnerError::EncodedJitConfigNotFound);
-    };
-    if let Some(id) = registration_info.get("runner").and_then(|v| v.get("id")) {
-        debug!("The GitHub runner id: is {id} ");
-    } else {
-        warn!("Couldn't find runner.id in the GitHub API answer");
-    }
-
-    let mut cmd = std::process::Command::new("docker");
-    cmd.arg("run").arg("--rm");
-
-    if let Some(device) = &config.map_device {
-        cmd.arg("--device").arg(device);
-    }
-
-    // Start the gh runner inside the container
-    cmd.arg(&config.docker_image_and_tag)
-        .arg("/home/servo_ci/runner/run.sh")
-        .arg(" --jitconfig")
-        .arg(encoded_jit_config);
-
-    let runner = cmd
-        .spawn()
-        .map_err(|e| SpawnRunnerError::SpawnDockerError(e))?;
-    Ok(runner)
 }
 
 // Note: For now we assume linux x64. Compilation will fail on other platforms to remind us of that.
