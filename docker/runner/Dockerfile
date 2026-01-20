@@ -35,8 +35,10 @@ ADD --chown=${USERNAME}:${USERNAME} ohos-signing-config.tar.gz /home/${USERNAME}
 COPY --chown=${USERNAME}:${USERNAME} hdckey hdckey.pub /home/${USERNAME}/.harmony/
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+RUN /home/${USERNAME}/.local/bin/uv tool install mitmproxy
 
 COPY sign.sh /usr/bin/sign-hos.sh
+COPY run_mitmproxy_and_gh.sh /usr/bin/run_mitmproxy_and_gh.sh
 
 COPY --from=rust /root/.cargo/bin /data/cargo
 ENV PATH="/home/${USERNAME}/.local/bin:/data/cargo:/data/commandline-tools/sdk/default/openharmony/toolchains/:${PATH}"

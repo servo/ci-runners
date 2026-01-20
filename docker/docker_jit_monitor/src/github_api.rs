@@ -89,9 +89,13 @@ pub(crate) fn spawn_runner(config: RunnerConfig) -> Result<DockerContainer, Spaw
         cmd.arg("--device").arg(device);
     }
 
+    if let Some((host_volume, container_volume)) = &config.map_volume {
+        cmd.args(["--volume".into(), format!("{host_volume}:{container_volume}")]);
+    }
+
     // Start the gh runner inside the container
     cmd.arg(&config.docker_image_and_tag)
-        .arg("/home/servo_ci/runner/run.sh")
+        .arg(&config.binary_to_run)
         .arg(" --jitconfig")
         .arg(encoded_jit_config);
 

@@ -54,6 +54,10 @@ struct RunnerConfig {
     work_folder: String,
     /// Map a device into the docker container
     map_device: Option<String>,
+    /// Do we map volumes in the docker container
+    map_volume: Option<(String, String)>,
+    /// The binary inside the docker container to run
+    binary_to_run: String,
 }
 
 impl RunnerConfig {
@@ -71,6 +75,8 @@ impl RunnerConfig {
             docker_image_and_tag: "servo_gha_hos_builder:latest".into(),
             work_folder: "/data".to_string(),
             map_device: None,
+            map_volume: None,
+            binary_to_run: "/home/servo_ci/runner/run.sh".into(),
         }
     }
 
@@ -102,6 +108,13 @@ impl RunnerConfig {
             .collect();
         let device = devices.get(0).ok_or(SpawnRunnerError::NoHdcDeviceFound)?;
 
+        // If you did not map thee path correctly we should abort because the
+        // mitmproxy error is very confusing.
+        if !std::path::PathBuf::from("/home/servo_ci/mitmdump/dump-current").exists() {
+            error!("Dump file does not exist. Mitmdump will have a weird error message.");
+            return Err(SpawnRunnerError::MitmProxyDump)
+        }
+
         Ok(RunnerConfig {
             servo_ci_scope: servo_ci_scope.to_string(),
             name: format!(
@@ -115,6 +128,8 @@ impl RunnerConfig {
             docker_image_and_tag: "servo_gha_hos_runner:latest".into(),
             work_folder: "/data".to_string(),
             map_device: Some(device.clone()),
+            map_volume: Some(("/home/servo_ci/mitmdump".into(), "/mitmdump".into())),
+            binary_to_run: "/usr/bin/run_mitmproxy_and_gh.sh".into(),
         })
     }
 }
@@ -137,6 +152,8 @@ enum SpawnRunnerError {
     NoHdcDeviceFound,
     #[error("Failed to list USB devices")]
     LsUsbError,
+    #[error("Dump file not found")]
+    MitmProxyDump,
 }
 
 // Note: For now we assume linux x64. Compilation will fail on other platforms to remind us of that.
