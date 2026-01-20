@@ -31,6 +31,13 @@ COPY --from=commandline_tools /data/command-line-tools/sdk/default/openharmony/t
 # servo workflows. I suspect that it is currently possible to extract secrets from the servo repo
 # via pull requests with malicous build scripts.
 ADD --chown=${USERNAME}:${USERNAME} ohos-signing-config.tar.gz /home/${USERNAME}/
+# According to https://github.com/moby/moby/issues/35525 the chown flag does not chown the files inside the archive.
+USER root
+RUN chown ${USERNAME}:${USERNAME} -R /home/${USERNAME}/.ohos
+USER ${USERNAME}
+
+# Add for tar.gz keeps the permission
+RUN chown ${USERNAME}:${USERNAME} -R /home/${USERNAME}/.ohos
 # Used to authorize with the hdc device and avoid the confirmation dialog.
 COPY --chown=${USERNAME}:${USERNAME} hdckey hdckey.pub /home/${USERNAME}/.harmony/
 
