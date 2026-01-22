@@ -11,7 +11,7 @@ use anyhow::{anyhow, Context};
 use clap::Parser;
 use log::{error, info, warn};
 
-use crate::github_api::spawn_runner;
+use crate::github_api::{get_idle_runners, spawn_runner};
 
 mod github_api;
 
@@ -199,6 +199,7 @@ fn iter_test() {
     assert_eq!(it.next(), None);
 }
 
+#[derive(Debug)]
 struct DockerContainer {
     #[allow(unused)]
     name: String,
@@ -273,6 +274,34 @@ fn main() -> anyhow::Result<()> {
                 Ok(None) => still_running.push(container),
                 Err(e) => {
                     error!("Failed to check the exit status of hos-container: {e:?}");
+                }
+            }
+        }
+
+        // If we have idle runners we should kill them.
+        if EXITING.load(Ordering::Relaxed) > 0 {
+            let idle = get_idle_runners(&servo_ci_scope);
+            if let Err(e) = idle {
+                error!("Could not get idle runners from api ({:?})", e);
+            } else {
+                for runner_name in idle.unwrap() {
+                    if let Some(container) = still_running
+                        .iter()
+                        .position(|container| container.name == runner_name)
+                        .and_then(|position| still_running.get_mut(position))
+                    {
+                        error!("Stoppking container {}", container.name);
+                        let mut cmd = std::process::Command::new("docker");
+                        cmd.arg("stop").arg(runner_name);
+                        if cmd.output().is_err() {
+                            error!("Trying to kill {} but could not", container.name);
+                        }
+                    } else {
+                        error!(
+                            "did not find runner name {runner_name} in still_running {:?}",
+                            still_running
+                        );
+                    }
                 }
             }
         }
