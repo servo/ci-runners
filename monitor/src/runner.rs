@@ -355,13 +355,9 @@ impl Runner {
 
 cfg_if! {
     if #[cfg(not(test))] {
-        use monitor::github::ApiGenerateJitconfigResponse;
-
         fn read_github_jitconfig(id: usize) -> eyre::Result<String> {
             let result = get_runner_data_path(id, Path::new("github-api-registration"))?;
-            let result: ApiGenerateJitconfigResponse =
-                serde_json::from_reader(File::open(result)?)?;
-            Ok(result.encoded_jit_config)
+            Ok(std::fs::read_to_string(result)?)
         }
 
         fn runner_created_time(id: usize) -> eyre::Result<SystemTime> {

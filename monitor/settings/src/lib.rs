@@ -16,6 +16,7 @@ use std::{
 use chrono::TimeDelta;
 use jane_eyre::eyre::{self, bail};
 use serde::Deserialize;
+use url::Url;
 
 use crate::{profile::Profile, queue::QueueConfig, units::MemorySize};
 
@@ -53,7 +54,7 @@ pub static TOML: LazyLock<Toml> = LazyLock::new(|| {
 
 #[derive(Default)]
 pub struct Dotenv {
-    // GITHUB_TOKEN not used
+    pub github_or_forgejo_token: String,
     // LIBVIRT_DEFAULT_URI not used
     pub monitor_api_token_raw_value: String,
     pub monitor_api_token_authorization_value: String,
@@ -64,7 +65,8 @@ pub struct Dotenv {
 pub struct Toml {
     pub listen_on: Vec<String>,
     pub external_base_url: String,
-    pub github_api_scope: String,
+    pub github_api_scope_url: Url,
+    pub github_api_is_forgejo: bool,
     pub allowed_qualified_repo_prefix: String,
     pub github_api_suffix: String,
     monitor_poll_interval: u64,
@@ -94,6 +96,7 @@ impl Dotenv {
     pub fn load() -> Self {
         let monitor_api_token = env_string("SERVO_CI_MONITOR_API_TOKEN");
         let result = Self {
+            github_or_forgejo_token: env_string("GITHUB_OR_FORGEJO_TOKEN"),
             monitor_api_token_raw_value: monitor_api_token.clone(),
             monitor_api_token_authorization_value: Self::monitor_api_token_authorization_value(
                 &monitor_api_token,
@@ -106,6 +109,7 @@ impl Dotenv {
 
     #[cfg(any(test, feature = "test"))]
     fn load_for_tests() -> Self {
+        let mut github_or_forgejo_token = None;
         let mut monitor_data_path = None;
 
         // TODO: find a way to do this without a temporary file
@@ -122,6 +126,7 @@ impl Dotenv {
         for entry in dotenv::from_path_iter(env_path).expect("Failed to load temporary env file") {
             let (key, value) = entry.expect("Failed to load entry");
             match &*key {
+                "GITHUB_OR_FORGEJO_TOKEN" => github_or_forgejo_token = Some(value),
                 "SERVO_CI_MONITOR_API_TOKEN" => { /* do nothing (see below) */ }
                 "SERVO_CI_MONITOR_DATA_PATH" => monitor_data_path = Some(value),
                 _ => { /* do nothing */ }
@@ -132,6 +137,8 @@ impl Dotenv {
         let monitor_api_token = "ChangedMe";
 
         let result = Self {
+            github_or_forgejo_token: github_or_forgejo_token
+                .expect("Bad contents of monitor.toml.example"),
             monitor_api_token_raw_value: monitor_api_token.to_owned(),
             monitor_api_token_authorization_value: Self::monitor_api_token_authorization_value(
                 monitor_api_token,
