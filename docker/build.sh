@@ -3,9 +3,10 @@
 set -eu
 
 SERVO_GIT_HASH=$(git ls-remote https://github.com/servo/servo.git --branches refs/heads/main | awk '{ print $1}')
-GITHUB_ACTIONS_RUNNER_VERSION="2.330.0"
+GITHUB_ACTIONS_RUNNER_VERSION="2.331.0"
+MITMPROXY_VERSION="12.2.1"
 RUST_VERSION="1.91.0"
-UV_VERSION="0.9.7"
+UV_VERSION="0.9.28"
 IMAGE_USERNAME=servo_ci
 
 
@@ -36,4 +37,6 @@ docker build hos_builder -f hos_builder/Dockerfile -t servo_gha_hos_builder:late
 docker build runner -f runner/Dockerfile -t servo_gha_hos_runner:latest \
     --build-arg HOS_COMMANDLINE_TOOLS_VERSION=latest \
     --build-arg GITHUB_ACTIONS_RUNNER_VERSION=${GITHUB_ACTIONS_RUNNER_VERSION} \
+    --build-arg MITMPROXY_VERSION=${MITMPROXY_VERSION} \
+    --build-arg UV_VERSION=${UV_VERSION} \
     --build-arg USERNAME=${IMAGE_USERNAME}
