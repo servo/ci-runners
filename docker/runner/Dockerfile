@@ -4,7 +4,7 @@ ARG HOS_COMMANDLINE_TOOLS_VERSION
 FROM ubuntu:22.04 AS rust
 RUN apt update && apt install -y curl build-essential
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-        | sh -s -- -y --default-toolchain stable \
+    | sh -s -- -y --default-toolchain stable \
         --profile=minimal
 RUN /root/.cargo/bin/cargo install hitrace-bench --version 0.9.1
 
@@ -41,10 +41,11 @@ RUN chown ${USERNAME}:${USERNAME} -R /home/${USERNAME}/.ohos
 # Used to authorize with the hdc device and avoid the confirmation dialog.
 COPY --chown=${USERNAME}:${USERNAME} hdckey hdckey.pub /home/${USERNAME}/.harmony/
 
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-
 COPY sign.sh /usr/bin/sign-hos.sh
 
+ARG MITMPROXY_VERSION
+ARG UV_VERSION
+RUN curl -LsSf https://astral.sh/uv/${UV_VERSION}/install.sh | sh
+RUN /home/${USERNAME}/.local/bin/uv tool install mitmproxy@${MITMPROXY_VERSION}
 COPY --from=rust /root/.cargo/bin /data/cargo
 ENV PATH="/home/${USERNAME}/.local/bin:/data/cargo:/data/commandline-tools/sdk/default/openharmony/toolchains/:${PATH}"
-
