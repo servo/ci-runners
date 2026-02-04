@@ -1,13 +1,14 @@
 use std::process::{Command, Output};
 
 use log::{debug, warn};
+use serde::Deserialize;
 use serde_json::Value;
 
 use crate::{DockerContainer, RunnerConfig, SpawnRunnerError};
 
 /// Function to call the github api.
 ///
-/// Notice that the api_endpoint needs to _not_ have the slash at the start.
+/// Notice that the api_endpoint needs to _have_ the slash at the start.
 /// raw_fields are given to the api via '--raw-field' and fields via '--field'.
 fn call_github_runner_api(
     ci_scope: &str,
@@ -18,7 +19,7 @@ fn call_github_runner_api(
 ) -> Result<Output, SpawnRunnerError> {
     // Note: octocrab apparently requires more coarse grained tokens compared to `gh`, so we use `gh`.
     let mut cmd = Command::new("gh");
-    let final_api_endpoint = format!("{}/actions/runners/{}", ci_scope, api_endpoint);
+    let final_api_endpoint = format!("{}/actions/runners{}", ci_scope, api_endpoint);
     cmd.args([
         "api",
         "--method",
@@ -41,7 +42,6 @@ fn call_github_runner_api(
     Ok(output)
 }
 
-
 pub(crate) fn spawn_runner(config: RunnerConfig) -> Result<DockerContainer, SpawnRunnerError> {
     let mut raw_fields = config
         .labels
@@ -55,7 +55,7 @@ pub(crate) fn spawn_runner(config: RunnerConfig) -> Result<DockerContainer, Spaw
     let output = call_github_runner_api(
         &config.servo_ci_scope,
         "POST",
-        "generate-jitconfig",
+        "/generate-jitconfig",
         &raw_fields,
         &fields,
     )?;
@@ -84,6 +84,7 @@ pub(crate) fn spawn_runner(config: RunnerConfig) -> Result<DockerContainer, Spaw
 
     let mut cmd = std::process::Command::new("docker");
     cmd.arg("run").arg("--rm");
+    cmd.arg("--name").arg(&config.name);
 
     if let Some(device) = &config.map_device {
         cmd.arg("--device").arg(device);
@@ -101,4 +102,47 @@ pub(crate) fn spawn_runner(config: RunnerConfig) -> Result<DockerContainer, Spaw
         process: runner,
         container_type: config.container_type,
     })
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+#[allow(non_camel_case_types)]
+enum GitHubApiStatus {
+    online,
+    offline,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubRunnerApiResponse {
+    #[allow(unused)]
+    total_count: usize,
+    runners: Vec<GitHubApiRunner>,
+}
+
+#[derive(Debug, Deserialize)]
+struct GitHubApiRunner {
+    #[allow(unused)]
+    id: usize,
+    name: String,
+    #[allow(unused)]
+    os: String,
+    #[allow(unused)]
+    status: GitHubApiStatus,
+    busy: bool,
+}
+
+pub(crate) fn get_idle_runners(ci_scope: &str) -> Result<Vec<String>, SpawnRunnerError> {
+    let output = call_github_runner_api(ci_scope, "GET", "", &[], &[])?;
+
+    let runners: GitHubRunnerApiResponse = serde_json::from_slice(&output.stdout).unwrap();
+
+    let idle_runners = runners
+        .runners
+        .into_iter()
+        .filter(|runner| runner.status == GitHubApiStatus::online)
+        .filter(|runner| runner.name.contains("dresden-hos"))
+        .filter(|runner| !runner.busy)
+        .map(|runner| runner.name)
+        .collect();
+
+    Ok(idle_runners)
 }
