@@ -7,7 +7,8 @@ use chrono::{DateTime, FixedOffset};
 use cmd_lib::{run_cmd, run_fun};
 use jane_eyre::eyre::{self, Context};
 use serde::{Deserialize, Serialize};
-use settings::TOML;
+use serde_json::json;
+use settings::{DOTENV, TOML};
 use tracing::trace;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -107,38 +108,123 @@ impl<Response: Clone + Debug> Cache<Response> {
 }
 
 fn list_registered_runners() -> eyre::Result<Vec<ApiRunner>> {
-    let github_api_scope = &TOML.github_api_scope;
-    let result = run_fun!(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
-    "$github_api_scope/actions/runners" --paginate -q ".runners[]"
-    | jq -s .)?;
+    let github_or_forgejo_token = &DOTENV.github_or_forgejo_token;
+    let github_api_scope_url = &TOML.github_api_scope_url;
+    let result = if TOML.github_api_is_forgejo {
+        // FIXME: this leaks the token in logs when the command fails
+        run_fun!(curl -fsSH "Authorization: token $github_or_forgejo_token"
+            "$github_api_scope_url/actions/runners" // TODO: pagination?
+            | jq -er ".runners")?
+    } else {
+        run_fun!(GITHUB_TOKEN=$github_or_forgejo_token gh api
+            -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
+            "$github_api_scope_url/actions/runners" --paginate -q ".runners[]"
+            | jq -s .)?
+    };
 
     Ok(serde_json::from_str(&result).wrap_err("Failed to parse JSON")?)
 }
 
 pub fn list_registered_runners_for_host() -> eyre::Result<Vec<ApiRunner>> {
+    let prefix = format!("{}-", TOML.libvirt_runner_guest_prefix());
     let suffix = format!("@{}", TOML.github_api_suffix);
     let result = list_registered_runners()?
         .into_iter()
+        .filter(|runner| runner.name.starts_with(&prefix))
         .filter(|runner| runner.name.ends_with(&suffix));
 
     Ok(result.collect())
 }
 
 pub fn register_runner(runner_name: &str, label: &str, work_folder: &str) -> eyre::Result<String> {
+    let github_or_forgejo_token = &DOTENV.github_or_forgejo_token;
+    let github_api_scope_url = &TOML.github_api_scope_url;
     let github_api_suffix = &TOML.github_api_suffix;
-    let github_api_scope = &TOML.github_api_scope;
-    let result = run_fun!(gh api --method POST -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
-    "$github_api_scope/actions/runners/generate-jitconfig"
-    -f "name=$runner_name@$github_api_suffix" -F "runner_group_id=1" -f "work_folder=$work_folder"
-    -f "labels[]=self-hosted" -f "labels[]=X64" -f "labels[]=$label")?;
+    let result = if TOML.github_api_is_forgejo {
+        // FIXME: this leaks the token in logs when the command fails
+        let registration_token = run_fun!(curl -fsSH "Authorization: token $github_or_forgejo_token"
+            -X POST "$github_api_scope_url/actions/runners/registration-token"
+            | jq -er .token)?;
+
+        // Hit the internal(?) registration API using JSON instead of protobuf (<https://connectrpc.com>):
+        // <https://code.forgejo.org/forgejo/actions-proto/src/commit/1b2c1084d34619fbb6cb768741a9321c49956032/proto/runner/v1/messages.proto>
+        // <https://codeberg.org/forgejo/forgejo/src/commit/ffbd500600d45fd86805004694086faaf68ecbdb/routers/api/actions/runner/runner.go>
+        #[derive(Clone, Debug, Deserialize, Serialize)]
+        struct RegisterRequest {
+            name: String,
+            token: String,
+            version: String,
+            labels: Vec<String>,
+            ephemeral: bool,
+        }
+        #[derive(Clone, Debug, Deserialize, Serialize)]
+        struct ForgejoApiRegisterResponse {
+            runner: ForgejoApiRegisterResponseRunner,
+        }
+        #[derive(Clone, Debug, Deserialize, Serialize)]
+        struct ForgejoApiRegisterResponseRunner {
+            id: String,
+            uuid: String,
+            token: String,
+            name: String,
+            version: String,
+            labels: Vec<String>,
+        }
+        impl ForgejoApiRegisterResponseRunner {
+            /// Convert the runner to the `.runner` format expected by forgejo-runner.
+            fn to_forgejo_dot_runner(&self) -> eyre::Result<String> {
+                let id = usize::from_str_radix(&self.id, 10)?;
+                let address = TOML.github_api_scope_url.join("/")?.to_string();
+                let address = address.strip_suffix("/").expect("Guaranteed by argument");
+                Ok(serde_json::to_string(&json!({
+                    "id": id,
+                    "uuid": self.uuid,
+                    "name": self.name,
+                    "token": self.token,
+                    "address": address,
+                    "labels": self.labels,
+                }))?)
+            }
+        }
+        let request = RegisterRequest {
+            name: format!("{runner_name}@{github_api_suffix}"),
+            token: registration_token,
+            version: "ServoCI".to_owned(),
+            labels: vec!["self-hosted".to_owned(), label.to_owned()],
+            ephemeral: true,
+        };
+        let request = serde_json::to_string(&request)?;
+        let register_url =
+            github_api_scope_url.join("/api/actions/runner.v1.RunnerService/Register")?;
+        let response = run_fun!(curl -fsSH "Content-Type: application/json"
+            --data-raw $request "$register_url")?;
+        let response: ForgejoApiRegisterResponse = serde_json::from_str(&response)?;
+        response.runner.to_forgejo_dot_runner()?
+    } else {
+        let response = run_fun!(GITHUB_TOKEN=$github_or_forgejo_token gh api
+            -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
+            --method POST "$github_api_scope_url/actions/runners/generate-jitconfig"
+            -f "name=$runner_name@$github_api_suffix" -F "runner_group_id=1" -f "work_folder=$work_folder"
+            -f "labels[]=self-hosted" -f "labels[]=X64" -f "labels[]=$label")?;
+        let response: ApiGenerateJitconfigResponse = serde_json::from_str(&response)?;
+        response.encoded_jit_config
+    };
 
     Ok(result)
 }
 
 pub fn unregister_runner(id: usize) -> eyre::Result<()> {
-    let github_api_scope = &TOML.github_api_scope;
-    run_cmd!(gh api --method DELETE -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
-        "$github_api_scope/actions/runners/$id")?;
+    let github_or_forgejo_token = &DOTENV.github_or_forgejo_token;
+    let github_api_scope_url = &TOML.github_api_scope_url;
+    if TOML.github_api_is_forgejo {
+        // FIXME: this leaks the token in logs when the command fails
+        run_cmd!(curl -fsSH "Authorization: token $github_or_forgejo_token"
+            -X DELETE "$github_api_scope_url/actions/runners/$id")?;
+    } else {
+        run_cmd!(GITHUB_TOKEN=$github_or_forgejo_token gh api
+            -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
+            --method DELETE "$github_api_scope_url/actions/runners/$id")?;
+    }
 
     Ok(())
 }
@@ -149,13 +235,19 @@ pub fn reserve_runner(
     reserved_since: SystemTime,
     reserved_by: &str,
 ) -> eyre::Result<()> {
-    let github_api_scope = &TOML.github_api_scope;
+    let github_or_forgejo_token = &DOTENV.github_or_forgejo_token;
+    let github_api_scope_url = &TOML.github_api_scope_url;
     let reserved_since = reserved_since.duration_since(UNIX_EPOCH)?.as_secs();
-    run_cmd!(gh api --method POST -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
-        "$github_api_scope/actions/runners/$id/labels"
-        -f "labels[]=reserved-for:$unique_id"
-        -f "labels[]=reserved-since:$reserved_since"
-        -f "labels[]=reserved-by:$reserved_by")?;
+    if TOML.github_api_is_forgejo {
+        todo!()
+    } else {
+        run_cmd!(GITHUB_TOKEN=$github_or_forgejo_token gh api
+            -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"
+            --method POST "$github_api_scope_url/actions/runners/$id/labels"
+            -f "labels[]=reserved-for:$unique_id"
+            -f "labels[]=reserved-since:$reserved_since"
+            -f "labels[]=reserved-by:$reserved_by")?;
+    }
 
     Ok(())
 }
