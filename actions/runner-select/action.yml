@@ -158,9 +158,11 @@ runs:
         result=$(mktemp)
         echo
         echo POST "$take_url"
-        # Retry for up to 3600 seconds, nominally once per second for up to 3600 times,
-        # but actually respecting Retry-After for up to 3600 times.
-        if curl -sS --fail-with-body --connect-timeout 5 --max-time 30 --retry-max-time 3600 --retry 3600 --retry-delay 1 -X POST "$take_url_with_token" > $result \
+        # Retry for up to 15 minutes (900 seconds), nominally once per second
+        # for up to 900 times, but actually respecting Retry-After for up to
+        # 900 times. A slow job on the CI is around 30 minutes, so we wait for
+        # half that time.
+        if curl -sS --fail-with-body --connect-timeout 5 --max-time 30 --retry-max-time 900 --retry 900 --retry-delay 1 -X POST "$take_url_with_token" > $result \
             && jq -e . $result > /dev/null; then
           echo
           echo "selected_runner_label=reserved-for:$unique_id" | tee -a $GITHUB_OUTPUT
