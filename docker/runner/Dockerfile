@@ -6,7 +6,7 @@ RUN apt update && apt install -y curl build-essential
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
     | sh -s -- -y --default-toolchain stable \
         --profile=minimal
-RUN /root/.cargo/bin/cargo install hitrace-bench --version 0.9.1
+RUN /root/.cargo/bin/cargo install hitrace-bench --version 0.11
 
 FROM hos_commandline_tools:${HOS_COMMANDLINE_TOOLS_VERSION} AS commandline_tools
 
