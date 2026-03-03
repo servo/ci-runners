@@ -53,6 +53,6 @@ if __name__ == "__main__":
         f.write("-appCertFile ${HOME}/.ohos/config/${key_base_name}.cer ")
         f.write("-inFile $1 ")
         f.write("-outFile $2 ")
-        print("File written")
+        print("File sign.sh written")
 
 
