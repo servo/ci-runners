@@ -1,4 +1,6 @@
-# This code is licensed under MIT and adapted from https://github.com/TermonyHQ/Termony
+# SPDX-License-Identifier: MIT
+#
+# This code is adapted from https://github.com/TermonyHQ/Termony:
 # https://github.com/TermonyHQ/Termony/blob/4e811a27d36be4037eadda456e4f057670c8198f/sign.js
 
 
