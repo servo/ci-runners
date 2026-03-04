@@ -22,7 +22,7 @@ in linkFarm "image-deps" {
   };
   "macos13/actions-runner-osx-x64.tar.gz" = fetchurl {
     url = "https://github.com/actions/runner/releases/download/v2.332.0/actions-runner-osx-x64-2.332.0.tar.gz";
-    hash = "sha256-QKMre4fiW3a1leIB4K83b8scO3g4/iFFKQl1YJBHPqk=";
+    hash = "sha256-mXVaT0jYHajWpZutajIWpJOU9B0shCw5+SGhWS19BzM=";
   };
   "macos13/uv-installer.sh" = fetchurl {
     url = "https://github.com/astral-sh/uv/releases/download/0.8.17/uv-installer.sh";
@@ -46,7 +46,7 @@ in linkFarm "image-deps" {
   };
   "ubuntu2204/actions-runner-linux-x64.tar.gz" = fetchurl {
     url = "https://github.com/actions/runner/releases/download/v2.332.0/actions-runner-linux-x64-2.332.0.tar.gz";
-    hash = "sha256-r1wz+pTzzDO46Xk3k5E2prBBl+ba38+ztuM64b9B55o=";
+    hash = "sha256-8glFIqa5r+qwf/tYbR6z8ZC2RXB0KCeWxJfOfc6eDyo=";
   };
   "ubuntu2204/uv-installer.sh" = fetchurl {
     url = "https://github.com/astral-sh/uv/releases/download/0.8.17/uv-installer.sh";
@@ -90,7 +90,7 @@ in linkFarm "image-deps" {
   };
   "windows10/actions-runner-win-x64.zip" = fetchurl {
     url = "https://github.com/actions/runner/releases/download/v2.332.0/actions-runner-win-x64-2.332.0.zip";
-    hash = "sha256-p0aefylJZXMn/ddWiP2IWOE1IgKEfQJNaLk94DOZB3k=";
+    hash = "sha256-g+VuBbIetYyWl/guUsU7MIZzNf8DnNXUTRoaJNIUn0s=";
   };
   "windows10/Git-2.45.1-64-bit.exe" = fetchurl {
     url = "https://github.com/git-for-windows/git/releases/download/v2.45.1.windows.1/Git-2.45.1-64-bit.exe";
