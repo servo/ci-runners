@@ -92,7 +92,7 @@ runs:
     - id: artifact
       name: Publish artifact with args
       if: ${{ !fromJSON(steps.init.outputs.disabled) }}
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: servo-ci-runners_${{ steps.init.outputs.unique_id }}
         path: ${{ steps.init.outputs.artifact_path }}
