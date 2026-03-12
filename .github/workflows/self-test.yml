@@ -9,7 +9,7 @@ jobs:
       runner-type-label: ${{ steps.select.outputs.runner-type-label }}
       is-self-hosted: ${{ steps.select.outputs.is-self-hosted }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Runner select
         id: select
         uses: ./actions/runner-select
@@ -32,7 +32,7 @@ jobs:
     if: ${{ fromJSON(needs.runner-select.outputs.is-self-hosted) }}
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Runner timeout
         uses: ./actions/runner-timeout
         with:
@@ -45,4 +45,4 @@ jobs:
     name: build [${{ needs.runner-select.outputs.unique-id }}]
     runs-on: ${{ needs.runner-select.outputs.selected-runner-label }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
