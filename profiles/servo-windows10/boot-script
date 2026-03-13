@@ -150,7 +150,10 @@ if (!(Test-Path .\image-built)) {
     Expand-Archive -Path ..\actions-runner-win-x64.zip
     cd ..
 
-    if (Test-Path C:\a\servo\servo\target\release\servo.exe) {
+    # Check that servoshell was built.
+    # This is janky, but we don’t really trust $LASTEXITCODE checks on Windows
+    # as much as their counterpart on Unix
+    if ((Test-Path C:\a\servo\servo\target\release\servoshell.exe) -or (Test-Path C:\a\servo\servo\target\release\servo.exe)) {
         New-Item C:\ci\image-built
         shutdown /s /t 0
         exit  # `shutdown` does not exit
