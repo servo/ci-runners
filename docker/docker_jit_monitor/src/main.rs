@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     process::{Child, Command},
     string::FromUtf8Error,
     sync::atomic::{AtomicU32, AtomicU64, Ordering},
@@ -15,6 +16,9 @@ use crate::github_api::{get_idle_runners, spawn_runner};
 
 mod github_api;
 
+const MAX_SPAWN_RETRIES: u32 = 10;
+/// How long the loop will sleep in milliseconds.
+const LOOP_SLEEP: u64 = 500;
 static RUNNER_ID: AtomicU64 = AtomicU64::new(0);
 static EXITING: AtomicU32 = AtomicU32::new(0);
 
@@ -143,7 +147,7 @@ enum SpawnRunnerError {
 #[cfg(target_os = "linux")]
 const OS_TAG: &str = "Linux";
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum ContainerType {
     Builder,
     Runner,
@@ -187,7 +191,7 @@ impl Iterator for ContainerTypeIterator {
                 None
             }
         };
-        self.current.clone()
+        self.current
     }
 }
 
@@ -205,6 +209,30 @@ struct DockerContainer {
     name: String,
     process: Child,
     container_type: ContainerType,
+}
+
+#[derive(Debug, Default)]
+/// Store the number of retries per container type
+struct Retries {
+    t: HashMap<ContainerType, u32>,
+}
+
+impl Retries {
+    /// Increases the number of retries and quits if it reaches `MAX_SPAWN_RETRIES`.
+    fn inc_and_check(&mut self, t: ContainerType) {
+        let value = self.t.entry(t).or_insert(0);
+        *value += 1;
+        if *value > MAX_SPAWN_RETRIES {
+            println!(
+                "We had {value} many times to spawn a runner/builder ({t:?}). It is not happening."
+            );
+            std::process::exit(-1);
+        }
+    }
+
+    fn reset(&mut self, t: ContainerType) {
+        self.t.entry(t).insert_entry(0);
+    }
 }
 
 fn main() -> anyhow::Result<()> {
@@ -232,6 +260,7 @@ fn main() -> anyhow::Result<()> {
     let mut running_containers: Vec<DockerContainer> = vec![];
     // Todo: implement something to reserve devices for the duration of the docker run child process.
 
+    let mut retries = Retries::default();
     loop {
         let exiting = EXITING.load(Ordering::Relaxed);
         for container_type in ContainerType::iter() {
@@ -254,13 +283,17 @@ fn main() -> anyhow::Result<()> {
                 };
 
                 match spawn_runner(config) {
-                    Ok(container) => running_containers.push(container),
+                    Ok(container) => {
+                        retries.reset(container_type);
+                        running_containers.push(container)
+                    }
                     Err(SpawnRunnerError::GhApiError(_, message))
                         if message.contains("gh: Already exists") =>
                     {
                         info!("Runner name already taken - Will retry with new name later")
                     }
                     Err(e) => {
+                        retries.inc_and_check(container_type);
                         error!("Failed to spawn JIT runner: {e:?}");
                     }
                 }
@@ -319,7 +352,7 @@ fn main() -> anyhow::Result<()> {
         }
 
         running_containers = still_running;
-        thread::sleep(Duration::from_millis(500));
+        thread::sleep(Duration::from_millis(LOOP_SLEEP));
     }
 
     info!("Exiting....");
