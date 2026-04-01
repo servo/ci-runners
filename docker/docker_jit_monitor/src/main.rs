@@ -138,6 +138,8 @@ enum SpawnRunnerError {
     EncodedJitConfigNotFound,
     #[error("Failed to spawn docker with IoError: `{0:?}`")]
     SpawnDockerError(std::io::Error),
+    #[error("Docker command returned failure error code")]
+    SpawnDockerExit,
     #[error("Couldn't find any hdc devices")]
     NoHdcDeviceFound,
     #[error("Failed to list USB devices")]

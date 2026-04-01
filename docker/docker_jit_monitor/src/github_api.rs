@@ -1,4 +1,4 @@
-use std::process::{Command, Output};
+use std::process::{Command, ExitCode, Output};
 
 use log::{debug, warn};
 use serde::Deserialize;
@@ -97,6 +97,13 @@ pub(crate) fn spawn_runner(config: RunnerConfig) -> Result<DockerContainer, Spaw
         .arg(encoded_jit_config);
 
     let runner = cmd.spawn().map_err(SpawnRunnerError::SpawnDockerError)?;
+
+    // The above command will not give an error if the docker command exists
+    // but the command exited with failure.
+    std::thread::sleep(Duration::from_millis(100));
+    if runner.try_wait() == Ok(Some(ExitCode::FAILURE)) {
+        return Err(SpawnRunnerError::SpawnDockerExit);
+    }
     Ok(DockerContainer {
         name: config.name,
         process: runner,
