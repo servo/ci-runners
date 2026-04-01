@@ -16,9 +16,9 @@ use crate::github_api::{get_idle_runners, spawn_runner};
 
 mod github_api;
 
-const MAX_SPAWN_RETRIES: u32 = 10;
+const MAX_SPAWN_RETRIES: u32 = 7;
 /// How long the loop will sleep in milliseconds.
-const LOOP_SLEEP: u64 = 500;
+const BASE_LOOP_SLEEP: u64 = 500;
 static RUNNER_ID: AtomicU64 = AtomicU64::new(0);
 static EXITING: AtomicU32 = AtomicU32::new(0);
 
@@ -230,8 +230,16 @@ impl Retries {
         }
     }
 
+    /// Resets the counter when we have succesfully spawned a runner.
     fn reset(&mut self, t: ContainerType) {
         self.t.entry(t).insert_entry(0);
+    }
+
+    /// The current wait time we have for a loop.
+    /// Defaults to `BASE_LOOP_SLEEP` and exponentially increases with failures.
+    fn wait_time(&self) -> Duration {
+        let m = self.t.values().max().unwrap_or(&0);
+        Duration::from_millis(BASE_LOOP_SLEEP * 2_u64.pow(*m))
     }
 }
 
@@ -352,7 +360,7 @@ fn main() -> anyhow::Result<()> {
         }
 
         running_containers = still_running;
-        thread::sleep(Duration::from_millis(LOOP_SLEEP));
+        thread::sleep(retries.wait_time());
     }
 
     info!("Exiting....");
