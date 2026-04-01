@@ -16,7 +16,8 @@ use crate::github_api::{get_idle_runners, spawn_runner};
 
 mod github_api;
 
-const MAX_SPAWN_RETRIES: u32 = 7;
+/// This will currently have 10 tries with equates to 500 * \sum_{i=0}^10 2^i = 500*2^{11} -1 = 102400 = 1024 secs ~ 17 min.
+const MAX_SPAWN_RETRIES: u32 = 10;
 /// How long the loop will sleep in milliseconds.
 const BASE_LOOP_SLEEP: u64 = 500;
 static RUNNER_ID: AtomicU64 = AtomicU64::new(0);
