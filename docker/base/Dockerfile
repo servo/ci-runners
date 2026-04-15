@@ -1,4 +1,4 @@
-	
+
 
 # syntax=docker/dockerfile:1
 # check=error=true
@@ -8,7 +8,7 @@
 # quickly as possible.
 # We already add a user in this image, so all other images inherit it.
 
-FROM ubuntu:22.04 AS base_fetcher
+FROM ubuntu:24.04 AS base_fetcher
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -18,7 +18,7 @@ RUN apt-get update && \
     && rm -rf /var/cache/apt/lists
 
 ARG USERNAME=servo_ci
-ARG USER_UID=1000
+ARG USER_UID=1010
 ARG USER_GID=${USER_UID}
 
 RUN groupadd --gid ${USER_GID} ${USERNAME} && \
