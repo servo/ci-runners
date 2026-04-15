@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     process::{Child, Command},
     string::FromUtf8Error,
     sync::atomic::{AtomicU32, AtomicU64, Ordering},
@@ -15,6 +16,10 @@ use crate::github_api::{get_idle_runners, spawn_runner};
 
 mod github_api;
 
+/// This will currently have 10 tries with equates to 500 * \sum_{i=0}^10 2^i = 500*2^{11} -1 = 102400 = 1024 secs ~ 17 min.
+const MAX_SPAWN_RETRIES: u32 = 10;
+/// How long the loop will sleep in milliseconds.
+const BASE_LOOP_SLEEP: u64 = 500;
 static RUNNER_ID: AtomicU64 = AtomicU64::new(0);
 static EXITING: AtomicU32 = AtomicU32::new(0);
 
@@ -133,6 +138,8 @@ enum SpawnRunnerError {
     EncodedJitConfigNotFound,
     #[error("Failed to spawn docker with IoError: `{0:?}`")]
     SpawnDockerError(std::io::Error),
+    #[error("Docker command returned failure error code")]
+    SpawnDockerExit,
     #[error("Couldn't find any hdc devices")]
     NoHdcDeviceFound,
     #[error("Failed to list USB devices")]
@@ -143,7 +150,7 @@ enum SpawnRunnerError {
 #[cfg(target_os = "linux")]
 const OS_TAG: &str = "Linux";
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum ContainerType {
     Builder,
     Runner,
@@ -187,7 +194,7 @@ impl Iterator for ContainerTypeIterator {
                 None
             }
         };
-        self.current.clone()
+        self.current
     }
 }
 
@@ -205,6 +212,38 @@ struct DockerContainer {
     name: String,
     process: Child,
     container_type: ContainerType,
+}
+
+#[derive(Debug, Default)]
+/// Store the number of retries per container type
+struct Retries {
+    t: HashMap<ContainerType, u32>,
+}
+
+impl Retries {
+    /// Increases the number of retries and quits if it reaches `MAX_SPAWN_RETRIES`.
+    fn inc_and_check(&mut self, t: ContainerType) {
+        let value = self.t.entry(t).or_insert(0);
+        *value += 1;
+        if *value > MAX_SPAWN_RETRIES {
+            println!(
+                "We had {value} many times to spawn a runner/builder ({t:?}). It is not happening."
+            );
+            std::process::exit(-1);
+        }
+    }
+
+    /// Resets the counter when we have succesfully spawned a runner.
+    fn reset(&mut self, t: ContainerType) {
+        self.t.entry(t).insert_entry(0);
+    }
+
+    /// The current wait time we have for a loop.
+    /// Defaults to `BASE_LOOP_SLEEP` and exponentially increases with failures.
+    fn wait_time(&self) -> Duration {
+        let m = self.t.values().max().unwrap_or(&0);
+        Duration::from_millis(BASE_LOOP_SLEEP * 2_u64.pow(*m))
+    }
 }
 
 fn main() -> anyhow::Result<()> {
@@ -232,6 +271,7 @@ fn main() -> anyhow::Result<()> {
     let mut running_containers: Vec<DockerContainer> = vec![];
     // Todo: implement something to reserve devices for the duration of the docker run child process.
 
+    let mut retries = Retries::default();
     loop {
         let exiting = EXITING.load(Ordering::Relaxed);
         for container_type in ContainerType::iter() {
@@ -254,13 +294,17 @@ fn main() -> anyhow::Result<()> {
                 };
 
                 match spawn_runner(config) {
-                    Ok(container) => running_containers.push(container),
+                    Ok(container) => {
+                        retries.reset(container_type);
+                        running_containers.push(container)
+                    }
                     Err(SpawnRunnerError::GhApiError(_, message))
                         if message.contains("gh: Already exists") =>
                     {
                         info!("Runner name already taken - Will retry with new name later")
                     }
                     Err(e) => {
+                        retries.inc_and_check(container_type);
                         error!("Failed to spawn JIT runner: {e:?}");
                     }
                 }
@@ -319,7 +363,7 @@ fn main() -> anyhow::Result<()> {
         }
 
         running_containers = still_running;
-        thread::sleep(Duration::from_millis(500));
+        thread::sleep(retries.wait_time());
     }
 
     info!("Exiting....");
