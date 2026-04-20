@@ -1,3 +1,5 @@
+## syntax=docker/dockerfile:1.4
+
 ARG GITHUB_ACTIONS_RUNNER_VERSION
 ARG HOS_COMMANDLINE_TOOLS_VERSION
 
@@ -8,9 +10,9 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
         --profile=minimal
 RUN /root/.cargo/bin/cargo install hitrace-bench --version 0.11.3
 
-FROM hos_commandline_tools:${HOS_COMMANDLINE_TOOLS_VERSION} AS commandline_tools
+FROM docker.io/library/hos_commandline_tools:${HOS_COMMANDLINE_TOOLS_VERSION} AS commandline_tools
 
-FROM servo_gha_runner:${GITHUB_ACTIONS_RUNNER_VERSION}
+FROM docker.io/library/servo_gha_runner:${GITHUB_ACTIONS_RUNNER_VERSION}
 
 USER root
 # Java is required for signing the hap, libatomic1 for hdc
@@ -38,7 +40,8 @@ USER ${USERNAME}
 
 # Add for tar.gz keeps the permission
 RUN chown ${USERNAME}:${USERNAME} -R /home/${USERNAME}/.ohos
-# Used to authorize with the hdc device and avoid the confirmation dialog.
+# Some SDK versions still expect the legacy authorization key pair, but the
+# public key is not always present in the build context.
 COPY --chown=${USERNAME}:${USERNAME} hdckey hdckey.pub /home/${USERNAME}/.harmony/
 
 COPY sign.sh /usr/bin/sign-hos.sh

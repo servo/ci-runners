@@ -1,4 +1,4 @@
-FROM servo_gha_base:latest
+FROM docker.io/library/servo_gha_base:latest
 
 ARG USERNAME
 USER ${USERNAME}

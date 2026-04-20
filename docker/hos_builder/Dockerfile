@@ -5,7 +5,7 @@ ARG HOS_COMMANDLINE_TOOLS_VERSION
 ARG USERNAME
 
 # Re-export the base image under a new name, so we can change change the tag in one place.
-FROM servo_gha_base:latest AS base_fetcher
+FROM docker.io/library/servo_gha_base:latest AS base_fetcher
 
 FROM base_fetcher AS base_with_cc
 RUN apt-get update && \
@@ -36,7 +36,7 @@ RUN apt-get update && \
 
 RUN mkdir -p /data/servo/servo && chown -R "${USERNAME}:${USERNAME}" /data/
 
-FROM servo_gha_runner:${GITHUB_ACTIONS_RUNNER_VERSION} AS gh_runner
+FROM docker.io/library/servo_gha_runner:${GITHUB_ACTIONS_RUNNER_VERSION} AS gh_runner
 
 FROM base_with_cc AS rust_toolchain
 ARG USERNAME
@@ -80,7 +80,7 @@ RUN git pull && git reset --hard "${SERVO_GIT_HASH}"
 ##### END FETCH SERVO #################################################################
 
 ARG HOS_COMMANDLINE_TOOLS_VERSION
-FROM hos_commandline_tools:${HOS_COMMANDLINE_TOOLS_VERSION} AS commandline_tools
+FROM docker.io/library/hos_commandline_tools:${HOS_COMMANDLINE_TOOLS_VERSION} AS commandline_tools
 
 FROM base AS servo_base
 COPY --chown=${USERNAME}:${USERNAME} --from=gh_runner /home/${USERNAME}/runner /home/${USERNAME}/runner

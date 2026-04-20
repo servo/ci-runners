@@ -43,6 +43,16 @@ fn call_github_runner_api(
 }
 
 pub(crate) fn spawn_runner(config: RunnerConfig) -> Result<DockerContainer, SpawnRunnerError> {
+    let image_exists = Command::new("docker")
+        .args(["image", "inspect", &config.docker_image_and_tag])
+        .output()
+        .map_err(SpawnRunnerError::SpawnDockerError)?;
+    if !image_exists.status.success() {
+        return Err(SpawnRunnerError::MissingDockerImage(
+            config.docker_image_and_tag,
+        ));
+    }
+
     let mut raw_fields = config
         .labels
         .iter()

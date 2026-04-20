@@ -133,6 +133,8 @@ enum SpawnRunnerError {
     EncodedJitConfigNotFound,
     #[error("Failed to spawn docker with IoError: `{0:?}`")]
     SpawnDockerError(std::io::Error),
+    #[error("Docker image `{0}` does not exist locally")]
+    MissingDockerImage(String),
     #[error("Couldn't find any hdc devices")]
     NoHdcDeviceFound,
     #[error("Failed to list USB devices")]

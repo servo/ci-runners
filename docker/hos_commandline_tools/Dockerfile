@@ -1,4 +1,4 @@
-FROM servo_gha_base:latest
+FROM docker.io/library/servo_gha_base:latest
 
 RUN mkdir -p data
 ARG COMMANDLINE_TOOLS_PATH=https://repo.huaweicloud.com/harmonyos/ohpm/5.1.0/commandline-tools-linux-x64-5.1.0.840.zip
