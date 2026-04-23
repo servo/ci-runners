@@ -2,7 +2,7 @@
 
 set -eu
 
-CONTAINER_CLI="${1:-${CONTAINER_CLI:-docker}}"
+CONTAINER_CLI="${CONTAINER_CLI:-docker}"
 
 SERVO_GIT_HASH=$(git ls-remote https://github.com/servo/servo.git --branches refs/heads/main | awk '{ print $1}')
 GITHUB_ACTIONS_RUNNER_VERSION="2.334.0"
@@ -19,11 +19,11 @@ then
 fi
 
 # Build the helper images
-"${CONTAINER_CLI}" build base -f base/Dockerfile -t "docker.io/library/servo_gha_base:latest" --build-arg=USERNAME=${IMAGE_USERNAME}
-"${CONTAINER_CLI}" build gh_runner -f gh_runner/Dockerfile -t "docker.io/library/servo_gha_runner:${GITHUB_ACTIONS_RUNNER_VERSION}" \
+"${CONTAINER_CLI}" build base -f base/Dockerfile -t "localhost/servo_gha_base:latest" --build-arg=USERNAME=${IMAGE_USERNAME}
+"${CONTAINER_CLI}" build gh_runner -f gh_runner/Dockerfile -t "localhost/servo_gha_runner:${GITHUB_ACTIONS_RUNNER_VERSION}" \
     --build-arg=USERNAME=${IMAGE_USERNAME} \
     --build-arg=GITHUB_ACTIONS_RUNNER_VERSION=${GITHUB_ACTIONS_RUNNER_VERSION}
-"${CONTAINER_CLI}" build hos_commandline_tools -f hos_commandline_tools/Dockerfile -t "docker.io/library/hos_commandline_tools:latest" \
+"${CONTAINER_CLI}" build hos_commandline_tools -f hos_commandline_tools/Dockerfile -t "localhost/hos_commandline_tools:latest" \
    --build-arg=USERNAME=${IMAGE_USERNAME}
 
 # Build the actual images
