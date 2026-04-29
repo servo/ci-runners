@@ -19,12 +19,17 @@ The images are not intended for publishing.
 
 ## Prepare the runner image
 
-Before building the runner image for the first time, some manual steps are necessary:
+Before building the runner image for the first time, some manual steps may be necessary:
 
 On the host machine install `hdc`, connect a device and run `hdc shell`.
 Accept the permission prompt on the device.
 Then copy ~/.harmony/hdckey and ~/.harmony/hdckey.pub to the runner directory.
 This allows the JIT runners to connect to the hdc device without a permission prompt.
+
+If you do not need to preseed the legacy hdc authorization key pair, you can skip this
+step and build with `SKIP_HDC_KEY=1 ./build.sh`.
+If you keep `SKIP_HDC_KEY=0`, both files are required and the build will fail early when
+they are missing.
 
 To setup the signing configuration, create an archive called `ohos-config.tar` from the
 `.ohos/config` directory and copy it together with the `signing-configs.json` into the

@@ -6,6 +6,31 @@ use serde_json::Value;
 
 use crate::{DockerContainer, RunnerConfig, SpawnRunnerError};
 
+fn resolve_local_image_tag(image: &str) -> Result<String, SpawnRunnerError> {
+    let candidates = if let Some(stripped) = image.strip_prefix("localhost/") {
+        [image, stripped]
+    } else {
+        [image, image]
+    };
+
+    for candidate in candidates {
+        let image_exists = Command::new("docker")
+            .args(["image", "inspect", candidate])
+            .output()
+            .map_err(SpawnRunnerError::SpawnDockerError)?;
+        if image_exists.status.success() {
+            return Ok(candidate.to_string());
+        }
+
+        let stderr = String::from_utf8_lossy(&image_exists.stderr);
+        if !stderr.trim().is_empty() {
+            warn!("docker could not inspect image `{candidate}`: {}", stderr.trim());
+        }
+    }
+
+    Err(SpawnRunnerError::MissingDockerImage(image.to_string()))
+}
+
 /// Function to call the github api.
 ///
 /// Notice that the api_endpoint needs to _have_ the slash at the start.
@@ -43,15 +68,7 @@ fn call_github_runner_api(
 }
 
 pub(crate) fn spawn_runner(config: RunnerConfig) -> Result<DockerContainer, SpawnRunnerError> {
-    let image_exists = Command::new("docker")
-        .args(["image", "inspect", &config.docker_image_and_tag])
-        .output()
-        .map_err(SpawnRunnerError::SpawnDockerError)?;
-    if !image_exists.status.success() {
-        return Err(SpawnRunnerError::MissingDockerImage(
-            config.docker_image_and_tag,
-        ));
-    }
+    let docker_image_and_tag = resolve_local_image_tag(&config.docker_image_and_tag)?;
 
     let mut raw_fields = config
         .labels
@@ -101,7 +118,7 @@ pub(crate) fn spawn_runner(config: RunnerConfig) -> Result<DockerContainer, Spaw
     }
 
     // Start the gh runner inside the container
-    cmd.arg(&config.docker_image_and_tag)
+    cmd.arg(&docker_image_and_tag)
         .arg("/home/servo_ci/runner/run.sh")
         .arg(" --jitconfig")
         .arg(encoded_jit_config);

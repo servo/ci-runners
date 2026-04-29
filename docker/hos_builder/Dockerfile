@@ -1,7 +1,6 @@
 # A dockerfile to build servo for HarmonyOS
 
-ARG GITHUB_ACTIONS_RUNNER_VERSION
-ARG HOS_COMMANDLINE_TOOLS_VERSION
+ARG GITHUB_ACTIONS_RUNNER_VERSION=2.333.0
 ARG USERNAME
 
 # Re-export the base image under a new name, so we can change change the tag in one place.
@@ -79,8 +78,7 @@ RUN git pull && git reset --hard "${SERVO_GIT_HASH}"
 
 ##### END FETCH SERVO #################################################################
 
-ARG HOS_COMMANDLINE_TOOLS_VERSION
-FROM localhost/hos_commandline_tools:${HOS_COMMANDLINE_TOOLS_VERSION} AS commandline_tools
+FROM localhost/hos_commandline_tools:latest AS commandline_tools
 
 FROM base AS servo_base
 COPY --chown=${USERNAME}:${USERNAME} --from=gh_runner /home/${USERNAME}/runner /home/${USERNAME}/runner

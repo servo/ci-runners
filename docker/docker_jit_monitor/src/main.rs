@@ -68,7 +68,7 @@ impl RunnerConfig {
             runner_group_id: 1,
             labels: vec!["self-hosted".into(), OS_TAG.into(), "hos-builder".into()],
             container_type: ContainerType::Builder,
-            docker_image_and_tag: "servo_gha_hos_builder:latest".into(),
+            docker_image_and_tag: "localhost/servo_gha_hos_builder:latest".into(),
             work_folder: "/data".to_string(),
             map_device: None,
         }
@@ -112,7 +112,7 @@ impl RunnerConfig {
             runner_group_id: 1,
             labels: vec!["self-hosted".into(), OS_TAG.into(), "hos-runner".into()],
             container_type: ContainerType::Runner,
-            docker_image_and_tag: "servo_gha_hos_runner:latest".into(),
+            docker_image_and_tag: "localhost/servo_gha_hos_runner:latest".into(),
             work_folder: "/data".to_string(),
             map_device: Some(device.clone()),
         })

@@ -1,7 +1,6 @@
 ## syntax=docker/dockerfile:1.4
 
-ARG GITHUB_ACTIONS_RUNNER_VERSION
-ARG HOS_COMMANDLINE_TOOLS_VERSION
+ARG GITHUB_ACTIONS_RUNNER_VERSION=2.333.0
 
 FROM ubuntu:24.04 AS rust
 RUN apt update && apt install -y curl build-essential
@@ -10,7 +9,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
         --profile=minimal
 RUN /root/.cargo/bin/cargo install hitrace-bench --version 0.11.3
 
-FROM localhost/hos_commandline_tools:${HOS_COMMANDLINE_TOOLS_VERSION} AS commandline_tools
+FROM localhost/hos_commandline_tools:latest AS commandline_tools
 
 FROM localhost/servo_gha_runner:${GITHUB_ACTIONS_RUNNER_VERSION}
 
@@ -22,6 +21,7 @@ RUN apt-get update && \
     && rm -rf /var/cache/apt/lists
 
 ARG USERNAME
+ARG SKIP_HDC_KEY=0
 USER ${USERNAME}
 WORKDIR /data/servo/servo
 
@@ -40,9 +40,18 @@ USER ${USERNAME}
 
 # Add for tar.gz keeps the permission
 RUN chown ${USERNAME}:${USERNAME} -R /home/${USERNAME}/.ohos
-# Some SDK versions still expect the legacy authorization key pair, but the
-# public key is not always present in the build context.
-# COPY --chown=${USERNAME}:${USERNAME} hdckey hdckey.pub /home/${USERNAME}/.harmony/
+
+# Some SDK versions still expect the legacy authorization key pair.
+USER root
+RUN --mount=type=bind,source=.staged_hdckey,target=/tmp/hdckey,readonly \
+    --mount=type=bind,source=.staged_hdckey.pub,target=/tmp/hdckey.pub,readonly \
+    mkdir -p /home/${USERNAME}/.harmony && \
+    if [ "${SKIP_HDC_KEY}" != "1" ]; then \
+        cp /tmp/hdckey /home/${USERNAME}/.harmony/hdckey && \
+        cp /tmp/hdckey.pub /home/${USERNAME}/.harmony/hdckey.pub; \
+    fi && \
+    chown ${USERNAME}:${USERNAME} -R /home/${USERNAME}/.harmony
+USER ${USERNAME}
 
 COPY sign.sh /usr/bin/sign-hos.sh
 
