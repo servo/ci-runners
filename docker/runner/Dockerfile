@@ -1,5 +1,3 @@
-## syntax=docker/dockerfile:1.4
-
 ARG GITHUB_ACTIONS_RUNNER_VERSION=2.333.0
 
 FROM ubuntu:24.04 AS rust
@@ -21,7 +19,6 @@ RUN apt-get update && \
     && rm -rf /var/cache/apt/lists
 
 ARG USERNAME
-ARG SKIP_HDC_KEY=0
 USER ${USERNAME}
 WORKDIR /data/servo/servo
 
@@ -41,17 +38,8 @@ USER ${USERNAME}
 # Add for tar.gz keeps the permission
 RUN chown ${USERNAME}:${USERNAME} -R /home/${USERNAME}/.ohos
 
-# Some SDK versions still expect the legacy authorization key pair.
-USER root
-RUN --mount=type=bind,source=.staged_hdckey,target=/tmp/hdckey,readonly \
-    --mount=type=bind,source=.staged_hdckey.pub,target=/tmp/hdckey.pub,readonly \
-    mkdir -p /home/${USERNAME}/.harmony && \
-    if [ "${SKIP_HDC_KEY}" != "1" ]; then \
-        cp /tmp/hdckey /home/${USERNAME}/.harmony/hdckey && \
-        cp /tmp/hdckey.pub /home/${USERNAME}/.harmony/hdckey.pub; \
-    fi && \
-    chown ${USERNAME}:${USERNAME} -R /home/${USERNAME}/.harmony
-USER ${USERNAME}
+# Used to authorize with the hdc device and avoid the confirmation dialog.
+COPY --chown=${USERNAME}:${USERNAME} hdckey hdckey.pub /home/${USERNAME}/.harmony/
 
 COPY sign.sh /usr/bin/sign-hos.sh
 
