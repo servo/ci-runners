@@ -8,7 +8,7 @@ use std::{
 use thiserror::Error;
 
 use anyhow::{anyhow, Context};
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use log::{error, info, warn};
 
 use crate::github_api::{get_idle_runners, spawn_runner};
@@ -41,6 +41,21 @@ struct Args {
         default_value_t = 1
     )]
     concurrent_builders: u8,
+    #[clap(
+        long,
+        value_enum,
+        default_value_t = SingleLabelMode::Default,
+        help = "Limit this monitor to builder runners, runner runners, or keep the default mixed mode"
+    )]
+    single_label_mode: SingleLabelMode,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
+enum SingleLabelMode {
+    #[default]
+    Default,
+    Builder,
+    Runner,
 }
 
 struct RunnerConfig {
@@ -153,8 +168,7 @@ impl ContainerType {
     /// This iterator will go from Builder -> Runner and then stop.
     fn iter() -> ContainerTypeIterator {
         ContainerTypeIterator {
-            current: None,
-            finished: false,
+            remaining: vec![ContainerType::Runner, ContainerType::Builder],
         }
     }
 
@@ -167,27 +181,33 @@ impl ContainerType {
     }
 }
 
+impl SingleLabelMode {
+    fn container_types(self) -> ContainerTypeIterator {
+        match self {
+            SingleLabelMode::Default => ContainerType::iter(),
+            SingleLabelMode::Builder => ContainerTypeIterator::single(ContainerType::Builder),
+            SingleLabelMode::Runner => ContainerTypeIterator::single(ContainerType::Runner),
+        }
+    }
+}
+
 struct ContainerTypeIterator {
-    current: Option<ContainerType>,
-    finished: bool,
+    remaining: Vec<ContainerType>,
+}
+
+impl ContainerTypeIterator {
+    fn single(container_type: ContainerType) -> Self {
+        Self {
+            remaining: vec![container_type],
+        }
+    }
 }
 
 impl Iterator for ContainerTypeIterator {
     type Item = ContainerType;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.finished {
-            return None;
-        }
-        self.current = match self.current {
-            None => Some(ContainerType::Builder),
-            Some(ContainerType::Builder) => Some(ContainerType::Runner),
-            Some(ContainerType::Runner) => {
-                self.finished = true;
-                None
-            }
-        };
-        self.current.clone()
+        self.remaining.pop()
     }
 }
 
@@ -197,6 +217,18 @@ fn iter_test() {
     assert_eq!(it.next(), Some(ContainerType::Builder));
     assert_eq!(it.next(), Some(ContainerType::Runner));
     assert_eq!(it.next(), None);
+}
+
+#[test]
+fn single_label_mode_test() {
+    let default_types = SingleLabelMode::Default.container_types().collect::<Vec<_>>();
+    assert_eq!(default_types, vec![ContainerType::Builder, ContainerType::Runner]);
+
+    let builder_types = SingleLabelMode::Builder.container_types().collect::<Vec<_>>();
+    assert_eq!(builder_types, vec![ContainerType::Builder]);
+
+    let runner_types = SingleLabelMode::Runner.container_types().collect::<Vec<_>>();
+    assert_eq!(runner_types, vec![ContainerType::Runner]);
 }
 
 #[derive(Debug)]
@@ -234,7 +266,7 @@ fn main() -> anyhow::Result<()> {
 
     loop {
         let exiting = EXITING.load(Ordering::Relaxed);
-        for container_type in ContainerType::iter() {
+        for container_type in args.single_label_mode.container_types() {
             if running_containers
                 .iter()
                 .filter(|container| container.container_type == container_type)
