@@ -64,7 +64,7 @@ RUN mkdir -p "$HOME/.local/bin" \
 FROM base_fetcher AS servo_fetcher 
 ARG USERNAME
 
-RUN mkdir -p /data/servo/servo && chown -R "${USERNAME}:${USERNAME}" /data/
+RUN mkdir -p /data/servo/servo && chown -R "${USERNAME}:${USERNAME}" /data
 USER ${USERNAME}
 # Clone servo, ignoring the history. We keep a small history, just in case some of our 
 # scripts might rely on a bit of history being available.
