@@ -30,13 +30,6 @@ To setup the signing configuration, create an archive called `ohos-config.tar` f
 `.ohos/config` directory and copy it together with the `signing-configs.json` into the
 `runner` directory.
 
-If you already downloaded the HarmonyOS command line tools locally, you can pass the archive
-path to `build.sh` instead of downloading it during the image build:
-
-`./build.sh --sdk-path /path/to/commandline-tools-linux-x64-5.1.0.840.zip`
-
-If you omit the argument, `build.sh` uses the default download URL.
-
 
 ## Docker JIT monitor
 

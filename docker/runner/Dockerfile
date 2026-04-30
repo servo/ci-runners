@@ -1,4 +1,5 @@
-ARG GITHUB_ACTIONS_RUNNER_VERSION=2.333.0
+ARG GITHUB_ACTIONS_RUNNER_VERSION
+ARG HOS_COMMANDLINE_TOOLS_VERSION
 
 FROM ubuntu:24.04 AS rust
 RUN apt update && apt install -y curl build-essential
@@ -7,9 +8,9 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
         --profile=minimal
 RUN /root/.cargo/bin/cargo install hitrace-bench --version 0.11.3
 
-FROM localhost/hos_commandline_tools:latest AS commandline_tools
+FROM hos_commandline_tools:${HOS_COMMANDLINE_TOOLS_VERSION} AS commandline_tools
 
-FROM localhost/servo_gha_runner:${GITHUB_ACTIONS_RUNNER_VERSION}
+FROM servo_gha_runner:${GITHUB_ACTIONS_RUNNER_VERSION}
 
 USER root
 # Java is required for signing the hap, libatomic1 for hdc
@@ -37,7 +38,6 @@ USER ${USERNAME}
 
 # Add for tar.gz keeps the permission
 RUN chown ${USERNAME}:${USERNAME} -R /home/${USERNAME}/.ohos
-
 # Used to authorize with the hdc device and avoid the confirmation dialog.
 COPY --chown=${USERNAME}:${USERNAME} hdckey hdckey.pub /home/${USERNAME}/.harmony/
 

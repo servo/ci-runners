@@ -7,31 +7,18 @@ use serde_json::Value;
 use crate::{DockerContainer, RunnerConfig, SpawnRunnerError};
 
 /// Function to check if the image is present
-///
-/// current build process adds `localhost/` prefix to local images
 fn resolve_local_image_tag(image: &str) -> Result<String, SpawnRunnerError> {
-    let candidates = if let Some(stripped) = image.strip_prefix("localhost/") {
-        [image, stripped]
-    } else {
-        [image, image]
-    };
+    let image_exists = Command::new("docker")
+        .args(["image", "inspect", image])
+        .output()
+        .map_err(SpawnRunnerError::SpawnDockerError)?;
+    if image_exists.status.success() {
+        return Ok(image.to_string());
+    }
 
-    for candidate in candidates {
-        let image_exists = Command::new("docker")
-            .args(["image", "inspect", candidate])
-            .output()
-            .map_err(SpawnRunnerError::SpawnDockerError)?;
-        if image_exists.status.success() {
-            return Ok(candidate.to_string());
-        }
-
-        let stderr = String::from_utf8_lossy(&image_exists.stderr);
-        if !stderr.trim().is_empty() {
-            warn!(
-                "docker could not inspect image `{candidate}`: {}",
-                stderr.trim()
-            );
-        }
+    let stderr = String::from_utf8_lossy(&image_exists.stderr);
+    if !stderr.trim().is_empty() {
+        warn!("docker could not inspect image `{image}`: {}", stderr.trim());
     }
 
     Err(SpawnRunnerError::MissingDockerImage(image.to_string()))

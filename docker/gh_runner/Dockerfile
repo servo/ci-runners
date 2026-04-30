@@ -1,4 +1,4 @@
-FROM localhost/servo_gha_base:latest
+FROM servo_gha_base:latest
 
 ARG USERNAME
 USER ${USERNAME}

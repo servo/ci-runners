@@ -1,10 +1,11 @@
 # A dockerfile to build servo for HarmonyOS
 
-ARG GITHUB_ACTIONS_RUNNER_VERSION=2.333.0
+ARG GITHUB_ACTIONS_RUNNER_VERSION
+ARG HOS_COMMANDLINE_TOOLS_VERSION
 ARG USERNAME
 
 # Re-export the base image under a new name, so we can change change the tag in one place.
-FROM localhost/servo_gha_base:latest AS base_fetcher
+FROM servo_gha_base:latest AS base_fetcher
 
 FROM base_fetcher AS base_with_cc
 RUN apt-get update && \
@@ -35,7 +36,7 @@ RUN apt-get update && \
 
 RUN mkdir -p /data/servo/servo && chown -R "${USERNAME}:${USERNAME}" /data/
 
-FROM localhost/servo_gha_runner:${GITHUB_ACTIONS_RUNNER_VERSION} AS gh_runner
+FROM servo_gha_runner:${GITHUB_ACTIONS_RUNNER_VERSION} AS gh_runner
 
 FROM base_with_cc AS rust_toolchain
 ARG USERNAME
@@ -64,7 +65,7 @@ RUN mkdir -p "$HOME/.local/bin" \
 FROM base_fetcher AS servo_fetcher 
 ARG USERNAME
 
-RUN mkdir -p /data/servo/servo && chown -R "${USERNAME}:${USERNAME}" /data
+RUN mkdir -p /data/servo/servo && chown -R "${USERNAME}:${USERNAME}" /data/
 USER ${USERNAME}
 # Clone servo, ignoring the history. We keep a small history, just in case some of our 
 # scripts might rely on a bit of history being available.
@@ -78,7 +79,8 @@ RUN git pull && git reset --hard "${SERVO_GIT_HASH}"
 
 ##### END FETCH SERVO #################################################################
 
-FROM localhost/hos_commandline_tools:latest AS commandline_tools
+ARG HOS_COMMANDLINE_TOOLS_VERSION
+FROM hos_commandline_tools:${HOS_COMMANDLINE_TOOLS_VERSION} AS commandline_tools
 
 FROM base AS servo_base
 COPY --chown=${USERNAME}:${USERNAME} --from=gh_runner /home/${USERNAME}/runner /home/${USERNAME}/runner
