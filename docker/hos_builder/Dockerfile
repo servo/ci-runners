@@ -21,15 +21,19 @@ ARG DEBIAN_FRONTEND=noninteractive
 COPY --chmod=644 githubcli-archive-keyring.gpg /etc/apt/keyrings/githubcli-archive-keyring.gpg
 RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list
 
+# Split up ap-install to allow slower compuers/networks to cache more steps
 RUN apt-get update && \
     apt-get -y install --no-install-recommends \
         libdbus-1-dev libfreetype6-dev libgl1-mesa-dri libgles2-mesa-dev \
-        libglib2.0-dev gstreamer1.0-plugins-good libgstreamer-plugins-good1.0-dev \
+        libglib2.0-dev gstreamer1.0-plugins-good libgstreamer-plugins-good1.0-dev
+RUN apt-get -y install --no-install-recommends \
         gstreamer1.0-plugins-bad libgstreamer-plugins-bad1.0-dev gstreamer1.0-plugins-ugly \
-        gstreamer1.0-plugins-base libgstreamer-plugins-base1.0-dev gstreamer1.0-libav \
+        gstreamer1.0-plugins-base libgstreamer-plugins-base1.0-dev gstreamer1.0-libav
+RUN apt-get -y install --no-install-recommends \
         libgstrtspserver-1.0-dev gstreamer1.0-tools libges-1.0-dev \
         libharfbuzz-dev liblzma-dev libudev-dev libunwind-dev \
-        libvulkan1 libx11-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxmu-dev \
+        libvulkan1 libx11-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxmu-dev
+RUN apt-get -y install --no-install-recommends \
         libxmu6 libegl1-mesa-dev llvm-dev m4 xorg-dev libxkbcommon0 libxkbcommon-x11-0 \
         xvfb gh sudo openjdk-21-jre-headless jq \
     && rm -rf /var/cache/apt/lists
@@ -43,7 +47,7 @@ ARG USERNAME
 USER ${USERNAME}
 ARG RUST_VERSION
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-        | sh -s -- -y --default-toolchain ${RUST_VERSION} \ 
+        | sh -s -- -y --default-toolchain ${RUST_VERSION} \
         --profile=minimal \
         --component rustfmt \
         --component clippy \
@@ -62,17 +66,17 @@ RUN mkdir -p "$HOME/.local/bin" \
         -LsSf https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-installer.sh | sh
 
 ##### FETCH SERVO ####################################################################
-FROM base_fetcher AS servo_fetcher 
+FROM base_fetcher AS servo_fetcher
 ARG USERNAME
 
 RUN mkdir -p /data/servo/servo && chown -R "${USERNAME}:${USERNAME}" /data/
 USER ${USERNAME}
-# Clone servo, ignoring the history. We keep a small history, just in case some of our 
+# Clone servo, ignoring the history. We keep a small history, just in case some of our
 # scripts might rely on a bit of history being available.
 RUN cd /data/servo && git clone https://github.com/servo/servo.git --depth 10
 WORKDIR /data/servo/servo
 
-# The above layer will be cached. For faster image rebuilds we 
+# The above layer will be cached. For faster image rebuilds we
 # just pull the diff from the previous cached layer.
 ARG SERVO_GIT_HASH=origin/main
 RUN git pull && git reset --hard "${SERVO_GIT_HASH}"
@@ -91,7 +95,7 @@ ARG USERNAME
 USER ${USERNAME}
 WORKDIR /data/servo/servo
 
-COPY --chown=${USERNAME}:${USERNAME} --from=rust_toolchain /home/${USERNAME}/.cargo /home/${USERNAME}/.cargo 
+COPY --chown=${USERNAME}:${USERNAME} --from=rust_toolchain /home/${USERNAME}/.cargo /home/${USERNAME}/.cargo
 COPY --chown=${USERNAME}:${USERNAME} --from=rust_toolchain /home/${USERNAME}/.rustup /home/${USERNAME}/.rustup
 COPY --chown="${USERNAME}:${USERNAME}" --from=uv /root/.local/bin/uv /root/.local/bin/uvx /home/${USERNAME}/.cargo/bin/
 ENV PATH="/home/${USERNAME}/.cargo/bin:${PATH}"
