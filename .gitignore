@@ -10,3 +10,5 @@
 /monitor.toml
 
 /docker/docker_jit_monitor/target/
+.DS_Store
+/target
