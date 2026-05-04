@@ -44,14 +44,14 @@ struct Args {
     #[clap(
         long,
         value_enum,
-        default_value_t = SingleLabelMode::Default,
+        default_value_t = SingleTypeMode::Default,
         help = "Limit this monitor to builder runners, runner runners, or keep the default mixed mode"
     )]
-    single_label_mode: SingleLabelMode,
+    single_type_mode: SingleTypeMode,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
-enum SingleLabelMode {
+enum SingleTypeMode {
     #[default]
     Default,
     Builder,
@@ -181,12 +181,12 @@ impl ContainerType {
     }
 }
 
-impl SingleLabelMode {
+impl SingleTypeMode {
     fn container_types(self) -> ContainerTypeIterator {
         match self {
-            SingleLabelMode::Default => ContainerType::iter(),
-            SingleLabelMode::Builder => ContainerTypeIterator::single(ContainerType::Builder),
-            SingleLabelMode::Runner => ContainerTypeIterator::single(ContainerType::Runner),
+            SingleTypeMode::Default => ContainerType::iter(),
+            SingleTypeMode::Builder => ContainerTypeIterator::single(ContainerType::Builder),
+            SingleTypeMode::Runner => ContainerTypeIterator::single(ContainerType::Runner),
         }
     }
 }
@@ -220,14 +220,14 @@ fn iter_test() {
 }
 
 #[test]
-fn single_label_mode_test() {
-    let default_types = SingleLabelMode::Default.container_types().collect::<Vec<_>>();
+fn single_type_mode_test() {
+    let default_types = SingleTypeMode::Default.container_types().collect::<Vec<_>>();
     assert_eq!(default_types, vec![ContainerType::Builder, ContainerType::Runner]);
 
-    let builder_types = SingleLabelMode::Builder.container_types().collect::<Vec<_>>();
+    let builder_types = SingleTypeMode::Builder.container_types().collect::<Vec<_>>();
     assert_eq!(builder_types, vec![ContainerType::Builder]);
 
-    let runner_types = SingleLabelMode::Runner.container_types().collect::<Vec<_>>();
+    let runner_types = SingleTypeMode::Runner.container_types().collect::<Vec<_>>();
     assert_eq!(runner_types, vec![ContainerType::Runner]);
 }
 
@@ -266,7 +266,7 @@ fn main() -> anyhow::Result<()> {
 
     loop {
         let exiting = EXITING.load(Ordering::Relaxed);
-        for container_type in args.single_label_mode.container_types() {
+        for container_type in args.single_type_mode.container_types() {
             if running_containers
                 .iter()
                 .filter(|container| container.container_type == container_type)
