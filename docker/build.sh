@@ -4,6 +4,7 @@ set -eu
 
 COMMANDLINE_TOOLS_PATH="https://repo.huaweicloud.com/harmonyos/ohpm/5.1.0/commandline-tools-linux-x64-5.1.0.840.zip"
 STAGED_COMMANDLINE_TOOLS_PATH=
+USER_SPECIFIED_SDK_PATH=0
 
 sdk_version() {
     local sdk_path
@@ -32,6 +33,7 @@ do
                 exit 1
             fi
             COMMANDLINE_TOOLS_PATH="$2"
+            USER_SPECIFIED_SDK_PATH=1
             shift 2
             ;;
         -h|--help)
@@ -45,6 +47,12 @@ do
             ;;
     esac
 done
+
+if [[ "${USER_SPECIFIED_SDK_PATH}" -eq 1 && "${COMMANDLINE_TOOLS_PATH}" != http://* && "${COMMANDLINE_TOOLS_PATH}" != https://* && ! -f "${COMMANDLINE_TOOLS_PATH}" ]]
+then
+    echo "SDK archive not found: ${COMMANDLINE_TOOLS_PATH}" >&2
+    exit 1
+fi
 
 cleanup() {
     if [[ -n "${STAGED_COMMANDLINE_TOOLS_PATH}" && -f "${STAGED_COMMANDLINE_TOOLS_PATH}" ]]
