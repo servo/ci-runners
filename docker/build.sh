@@ -5,6 +5,18 @@ set -eu
 COMMANDLINE_TOOLS_PATH="https://repo.huaweicloud.com/harmonyos/ohpm/5.1.0/commandline-tools-linux-x64-5.1.0.840.zip"
 STAGED_COMMANDLINE_TOOLS_PATH=
 
+sdk_version() {
+    local sdk_path
+    sdk_path="${1##*/}"
+
+    if [[ "${sdk_path}" =~ commandline-tools-linux-x64-(.+)\.zip$ ]]
+    then
+        echo "${BASH_REMATCH[1]}"
+    else
+        echo "${sdk_path}"
+    fi
+}
+
 usage() {
     echo "Usage: $0 [--sdk-path PATH]"
 }
@@ -42,6 +54,13 @@ cleanup() {
 }
 
 trap cleanup EXIT
+
+if [[ -f "${COMMANDLINE_TOOLS_PATH}" ]]
+then
+    echo "Using SDK version $(sdk_version "${COMMANDLINE_TOOLS_PATH}") from local archive: ${COMMANDLINE_TOOLS_PATH}"
+else
+    echo "Using SDK version $(sdk_version "${COMMANDLINE_TOOLS_PATH}") from web"
+fi
 
 if [[ -f "${COMMANDLINE_TOOLS_PATH}" ]]
 then
