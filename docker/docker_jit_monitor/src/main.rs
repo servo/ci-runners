@@ -45,7 +45,7 @@ struct Args {
         long,
         value_enum,
         default_value_t = SingleTypeMode::Both,
-        help = "Limit this monitor to builder runners, runner runners, or run both"
+        help = "set if you want only one type of runner running"
     )]
     single_type_mode: SingleTypeMode,
 }
