@@ -165,13 +165,6 @@ enum ContainerType {
 }
 
 impl ContainerType {
-    /// This iterator will go from Builder -> Runner and then stop.
-    fn iter() -> ContainerTypeIterator {
-        ContainerTypeIterator {
-            remaining: vec![ContainerType::Runner, ContainerType::Builder],
-        }
-    }
-
     /// The number of concurrent instances we allow for this container type
     fn concurrent_number(&self, args: &Args) -> usize {
         match self {
@@ -184,7 +177,9 @@ impl ContainerType {
 impl From<SingleTypeMode> for ContainerTypeIterator {
     fn from(value: SingleTypeMode) -> Self {
         match value {
-            SingleTypeMode::Both => ContainerType::iter(),
+            SingleTypeMode::Both => ContainerTypeIterator {
+                remaining: vec![ContainerType::Builder, ContainerType::Runner],
+            },
             SingleTypeMode::Builder => ContainerTypeIterator {
                 remaining: vec![ContainerType::Builder],
             },
@@ -208,19 +203,11 @@ impl Iterator for ContainerTypeIterator {
 }
 
 #[test]
-fn iter_test() {
-    let mut it = ContainerType::iter();
-    assert_eq!(it.next(), Some(ContainerType::Builder));
-    assert_eq!(it.next(), Some(ContainerType::Runner));
-    assert_eq!(it.next(), None);
-}
-
-#[test]
 fn single_type_mode_test() {
     let both_types = ContainerTypeIterator::from(SingleTypeMode::Both).collect::<Vec<_>>();
     assert_eq!(
         both_types,
-        vec![ContainerType::Builder, ContainerType::Runner]
+        vec![ContainerType::Runner, ContainerType::Builder]
     );
 
     let builder_types = ContainerTypeIterator::from(SingleTypeMode::Builder).collect::<Vec<_>>();
