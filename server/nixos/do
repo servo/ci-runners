@@ -45,8 +45,12 @@ case "$action" in
         esac
     done
     for host in $hosts; do
-        mosh root@"$host".servo.org -- "$@"
+        ssh root@"$host".servo.org -- "$@"
     done
+    ;;
+(mosh)
+    host=$1; shift
+    mosh root@"$host".servo.org -- "$@"
     ;;
 (logs)
     mosh root@"$1".servo.org tmux new 'journalctl -af'
@@ -55,7 +59,7 @@ case "$action" in
     mosh root@"$1".servo.org tmux new 'htop'
     ;;
 (*)
-    >&2 echo 'usage: ./do <deploy|read|write|restart-monitor|run|logs|htop> [args ...]'
+    >&2 echo 'usage: ./do <deploy|read|write|restart-monitor|run|mosh|logs|htop> [args ...]'
     exit 1
     ;;
 esac
