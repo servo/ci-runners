@@ -30,6 +30,14 @@ case "$action" in
         printf '>>> %s\n' https://"$host".servo.org
     done
     ;;
+(restart-queue)
+    for host; do
+        ssh root@"$host".servo.org systemctl restart queue
+    done
+    for host; do
+        printf '>>> %s\n' https://"$host".servo.org/queue/
+    done
+    ;;
 (run)
     hosts=
     for arg; do
@@ -59,7 +67,7 @@ case "$action" in
     mosh root@"$1".servo.org tmux new 'htop'
     ;;
 (*)
-    >&2 echo 'usage: ./do <deploy|read|write|restart-monitor|run|mosh|logs|htop> [args ...]'
+    >&2 echo 'usage: ./do <deploy|read|write|restart-monitor|restart-queue|run|mosh|logs|htop> [args ...]'
     exit 1
     ;;
 esac
