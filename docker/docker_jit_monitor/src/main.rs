@@ -43,15 +43,16 @@ struct Args {
     concurrent_builders: u8,
     #[clap(
         long,
+        env = "MODE",
         value_enum,
-        default_value_t = SingleTypeMode::Both,
+        default_value_t = Mode::Both,
         help = "set if you want only one type of runner running"
     )]
-    single_type_mode: SingleTypeMode,
+    mode: Mode,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
-enum SingleTypeMode {
+enum Mode {
     #[default]
     Both,
     Builder,
@@ -174,16 +175,16 @@ impl ContainerType {
     }
 }
 
-impl From<SingleTypeMode> for ContainerTypeIterator {
-    fn from(value: SingleTypeMode) -> Self {
+impl From<Mode> for ContainerTypeIterator {
+    fn from(value: Mode) -> Self {
         match value {
-            SingleTypeMode::Both => ContainerTypeIterator {
+            Mode::Both => ContainerTypeIterator {
                 remaining: vec![ContainerType::Builder, ContainerType::Runner],
             },
-            SingleTypeMode::Builder => ContainerTypeIterator {
+            Mode::Builder => ContainerTypeIterator {
                 remaining: vec![ContainerType::Builder],
             },
-            SingleTypeMode::Runner => ContainerTypeIterator {
+            Mode::Runner => ContainerTypeIterator {
                 remaining: vec![ContainerType::Runner],
             },
         }
@@ -204,16 +205,16 @@ impl Iterator for ContainerTypeIterator {
 
 #[test]
 fn single_type_mode_test() {
-    let both_types = ContainerTypeIterator::from(SingleTypeMode::Both).collect::<Vec<_>>();
+    let both_types = ContainerTypeIterator::from(Mode::Both).collect::<Vec<_>>();
     assert_eq!(
         both_types,
         vec![ContainerType::Runner, ContainerType::Builder]
     );
 
-    let builder_types = ContainerTypeIterator::from(SingleTypeMode::Builder).collect::<Vec<_>>();
+    let builder_types = ContainerTypeIterator::from(Mode::Builder).collect::<Vec<_>>();
     assert_eq!(builder_types, vec![ContainerType::Builder]);
 
-    let runner_types = ContainerTypeIterator::from(SingleTypeMode::Runner).collect::<Vec<_>>();
+    let runner_types = ContainerTypeIterator::from(Mode::Runner).collect::<Vec<_>>();
     assert_eq!(runner_types, vec![ContainerType::Runner]);
 }
 
@@ -252,7 +253,7 @@ fn main() -> anyhow::Result<()> {
 
     loop {
         let exiting = EXITING.load(Ordering::Relaxed);
-        for container_type in ContainerTypeIterator::from(args.single_type_mode) {
+        for container_type in ContainerTypeIterator::from(args.mode) {
             if running_containers
                 .iter()
                 .filter(|container| container.container_type == container_type)
