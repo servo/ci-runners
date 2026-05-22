@@ -8,7 +8,7 @@ use std::{
 use thiserror::Error;
 
 use anyhow::{anyhow, Context};
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use log::{error, info, warn};
 
 use crate::github_api::{get_idle_runners, spawn_runner};
@@ -37,10 +37,27 @@ struct Args {
     #[clap(
         short,
         long,
+        env = "SERVO_OHOS_CI_CONCURRENT_BUILDERS",
         help = "Number of concurrent builder github runners on this machine",
         default_value_t = 1
     )]
     concurrent_builders: u8,
+    #[clap(
+        long,
+        env = "SERVO_OHOS_CI_MONITOR_MODE",
+        value_enum,
+        default_value_t = Mode::Both,
+        help = "set if you want only one type of runner running"
+    )]
+    mode: Mode,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
+enum Mode {
+    #[default]
+    Both,
+    Builder,
+    Runner,
 }
 
 struct RunnerConfig {
@@ -152,14 +169,6 @@ enum ContainerType {
 }
 
 impl ContainerType {
-    /// This iterator will go from Builder -> Runner and then stop.
-    fn iter() -> ContainerTypeIterator {
-        ContainerTypeIterator {
-            current: None,
-            finished: false,
-        }
-    }
-
     /// The number of concurrent instances we allow for this container type
     fn concurrent_number(&self, args: &Args) -> usize {
         match self {
@@ -169,36 +178,47 @@ impl ContainerType {
     }
 }
 
+impl From<Mode> for ContainerTypeIterator {
+    fn from(value: Mode) -> Self {
+        match value {
+            Mode::Both => ContainerTypeIterator {
+                remaining: vec![ContainerType::Builder, ContainerType::Runner],
+            },
+            Mode::Builder => ContainerTypeIterator {
+                remaining: vec![ContainerType::Builder],
+            },
+            Mode::Runner => ContainerTypeIterator {
+                remaining: vec![ContainerType::Runner],
+            },
+        }
+    }
+}
+
 struct ContainerTypeIterator {
-    current: Option<ContainerType>,
-    finished: bool,
+    remaining: Vec<ContainerType>,
 }
 
 impl Iterator for ContainerTypeIterator {
     type Item = ContainerType;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.finished {
-            return None;
-        }
-        self.current = match self.current {
-            None => Some(ContainerType::Builder),
-            Some(ContainerType::Builder) => Some(ContainerType::Runner),
-            Some(ContainerType::Runner) => {
-                self.finished = true;
-                None
-            }
-        };
-        self.current.clone()
+        self.remaining.pop()
     }
 }
 
 #[test]
-fn iter_test() {
-    let mut it = ContainerType::iter();
-    assert_eq!(it.next(), Some(ContainerType::Builder));
-    assert_eq!(it.next(), Some(ContainerType::Runner));
-    assert_eq!(it.next(), None);
+fn single_type_mode_test() {
+    let both_types = ContainerTypeIterator::from(Mode::Both).collect::<Vec<_>>();
+    assert_eq!(
+        both_types,
+        vec![ContainerType::Runner, ContainerType::Builder]
+    );
+
+    let builder_types = ContainerTypeIterator::from(Mode::Builder).collect::<Vec<_>>();
+    assert_eq!(builder_types, vec![ContainerType::Builder]);
+
+    let runner_types = ContainerTypeIterator::from(Mode::Runner).collect::<Vec<_>>();
+    assert_eq!(runner_types, vec![ContainerType::Runner]);
 }
 
 #[derive(Debug)]
@@ -236,7 +256,7 @@ fn main() -> anyhow::Result<()> {
 
     loop {
         let exiting = EXITING.load(Ordering::Relaxed);
-        for container_type in ContainerType::iter() {
+        for container_type in ContainerTypeIterator::from(args.mode) {
             if running_containers
                 .iter()
                 .filter(|container| container.container_type == container_type)
