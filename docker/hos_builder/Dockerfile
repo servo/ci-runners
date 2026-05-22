@@ -112,4 +112,4 @@ RUN cd /data/servo/servo && ./mach bootstrap --skip-platform
 
 FROM servo_base AS servo_cooked_ohos_release
 
-RUN ./mach build --ohos --profile=release --no-package --no-default-features --features=tracing,tracing-hitrace
+RUN ./mach build --ohos --profile=checked-release --no-package --no-default-features --features=tracing,tracing-hitrace
