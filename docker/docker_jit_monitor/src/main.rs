@@ -37,6 +37,7 @@ struct Args {
     #[clap(
         short,
         long,
+        env = "SERVO_OHOS_CI_CONCURRENT_BUILDERS",
         help = "Number of concurrent builder github runners on this machine",
         default_value_t = 1
     )]
