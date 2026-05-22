@@ -27,9 +27,9 @@ bake_servo_repo() (
     ./mach bootstrap --force
     # TODO: bake in a build for the libservo/MSRV job
     # Build the same way as a typical macOS libservo job, to allow for incremental builds.
-    # cargo build -p libservo --all-targets --profile release --target-dir target/libservo
+    # cargo build -p libservo --all-targets --profile checked-release --target-dir target/libservo
     # Build the same way as a typical macOS build job, to allow for incremental builds.
-    ./mach build --use-crown --locked --profile release
+    ./mach build --use-crown --locked --profile checked-release
 )
 
 start_github_actions_runner() {
