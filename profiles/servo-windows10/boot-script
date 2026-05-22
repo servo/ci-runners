@@ -128,12 +128,11 @@ if (!(Test-Path .\image-built)) {
     echo "`$env:PATH in runner image = $env:PATH" >> C:\init\incremental_build_debug.txt
 
     $env:RUSTUP_WINDOWS_PATH_ADD_BIN = 1
+    # TODO: bake in a build for the libservo/MSRV job
     # Build the same way as a typical Windows libservo job, to allow for incremental builds.
-    # FIXME: `cargo build -p libservo` is busted on most platforms <https://github.com/servo/servo/issues/37939>
-    # FIXME: `cargo build -p libservo` is untested in CI <https://github.com/servo/servo/issues/38015>
-    # cargo build -p libservo --all-targets --release --target-dir target\libservo; Check
+    # cargo build -p libservo --all-targets --profile checked-release --target-dir target\libservo; Check
     # Build the same way as a typical Windows build job, to allow for incremental builds.
-    .\mach build --use-crown --locked --release; Check
+    .\mach build --use-crown --locked --profile checked-release; Check
 
     # Leave the Servo repo
     cd C:\ci
