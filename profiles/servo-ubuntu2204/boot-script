@@ -27,14 +27,14 @@ bake_servo_repo() (
 
     # DEBIAN_FRONTEND needed to avoid hang when installing tshark
     DEBIAN_FRONTEND=noninteractive ./mach bootstrap --force
+    # TODO: bake in a build for the libservo/MSRV job
     # Build the same way as a typical Linux libservo job, to allow for incremental builds.
-    # FIXME: `cargo build -p libservo` is untested in CI <https://github.com/servo/servo/issues/38015>
-    # cargo build -p libservo --all-targets --release --target-dir target/libservo
+    # cargo build -p libservo --all-targets --profile checked-release --target-dir target/libservo
     # Build the same way as a typical Linux build job, to allow for incremental builds.
-    ./mach build --use-crown --locked --release
+    ./mach build --use-crown --locked --profile checked-release
     # Some hacks that seem to help with incremental builds.
     git status
-    ./mach build --use-crown --locked --release
+    ./mach build --use-crown --locked --profile checked-release
 )
 
 install_github_actions_runner() {
@@ -54,7 +54,7 @@ reheat_servo_repo() (
     git status
 
     # Freshen cargo’s understanding of the incremental build.
-    ./mach build --use-crown --locked --release
+    ./mach build --use-crown --locked --profile checked-release
 )
 
 start_github_actions_runner() {
