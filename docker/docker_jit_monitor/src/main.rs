@@ -43,7 +43,7 @@ struct Args {
     concurrent_builders: u8,
     #[clap(
         long,
-        env = "MODE",
+        env = "SERVO_OHOS_CI_MONITOR_MODE",
         value_enum,
         default_value_t = Mode::Both,
         help = "set if you want only one type of runner running"
