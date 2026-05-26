@@ -169,6 +169,9 @@
     enable = true;
     # logError = "stderr notice";
     recommendedProxySettings = true;
+    # Raise client_max_body_size to avoid "HTTP Error 413: Request Entity Too Large."
+    # in intermittent-tracker (see #135, servo/servo#31845)
+    clientMaxBodySize = "20m";
     virtualHosts = let
       proxy = {
         extraConfig = ''
