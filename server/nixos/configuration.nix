@@ -169,6 +169,11 @@
     enable = true;
     # logError = "stderr notice";
     recommendedProxySettings = true;
+    commonHttpConfig = ''
+      # Raise client_max_body_size to avoid "HTTP Error 413: Request Entity Too Large."
+      # in intermittent-tracker (see #135, servo/servo#31845)
+      client_max_body_size 20m;
+    '';
     virtualHosts = let
       proxy = {
         extraConfig = ''
@@ -203,18 +208,11 @@
       "intermittent-tracker.servo.org" = lib.mkIf hasIntermittentTracker ({
         locations."/" = proxy // {
           proxyPass = "http://127.0.0.1:5000";
-          extraConfig = ''
-            # Raise client_max_body_size to avoid "HTTP Error 413: Request Entity Too Large."
-            client_max_body_size 20m;
-          '';
         };
       } // ssl);
       "staging.intermittent-tracker.servo.org" = lib.mkIf hasIntermittentTracker ({
         locations."/" = proxy // {
           proxyPass = "http://127.0.0.1:5001";
-          extraConfig = ''
-            client_max_body_size 20m;
-          '';
         };
       } // ssl);
     };
