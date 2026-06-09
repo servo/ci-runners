@@ -78,10 +78,10 @@ then
 fi
 
 SERVO_GIT_HASH=$(git ls-remote https://github.com/servo/servo.git --branches refs/heads/main | awk '{ print $1}')
-GITHUB_ACTIONS_RUNNER_VERSION="2.334.0"
+GITHUB_ACTIONS_RUNNER_VERSION="2.335.1"
 MITMPROXY_VERSION="12.2.1"
 RUST_VERSION="1.95.0"
-UV_VERSION="0.9.28"
+UV_VERSION="0.11.19"
 IMAGE_USERNAME=servo_ci
 
 
