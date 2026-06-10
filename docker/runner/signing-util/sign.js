@@ -9,15 +9,9 @@ const fs = require("fs");
 const path = require("path");
 class DecipherUtil {
   static decryptPwd(r, e) {
-    let t = buffer.Buffer.from("");
-    try {
-      const i = DecipherUtil.getKey(r),
-            o = new Int8Array(buffer.Buffer.from(e, "hex"));
-      t = DecipherUtil.decrypt(i, o)
-    } catch (e) {
-      console.log(e);
-    }
-    return t.toString("utf-8")
+    const i = DecipherUtil.getKey(r),
+          o = new Int8Array(buffer.Buffer.from(e, "hex"));
+    return DecipherUtil.decrypt(i, o).toString("utf-8")
   }
   static getKey(r) {
     const e = path.resolve(r, "material");
