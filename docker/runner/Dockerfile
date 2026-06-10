@@ -41,7 +41,7 @@ RUN chown ${USERNAME}:${USERNAME} -R /home/${USERNAME}/.ohos
 # Used to authorize with the hdc device and avoid the confirmation dialog.
 COPY --chown=${USERNAME}:${USERNAME} hdckey hdckey.pub /home/${USERNAME}/.harmony/
 
-COPY sign.sh /usr/bin/sign-hos.sh
+COPY --chmod=755 sign.sh /usr/bin/sign-hos.sh
 
 ARG MITMPROXY_VERSION
 ARG UV_VERSION
