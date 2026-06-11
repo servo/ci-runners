@@ -4,17 +4,15 @@
 # https://github.com/TermonyHQ/Termony/blob/4e811a27d36be4037eadda456e4f057670c8198f/sign.js
 
 
+from pathlib import PurePosixPath
 import argparse
 import json
 import os
 import shutil
 import subprocess
-import urllib.request
 
 def key_base_name_from_certpath(certpath: str) -> str:
-    filename = certpath.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]
-    return os.path.splitext(filename)[0]
-
+    return PurePosixPath(certpath.replace("\\", "/")).stem
 
 def decrypt_pwd(path: str, password: str) -> bytes:
     node = shutil.which("node")
