@@ -310,6 +310,11 @@
       serviceConfig = {
         WorkingDirectory = "/config/monitor";
         Restart = "on-failure";
+        RestartSec = "5s";
+        RestartSteps = 5;
+        RestartMaxDelaySec = "5min";
+        StartLimitBurst = 10;
+        StartLimitIntervalSec = "35min";
       };
     };
 
