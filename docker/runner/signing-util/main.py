@@ -4,13 +4,15 @@
 # https://github.com/TermonyHQ/Termony/blob/4e811a27d36be4037eadda456e4f057670c8198f/sign.js
 
 
+from pathlib import PurePosixPath
 import argparse
 import json
 import os
-from pathlib import Path
 import shutil
 import subprocess
-import urllib.request
+
+def key_base_name_from_certpath(certpath: str) -> str:
+    return PurePosixPath(certpath.replace("\\", "/")).stem
 
 def decrypt_pwd(path: str, password: str) -> bytes:
     node = shutil.which("node")
@@ -29,13 +31,12 @@ if __name__ == "__main__":
     profile = json.load(open(args.build_profile_json))
     config = profile["app"]["signingConfigs"][0]["material"]
 
-    basePath = Path(config["certpath"]).parent
     build_profile_path, filename = os.path.split(args.build_profile_json)
 
     keyPwd = decrypt_pwd(build_profile_path, config["keyPassword"]).strip()
 
     keystorePwd = decrypt_pwd(build_profile_path, config["storePassword"]).strip()
-    key_base_name = config["certpath"].split("\\")[-1].split(".")[0]
+    key_base_name = key_base_name_from_certpath(config["certpath"])
 
     with open("sign.sh", "w") as f:
         f.write("#!/usr/bin/env bash\n")
@@ -54,5 +55,4 @@ if __name__ == "__main__":
         f.write("-inFile $1 ")
         f.write("-outFile $2 ")
         print("File sign.sh written")
-
 
