@@ -124,6 +124,10 @@ if (!(Test-Path .\image-built)) {
 
     .\mach bootstrap; Check
 
+    # FIXME: workaround for servo/servo#46523 <https://github.com/servo/servo/issues/46523>
+    # Update $env:PATH from defaults, to pick up the LLVM directory added by `mach bootstrap`.
+    Update-SessionEnvironment
+
     # Save a copy of the environment variables that can break incremental builds, for debugging.
     mkdir -p C:\init
     echo "`$env:LIBCLANG_PATH in runner image = $env:LIBCLANG_PATH" > C:\init\incremental_build_debug.txt
