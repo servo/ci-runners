@@ -5,6 +5,7 @@
   qemu,
   runCommand,
   writeText,
+  openssl,
 }: let
   jammy-server-cloudimg-amd64_img = fetchurl {
     url = "https://cloud-images.ubuntu.com/jammy/20251023/jammy-server-cloudimg-amd64.img";
@@ -53,6 +54,12 @@ in linkFarm "image-deps" {
     hash = "sha256-kvqQhdJMIUu0RFzB2owVypzKjP+zRyYkD6CMUwLpTMw=";
   };
 
+  "windows10/cacert.pfx" = runCommand "cacert.pfx" {} ''
+    ${openssl}/bin/openssl pkcs12 -export -nokeys -passout pass:servo -out $out -in ${fetchurl {
+      url = "https://curl.se/ca/cacert.pem";
+      hash = "sha256-hqHzNmr6x8b4rp88d5rCIRKTKMQ/CrK4gX6y82KlAlw=";
+    }}
+  '';
   "windows10/virtio-win-0.1.240.iso" = fetchurl {
     url = "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.240-1/virtio-win-0.1.240.iso";
     hash = "sha256-69SCWGaPf3jgJu0nbCip0Z2D4CD/oICtaZENyGu8vMY=";

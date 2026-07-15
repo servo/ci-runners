@@ -18,6 +18,13 @@ function Check {
 cd C:\ci
 
 if (!(Test-Path .\image-built)) {
+    # Install Mozilla’s root certificates, to avoid SSL errors in Python.
+    # More details: <https://github.com/python/cpython/issues/80192>
+    # Example error: `Error downloading moztools-4.0: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1016). The failing URL was: https://github.com/servo/servo-build-deps/releases/download/msvc-deps/moztools-4.0.zip`
+    curl.exe -fsSLO 'http://192.168.100.1:8000/image-deps/windows10/cacert.pfx'; Check
+    $pfx_password = ConvertTo-SecureString "servo" -AsPlainText -Force
+    Import-PfxCertificate -Password $pfx_password -CertStoreLocation Cert:\LocalMachine\Root -FilePath cacert.pfx
+
     # Install Git
     # Note: installer automatically uninstalls first if needed, so the check is just there to save time
     if (!(Test-Path 'C:\Program Files\Git\cmd\git.exe')) {
@@ -42,14 +49,6 @@ if (!(Test-Path .\image-built)) {
         curl.exe -fsSLO 'http://192.168.100.1:8000/image-deps/windows10/uv-installer.ps1'; Check
         .\uv-installer.ps1; Check
     }
-
-    # Workaround for `Error downloading moztools-4.0: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1016). The failing URL was: https://github.com/servo/servo-build-deps/releases/download/msvc-deps/moztools-4.0.zip`
-    # <https://github.com/python/cpython/issues/80192>
-    Invoke-WebRequest -UseBasicParsing https://github.com | Out-Null
-    try {
-        # This request is a 404, so we need to try/catch
-        Invoke-WebRequest -UseBasicParsing https://release-assets.githubusercontent.com | Out-Null
-    } catch {}
 
     # Install rustup and the latest Rust
     if (!(Test-Path C:\Users\Administrator\.rustup)) {
