@@ -15,6 +15,14 @@ function Check {
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
+function Update-SessionEnvironment {
+    # This is a bit like what refreshenv / Update-SessionEnvironment used to do in Chocolatey,
+    # but in servo/servo#42372 we moved from Chocolatey to WinGet, so we need to roll our own.
+    # <https://stackoverflow.com/a/31845512>
+    # <https://stackoverflow.com/a/46760714>
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+}
+
 cd C:\ci
 
 if (!(Test-Path .\image-built)) {
@@ -50,8 +58,7 @@ if (!(Test-Path .\image-built)) {
         .\python-3.10.11-amd64.exe /passive | Out-Default; Check
     }
 
-    # Install uv. Note that actually running uv relies on $env:USERPROFILE\.local\bin being on PATH,
-    # and that directory gets added to PATH by Chocolatey and refreshenv (see refreshenv.ps1).
+    # Install uv
     if (!(Test-Path C:\Users\Administrator\.local\bin\uv.exe)) {
         curl.exe -fsSLO 'http://192.168.100.1:8000/image-deps/windows10/uv-installer.ps1'; Check
         .\uv-installer.ps1; Check
@@ -63,31 +70,20 @@ if (!(Test-Path .\image-built)) {
         .\rustup-init.exe -y --quiet; Check
     }
 
-    # Install .NET 4.8 for Chocolatey
-    # Note: installer is idempotent, so the check is just there to save time
-    # Note: explicit install avoids failure in Chocolatey installer due to the required reboot
-    # See also: <https://learn.microsoft.com/en-us/dotnet/framework/migration-guide/how-to-determine-which-versions-are-installed#query-the-registry-using-powershell>
-    # See also: <https://learn.microsoft.com/en-us/dotnet/core/install/windows?tabs=net80>
-    # See also: the installer’s /?
-    if (!((Get-ItemPropertyValue -LiteralPath 'HKLM:SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full' -Name Release) -ge 528040)) {
-        curl.exe -fsSLO 'http://192.168.100.1:8000/image-deps/windows10/ndp48-x86-x64-allos-enu.exe'; Check
-        # /passive works on Windows Server with desktop, but not on core
-        # <https://serverfault.com/a/914454>
-        .\ndp48-x86-x64-allos-enu.exe /norestart /q | Out-Default; Check
-        # Reboot to avoid running Chocolatey installer
-        shutdown /r /t 0
-        exit  # `shutdown` does not exit
-    }
-
-    # Install Chocolatey
-    if (!(Test-Path C:\ProgramData\chocolatey\bin\choco.exe)) {
-        Set-ExecutionPolicy Bypass -Scope Process -Force
-        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-        iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+    # Install WinGet, which does not ship with Windows 10.
+    # Based on: <https://github.com/servo/servo/pull/42372>
+    # Based on: <https://learn.microsoft.com/en-us/windows/package-manager/winget/troubleshooting>
+    if (!(Test-Path $env:LOCALAPPDATA\Microsoft\WindowsApps\winget.exe)) {
+        Install-PackageProvider -Name NuGet -Force
+        Install-Module -Name Microsoft.WinGet.Client -Repository PSGallery -Force
+        # NOTE: unlike in servo/servo#42372, we do not use `-AllUsers`, to avoid an error:
+        # `Deployment failed with HRESULT: 0x80073D06, The package could not be installed because a higher version of this package is already installed.`
+        # `Windows cannot install package Microsoft.DesktopAppInstaller_1.0.30251.0_x64__8wekyb3d8bbwe because it has version 1.0.30251.0. A higher version 1.29.280.0 of this package is already installed.`
+        Repair-WinGetPackageManager -Latest -Force
     }
 
     # Install Visual Studio 2022 (17.0), with the components from the Servo book
-    # <https://book.servo.org/hacking/setting-up-your-environment.html#tools-for-windows>
+    # <https://book.servo.org/building/windows.html>
     # See also: <https://github.com/rust-lang/rustup/blob/2a5a69e0914ff419554d684ca71eb1d72c72bcb3/src/cli/self_update/windows.rs#L174>
     # See also: <https://learn.microsoft.com/en-us/visualstudio/install/use-command-line-parameters-to-install-visual-studio?view=vs-2022>
     # See also: the installer’s --help
@@ -102,14 +98,10 @@ if (!(Test-Path .\image-built)) {
             --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
             --add Microsoft.VisualStudio.Component.VC.ATL `
             --passive | Out-Default; Check
-        # FIXME: rebooting here as a speculative fix for choco hanging during warm.ps1
-        shutdown /r /t 0
-        exit  # `shutdown` does not exit
     }
 
-    if (!(Test-Path .\refreshenv.ps1)) {
-        curl.exe -fsSLO 'http://192.168.100.1:8000/image-deps/windows10/refreshenv.ps1'; Check
-    }
+    # Update $env:PATH from defaults, to pick up the tools installed above.
+    Update-SessionEnvironment
 
     # Clone and enter the Servo repo
     if (!(Test-Path C:\a\servo\servo)) {
@@ -124,23 +116,22 @@ if (!(Test-Path .\image-built)) {
     .\mach fetch; Check
     .\mach bootstrap-gstreamer; Check
 
-    # Like `mach bootstrap`, but doesn’t require closing choco’s conhost window manually (servo#32342)
-    choco install -y support\windows\chocolatey.config; Check
-    . C:\ci\refreshenv.ps1
-
     # Install the Rust toolchain, for checkouts without servo#35795
     rustup show active-toolchain
     if ($LASTEXITCODE -ne 0) {
         rustup toolchain install; Check
     }
 
-    .\mach bootstrap --skip-platform; Check
+    .\mach bootstrap; Check
 
     # Save a copy of the environment variables that can break incremental builds, for debugging.
     mkdir -p C:\init
     echo "`$env:LIBCLANG_PATH in runner image = $env:LIBCLANG_PATH" > C:\init\incremental_build_debug.txt
     echo "`$env:PATH in runner image = $env:PATH" >> C:\init\incremental_build_debug.txt
 
+    # Work around servo/servo#32302 (see also servo/servo#32300)
+    # <https://github.com/servo/servo/issues/32302>
+    # <https://github.com/servo/servo/issues/32300>
     $env:RUSTUP_WINDOWS_PATH_ADD_BIN = 1
     # TODO: bake in a build for the libservo/MSRV job
     # Build the same way as a typical Windows libservo job, to allow for incremental builds.
@@ -175,7 +166,6 @@ if (!(Test-Path .\image-built)) {
     # Use the actual curl shipped in Windows 1804+, not the alias for Invoke-WebRequest
     $jitconfig = curl.exe -fsS --max-time 5 --retry 99 --retry-all-errors http://192.168.100.1:8000/github-jitconfig | ConvertFrom-Json
     if ($jitconfig -ne $null) {
-        . C:\ci\refreshenv.ps1
         & C:\ci\actions-runner\actions-runner-win-x64\run.cmd --jitconfig $jitconfig
     }
 }

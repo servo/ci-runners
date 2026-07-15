@@ -105,5 +105,4 @@ in linkFarm "image-deps" {
   };
   "windows10/software.reg" = writeText "software.reg" (lib.readFile ../../static/windows10/software.reg);
   "windows10/system.reg" = writeText "system.reg" (lib.readFile ../../static/windows10/system.reg);
-  "windows10/refreshenv.ps1" = writeText "refreshenv.ps1" (lib.readFile ../../static/windows10/refreshenv.ps1);
 }
