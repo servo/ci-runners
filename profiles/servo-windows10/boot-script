@@ -43,6 +43,10 @@ if (!(Test-Path .\image-built)) {
         .\uv-installer.ps1; Check
     }
 
+    # Workaround for `Error downloading moztools-4.0: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1016). The failing URL was: https://github.com/servo/servo-build-deps/releases/download/msvc-deps/moztools-4.0.zip`
+    # <https://github.com/python/cpython/issues/80192>
+    Invoke-WebRequest -UseBasicParsing https://github.com | Out-Null
+
     # Install rustup and the latest Rust
     if (!(Test-Path C:\Users\Administrator\.rustup)) {
         curl.exe -fsSLO 'http://192.168.100.1:8000/image-deps/windows10/rustup-init.exe'; Check
