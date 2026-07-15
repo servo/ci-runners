@@ -5,6 +5,7 @@
   qemu,
   runCommand,
   writeText,
+  openssl,
 }: let
   jammy-server-cloudimg-amd64_img = fetchurl {
     url = "https://cloud-images.ubuntu.com/jammy/20251023/jammy-server-cloudimg-amd64.img";
@@ -25,8 +26,8 @@ in linkFarm "image-deps" {
     hash = "sha256-c6l5/36c6KcCRPOpWdiWhwvkhvrJK7CO2QaE+WFHTg0=";
   };
   "macos13/uv-installer.sh" = fetchurl {
-    url = "https://github.com/astral-sh/uv/releases/download/0.8.17/uv-installer.sh";
-    hash = "sha256-A7FPajPSs8FaghFb8z/TiwleE4PPm8I1r6MwOu2Axjs=";
+    url = "https://github.com/astral-sh/uv/releases/download/0.11.26/uv-installer.sh";
+    hash = "sha256-kvqQhdJMIUu0RFzB2owVypzKjP+zRyYkD6CMUwLpTMw=";
   };
   "macos13/install-xcode-clt.sh" = fetchurl {
     url = "https://raw.githubusercontent.com/actions/runner-images/3d5f09a90fd475a3531b0ef57325aa7e27b24595/images/macos/scripts/build/install-xcode-clt.sh";
@@ -49,10 +50,16 @@ in linkFarm "image-deps" {
     hash = "sha256-BIAkzSyEjrbxTVZG1WwTpN7yrn7jrRISK+6WDFbz0nE=";
   };
   "ubuntu2204/uv-installer.sh" = fetchurl {
-    url = "https://github.com/astral-sh/uv/releases/download/0.8.17/uv-installer.sh";
-    hash = "sha256-A7FPajPSs8FaghFb8z/TiwleE4PPm8I1r6MwOu2Axjs=";
+    url = "https://github.com/astral-sh/uv/releases/download/0.11.26/uv-installer.sh";
+    hash = "sha256-kvqQhdJMIUu0RFzB2owVypzKjP+zRyYkD6CMUwLpTMw=";
   };
 
+  "windows10/cacert.pfx" = runCommand "cacert.pfx" {} ''
+    ${openssl}/bin/openssl pkcs12 -export -nokeys -passout pass:servo -out $out -in ${fetchurl {
+      url = "https://curl.se/ca/cacert.pem";
+      hash = "sha256-hqHzNmr6x8b4rp88d5rCIRKTKMQ/CrK4gX6y82KlAlw=";
+    }}
+  '';
   "windows10/virtio-win-0.1.240.iso" = fetchurl {
     url = "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-virtio/virtio-win-0.1.240-1/virtio-win-0.1.240.iso";
     hash = "sha256-69SCWGaPf3jgJu0nbCip0Z2D4CD/oICtaZENyGu8vMY=";
@@ -69,8 +76,8 @@ in linkFarm "image-deps" {
     hash = "sha256-2N7eUAVWS0CLpQMXEIt2XtnDxRA0KlmPn9QmgcvgZIs=";
   };
   "windows10/uv-installer.ps1" = fetchurl {
-    url = "https://github.com/astral-sh/uv/releases/download/0.8.17/uv-installer.ps1";
-    hash = "sha256-FrrE7pz/5C64U9X8q/5EMYwisRATgLEc51thr5qS4wI=";
+    url = "https://github.com/astral-sh/uv/releases/download/0.11.26/uv-installer.ps1";
+    hash = "sha256-N7O8lHCKrLMVJU38ad8ybkC2cNP0eFy94YmQM2nb0hs=";
   };
   "windows10/ndp48-x86-x64-allos-enu.exe" = fetchurl {
     url = "https://download.visualstudio.microsoft.com/download/pr/2d6bb6b2-226a-4baa-bdec-798822606ff1/8494001c276a4b96804cde7829c04d7f/ndp48-x86-x64-allos-enu.exe";
@@ -98,5 +105,4 @@ in linkFarm "image-deps" {
   };
   "windows10/software.reg" = writeText "software.reg" (lib.readFile ../../static/windows10/software.reg);
   "windows10/system.reg" = writeText "system.reg" (lib.readFile ../../static/windows10/system.reg);
-  "windows10/refreshenv.ps1" = writeText "refreshenv.ps1" (lib.readFile ../../static/windows10/refreshenv.ps1);
 }
