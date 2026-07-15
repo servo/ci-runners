@@ -25,6 +25,13 @@ if (!(Test-Path .\image-built)) {
     $pfx_password = ConvertTo-SecureString "servo" -AsPlainText -Force
     Import-PfxCertificate -Password $pfx_password -CertStoreLocation Cert:\LocalMachine\Root -FilePath cacert.pfx
 
+    # In case those are out of date, update certs for servers we know we’ll need.
+    Invoke-WebRequest -UseBasicParsing https://github.com | Out-Null
+    try {
+        # This request is a 404, so we need to try/catch
+        Invoke-WebRequest -UseBasicParsing https://release-assets.githubusercontent.com | Out-Null
+    } catch {}
+
     # Install Git
     # Note: installer automatically uninstalls first if needed, so the check is just there to save time
     if (!(Test-Path 'C:\Program Files\Git\cmd\git.exe')) {
