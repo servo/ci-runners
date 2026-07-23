@@ -26,6 +26,9 @@ runs:
       with:
         ref: ${{ steps.choose-commit.outputs.commit }}
         fetch-depth: ${{ inputs.fetch-depth }}
+        # This is necessary to check out pull requests for `pull_request_target` actions,
+        # which are used for things like the WPT update job and the try label.
+        allow-unsafe-pr-checkout: true
 
     # Use prebaked repo on self-hosted runners
     - if: ${{ runner.environment == 'self-hosted' && inputs.fetch-depth != 0 }}
