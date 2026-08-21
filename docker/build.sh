@@ -78,7 +78,7 @@ then
 fi
 
 SERVO_GIT_HASH=$(git ls-remote https://github.com/servo/servo.git --branches refs/heads/main | awk '{ print $1}')
-GITHUB_ACTIONS_RUNNER_VERSION="2.335.1"
+GITHUB_ACTIONS_RUNNER_VERSION="2.336.0"
 MITMPROXY_VERSION="12.2.1"
 RUST_VERSION="1.97.1"
 UV_VERSION="0.11.19"
