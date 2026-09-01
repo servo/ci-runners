@@ -24,7 +24,7 @@ RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/git
 RUN apt-get update && \
     apt-get -y install --no-install-recommends \
         libdbus-1-dev libfreetype6-dev libgl1-mesa-dri libgles2-mesa-dev \
-        libglib2.0-dev gstreamer1.0-plugins-good libgstreamer-plugins-good1.0-dev \
+        libglib2.0-dev gstreamer1.0-plugins-good \
         gstreamer1.0-plugins-bad libgstreamer-plugins-bad1.0-dev gstreamer1.0-plugins-ugly \
         gstreamer1.0-plugins-base libgstreamer-plugins-base1.0-dev gstreamer1.0-libav \
         libgstrtspserver-1.0-dev gstreamer1.0-tools libges-1.0-dev \
@@ -107,7 +107,7 @@ ENV OHOS_BASE_SDK_HOME=/data/commandline-tools/sdk/default/openharmony
 ENV OHOS_SDK_NATIVE=/data/commandline-tools/sdk/default/openharmony/native
 
 # ideally this should be a no-op: Todo: investigate the layer and see if it is.
-RUN cd /data/servo/servo && ./mach bootstrap --skip-platform
+RUN cd /data/servo/servo && ./mach bootstrap --skip-platform --ohos
 
 
 FROM servo_base AS servo_cooked_ohos_release
