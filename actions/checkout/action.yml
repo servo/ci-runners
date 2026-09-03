@@ -31,12 +31,21 @@ runs:
         allow-unsafe-pr-checkout: true
 
     # Use prebaked repo on self-hosted runners
+    - if: ${{ runner.environment == 'self-hosted'}}
+      shell: bash
+      # Setup authentication using GITHUB_TOKEN to avoid rate limits.
+      run: |
+        git config credential.helper '!f() { echo username=x-access-token; echo "password=$GH_TOKEN"; };f'
     - if: ${{ runner.environment == 'self-hosted' && inputs.fetch-depth != 0 }}
       shell: bash
       run: git fetch --depth=${{ inputs.fetch-depth }} origin ${{ steps.choose-commit.outputs.commit }}
+      env:
+        GH_TOKEN: ${{ github.token }}
     - if: ${{ runner.environment == 'self-hosted' && inputs.fetch-depth == 0 }}
       shell: bash
       run: git fetch origin ${{ steps.choose-commit.outputs.commit }}
+      env:
+        GH_TOKEN: ${{ github.token }}
     - if: ${{ runner.environment == 'self-hosted' }}
       shell: bash
       # Same as `git switch --detach FETCH_HEAD`, but fixes up dirty working
@@ -46,4 +55,10 @@ runs:
       run: |
         git switch --detach
         git reset --hard FETCH_HEAD --
+    - if: ${{ runner.environment == 'self-hosted' }}
+      shell: bash
+      # Remove the credential helper so it doesn't persist beyond this action.
+      run: |
+        git config --unset credential.helper
+
 
