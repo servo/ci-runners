@@ -35,6 +35,7 @@ runs:
       shell: bash
       # Setup authentication using GITHUB_TOKEN to avoid rate limits.
       run: |
+        git config url.'https://x-access-token@github.com'.insteadOf 'https://github.com'
         git config credential.helper '!f() { echo username=x-access-token; echo "password=$GH_TOKEN"; };f'
     - if: ${{ runner.environment == 'self-hosted' && inputs.fetch-depth != 0 }}
       shell: bash
@@ -55,10 +56,11 @@ runs:
       run: |
         git switch --detach
         git reset --hard FETCH_HEAD --
-    - if: ${{ runner.environment == 'self-hosted' }}
+    - if: always() && ${{ runner.environment == 'self-hosted' }}
       shell: bash
       # Remove the credential helper so it doesn't persist beyond this action.
       run: |
+        git config --unset url.'https://x-access-token@github.com'.insteadOf
         git config --unset credential.helper
 
 
