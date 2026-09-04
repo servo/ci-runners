@@ -21,44 +21,21 @@ runs:
           echo "commit=$GITHUB_SHA" | tee -a $GITHUB_OUTPUT
         fi
 
-    - if: ${{ runner.environment != 'self-hosted' }}
-      uses: actions/checkout@v6
+    - if: ${{ runner.environment == 'self-hosted' }}
+      shell: bash
+      # This is necessary because the checkout action does a strict equality on
+      # URL when deciding whether to keep the directory contents or not. It expects
+      # the URL to be in this format.
+      run: |
+        if [ -d .git ]; then
+          git remote set-url origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+        fi
+
+    - uses: actions/checkout@v6
       with:
         ref: ${{ steps.choose-commit.outputs.commit }}
         fetch-depth: ${{ inputs.fetch-depth }}
         # This is necessary to check out pull requests for `pull_request_target` actions,
         # which are used for things like the WPT update job and the try label.
         allow-unsafe-pr-checkout: true
-
-    # Use prebaked repo on self-hosted runners
-    - if: ${{ runner.environment == 'self-hosted'}}
-      shell: bash
-      # Setup authentication using GITHUB_TOKEN to avoid rate limits.
-      run: |
-        git config credential.helper '!f() { echo username=x-access-token; echo "password=$GH_TOKEN"; };f'
-    - if: ${{ runner.environment == 'self-hosted' && inputs.fetch-depth != 0 }}
-      shell: bash
-      run: git fetch --depth=${{ inputs.fetch-depth }} origin ${{ steps.choose-commit.outputs.commit }}
-      env:
-        GH_TOKEN: ${{ github.token }}
-    - if: ${{ runner.environment == 'self-hosted' && inputs.fetch-depth == 0 }}
-      shell: bash
-      run: git fetch origin ${{ steps.choose-commit.outputs.commit }}
-      env:
-        GH_TOKEN: ${{ github.token }}
-    - if: ${{ runner.environment == 'self-hosted' }}
-      shell: bash
-      # Same as `git switch --detach FETCH_HEAD`, but fixes up dirty working
-      # trees, in case the runner image was baked with a dirty working tree.
-      # Safeguard: -- after FETCH_HEAD means FETCH_HEAD is a revision and not a
-      # file literally called `FETCH_HEAD`. See <https://github.com/servo/servo/pull/44309>
-      run: |
-        git switch --detach
-        git reset --hard FETCH_HEAD --
-    - if: ${{ runner.environment == 'self-hosted' }}
-      shell: bash
-      # Remove the credential helper so it doesn't persist beyond this action.
-      run: |
-        git config --unset credential.helper
-
-
+        clean: ${{ runner.environment != 'self-hosted' }}
