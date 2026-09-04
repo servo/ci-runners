@@ -21,16 +21,6 @@ runs:
           echo "commit=$GITHUB_SHA" | tee -a $GITHUB_OUTPUT
         fi
 
-    - if: ${{ runner.environment == 'self-hosted' }}
-      shell: bash
-      # This is necessary because the checkout action does a strict equality on
-      # URL when deciding whether to keep the directory contents or not. It expects
-      # the URL to be in this format.
-      run: |
-        if [ -d .git ]; then
-          git remote set-url origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
-        fi
-
     - uses: actions/checkout@v6
       with:
         ref: ${{ steps.choose-commit.outputs.commit }}
