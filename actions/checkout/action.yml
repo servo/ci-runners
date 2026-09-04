@@ -23,7 +23,7 @@ runs:
 
     - if: ${{ runner.environment == 'self-hosted' }}
       shell: bash
-      # This is necessary because the checkout action does a strict quality on
+      # This is necessary because the checkout action does a strict equality on
       # URL when deciding whether to keep the directory contents or not. It expects
       # the URL to be in this format.
       run: |
