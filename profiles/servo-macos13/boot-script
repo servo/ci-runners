@@ -75,6 +75,7 @@ if ! [ -e image-built ]; then
 
     set -- gnu-tar  # Install gtar(1)
     set -- "$@" jq  # Used by start_github_actions_runner()
+    set -- "$@" shellcheck # Used ./mach test-tidy <https://github.com/servo/ci-runners/issues/147>
 
     brew install "$@"
 
