@@ -22,11 +22,9 @@ COPY --chmod=644 githubcli-archive-keyring.gpg /etc/apt/keyrings/githubcli-archi
 RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list
 
 RUN apt-get update && \
-    apt-get -y install --no-install-recommends \
+	apt-get -y install --no-install-recommends \
         libdbus-1-dev libfreetype6-dev libgl1-mesa-dri libgles2-mesa-dev \
-        libglib2.0-dev gstreamer1.0-plugins-good libgstreamer-plugins-good1.0-dev \
-        gstreamer1.0-plugins-bad libgstreamer-plugins-bad1.0-dev gstreamer1.0-plugins-ugly \
-        gstreamer1.0-plugins-base libgstreamer-plugins-base1.0-dev gstreamer1.0-libav \
+        libglib2.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev libgstreamer-plugins-extra1.0-dev \
         libgstrtspserver-1.0-dev gstreamer1.0-tools libges-1.0-dev \
         libharfbuzz-dev liblzma-dev libudev-dev libunwind-dev \
         libvulkan1 libx11-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxmu-dev \
