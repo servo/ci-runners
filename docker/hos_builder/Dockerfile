@@ -10,7 +10,7 @@ FROM servo_gha_base:latest AS base_fetcher
 FROM base_fetcher AS base_with_cc
 RUN apt-get update && \
     apt-get -y install --no-install-recommends \
-    build-essential ccache clang cmake python3 \
+    build-essential ccache clang clang-20 cmake python3 \
     && rm -rf /var/cache/apt/lists
 
 FROM base_with_cc AS base
@@ -24,7 +24,7 @@ RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/git
 RUN apt-get update && \
 	apt-get -y install --no-install-recommends \
         libdbus-1-dev libfreetype6-dev libgl1-mesa-dri libgles2-mesa-dev \
-        libglib2.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev libgstreamer-plugins-extra1.0-dev \
+        libglib2.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-dev \
         libgstrtspserver-1.0-dev gstreamer1.0-tools libges-1.0-dev \
         libharfbuzz-dev liblzma-dev libudev-dev libunwind-dev \
         libvulkan1 libx11-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxmu-dev \
@@ -33,6 +33,8 @@ RUN apt-get update && \
     && rm -rf /var/cache/apt/lists
 
 RUN mkdir -p /data/servo/servo && chown -R "${USERNAME}:${USERNAME}" /data/
+RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-20 10
+RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-20 10
 
 FROM servo_gha_runner:${GITHUB_ACTIONS_RUNNER_VERSION} AS gh_runner
 
