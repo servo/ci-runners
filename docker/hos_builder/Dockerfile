@@ -107,7 +107,7 @@ ENV OHOS_BASE_SDK_HOME=/data/commandline-tools/sdk/default/openharmony
 ENV OHOS_SDK_NATIVE=/data/commandline-tools/sdk/default/openharmony/native
 
 # ideally this should be a no-op: Todo: investigate the layer and see if it is.
-RUN cd /data/servo/servo && ./mach bootstrap --skip-platform
+RUN cd /data/servo/servo && ./mach bootstrap --ohos --skip-platform
 
 
 FROM servo_base AS servo_cooked_ohos_release
