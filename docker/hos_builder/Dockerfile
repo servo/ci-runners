@@ -21,6 +21,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 COPY --chmod=644 githubcli-archive-keyring.gpg /etc/apt/keyrings/githubcli-archive-keyring.gpg
 RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list
 
+# Because the current base image is Ubuntu24.04 and clang>=19 is required for mozjs, we need to install clang-20.
 RUN apt-get update && \
     apt-get -y install --no-install-recommends \
         libdbus-1-dev libfreetype6-dev libgl1-mesa-dri libgles2-mesa-dev \
@@ -31,7 +32,7 @@ RUN apt-get update && \
         libharfbuzz-dev liblzma-dev libudev-dev libunwind-dev \
         libvulkan1 libx11-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxmu-dev \
         libxmu6 libegl1-mesa-dev llvm-dev m4 xorg-dev libxkbcommon0 libxkbcommon-x11-0 \
-        xvfb gh sudo openjdk-21-jre-headless jq \
+        xvfb gh sudo openjdk-21-jre-headless jq clang-20 \
     && rm -rf /var/cache/apt/lists
 
 RUN mkdir -p /data/servo/servo && chown -R "${USERNAME}:${USERNAME}" /data/
