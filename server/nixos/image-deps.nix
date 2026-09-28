@@ -57,7 +57,7 @@ in linkFarm "image-deps" {
   "windows10/cacert.pfx" = runCommand "cacert.pfx" {} ''
     ${openssl}/bin/openssl pkcs12 -export -nokeys -passout pass:servo -out $out -in ${fetchurl {
       url = "https://curl.se/ca/cacert.pem";
-      hash = "sha256-P/NE4wubHtKXEETqu0OKCPLiJF3bX4qxo62LY6tOr5E=";
+      hash = "sha256-9m3/G9+PlgYLgXeXb4t9klS8ibxNuTPXafc4TShIC8k=";
     }}
   '';
   "windows10/virtio-win-0.1.240.iso" = fetchurl {
@@ -89,7 +89,7 @@ in linkFarm "image-deps" {
   };
   "windows10/vs_community.exe" = fetchurl {
     url = "https://aka.ms/vs/17/release/vs_community.exe";
-    hash = "sha256-08wjgGPWTmRIr75N/WklSvN620/0fhWP6iKAvK/QmMQ=";
+    hash = "sha256-mjMiorG4xjL8X8EFxSmQxxFY+cqP63NpDcLhMXp/Qbk=";
   };
   "windows10/rustup-init.exe" = fetchurl {
     url = "https://static.rust-lang.org/rustup/archive/1.28.1/x86_64-pc-windows-msvc/rustup-init.exe";

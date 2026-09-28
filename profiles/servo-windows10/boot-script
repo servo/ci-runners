@@ -111,7 +111,9 @@ if (!(Test-Path .\image-built)) {
     cd C:\a\servo\servo
 
     # Fix the remote url, since it’s still set to our cache
-    git remote set-url origin https://github.com/servo/servo.git; Check
+    # Don't include the .git suffix in the URL as this is needed by `actions/checkout`
+    # <https://github.com/servo/ci-runners/pull/159>
+    git remote set-url origin https://github.com/servo/servo; Check
 
     .\mach fetch; Check
     .\mach bootstrap-gstreamer; Check
