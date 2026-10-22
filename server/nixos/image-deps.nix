@@ -8,8 +8,8 @@
   openssl,
 }: let
   jammy-server-cloudimg-amd64_img = fetchurl {
-    url = "https://cloud-images.ubuntu.com/jammy/20260802/jammy-server-cloudimg-amd64.img";
-    hash = "sha256-v0voTtHPJV6O8g5Y2yzg0dVliCxV6MePug0lxuMu+UU=";
+    url = "https://cloud-images.ubuntu.com/jammy/20261020/jammy-server-cloudimg-amd64.img";
+    hash = "sha256-IJnmPaC4Iu+OBePVlsG0Auqq5lj8CKuRnLhJW/zcSIs=";
   };
 in linkFarm "image-deps" {
   "cargo-config.toml" = writeText "cargo-config.toml" ''
@@ -57,7 +57,7 @@ in linkFarm "image-deps" {
   "windows10/cacert.pfx" = runCommand "cacert.pfx" {} ''
     ${openssl}/bin/openssl pkcs12 -export -nokeys -passout pass:servo -out $out -in ${fetchurl {
       url = "https://curl.se/ca/cacert.pem";
-      hash = "sha256-9m3/G9+PlgYLgXeXb4t9klS8ibxNuTPXafc4TShIC8k=";
+      hash = "sha256-eW8Tib/qE8DtePZjt2W6r/VKUI5Ug3hr1uznPF4+PL4=";
     }}
   '';
   "windows10/virtio-win-0.1.240.iso" = fetchurl {
@@ -89,7 +89,7 @@ in linkFarm "image-deps" {
   };
   "windows10/vs_community.exe" = fetchurl {
     url = "https://aka.ms/vs/17/release/vs_community.exe";
-    hash = "sha256-mjMiorG4xjL8X8EFxSmQxxFY+cqP63NpDcLhMXp/Qbk=";
+    hash = "sha256-44BIxFgRvtZtpTFaqSFXOgsBytrrX4Kzqhg7itSX5Ys=";
   };
   "windows10/rustup-init.exe" = fetchurl {
     url = "https://static.rust-lang.org/rustup/archive/1.28.1/x86_64-pc-windows-msvc/rustup-init.exe";
