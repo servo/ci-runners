@@ -1,0 +1,15 @@
+[Unit]
+Description=Update the servo-ohos CI runners, and rebuild the image if ohos-main or the runner moved
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+# `docker` or `podman`, as for the monitor. The settings file can override it.
+Environment="CONTAINER_ENGINE=docker"
+# The rootless docker daemon of the user. %t is $XDG_RUNTIME_DIR, %h the home directory.
+Environment="DOCKER_HOST=unix://%t/docker.sock"
+Environment="PATH=%h/.cargo/bin:/usr/local/bin:/usr/bin:/bin"
+WorkingDirectory=%h/ohos-ci-runners
+ExecStart=/usr/bin/bash update.sh
+TimeoutStartSec=4h
