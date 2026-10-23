@@ -236,6 +236,12 @@ curl.exe -fsSo system.reg --max-time 5 --retry 99 --retry-all-errors http://192.
 reg import software.reg
 reg import system.reg
 
+# Use a fixed 16 GiB pagefile, since Windows has no overcommit and the default pagefile does not grow fast enough,
+# causing OOM errors when compiling Servo unit tests.
+# The sum of guest memory + this pagefile, should be > number_of_cores * 2GiB + 4GiB. 
+# The 2GiB comes from local observation of max committed memory of rustc (which scales with number of logical cores)
+Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management' -Name PagingFiles -Type MultiString -Value 'C:\pagefile.sys 16384 16384'
+
 echo "curl.exe -fsSo C:\ci\servo-ci-boot.ps1 --max-time 5 --retry 99 --retry-all-errors http://192.168.100.1:8000/boot" > init.ps1
 echo "C:\ci\servo-ci-boot.ps1" >> init.ps1
 
