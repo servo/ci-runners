@@ -1,0 +1,8 @@
+{
+    "version": "2.338.1",
+    "hashes": {
+        "linux-x64": "sha256-COnMs2BNJGLCS14zYE3DCBApbKFcxl8jz/1DF+sUTDc=",
+        "osx-x64": "sha256-8G4yn/6QoqS9qLRgogueJty3UloJO/m0+JElxyvB854=",
+        "win-x64": "sha256-R49TOsLDSQQPuup+FY9/fQI1CFzzW8gfZhrwxxUgf/k="
+    }
+}
