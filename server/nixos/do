@@ -1,13 +1,50 @@
 #!/usr/bin/env zsh
 set -euo pipefail -o bsdecho -o shwordsplit
+
+usage() {
+    >&2 printf '%s\n' \
+        'usage: ./do deploy <host ...> [-- <nixos-rebuild args ...>]' \
+        '       ./do read <host ...>' \
+        '       ./do write <host ...>' \
+        '       ./do restart-monitor <host ...>' \
+        '       ./do restart-queue <host ...>' \
+        '       ./do run <host ...> -- <command ...>' \
+        '       ./do logs <host>' \
+        '       ./do mosh <host> [command ...]' \
+        '       ./do htop <host>'
+    exit 1
+}
+
+# Print usage if there is no argument supplied.
+[ $# -gt 0 ] || usage
 action=$1; shift
 
 case "$action" in
 (deploy)
-    for host; do
-        ./deploy -s "$host".servo.org "$host"
+    hosts=
+    for arg; do
+        case "$arg" in
+        (--)
+            shift
+            break
+            ;;
+        (*)
+            hosts="$hosts $arg"
+            shift
+            ;;
+        esac
     done
-    for host; do
+    # If no action is provided, default to using "switch".
+    if [ $# -eq 0 ]; then
+        set -- switch
+    fi
+    for host in $hosts; do
+        nixos-rebuild "$@" --fast \
+            --flake .#"$host" \
+            --target-host root@"$host".servo.org \
+            -v --log-format internal-json 2>&1 | nom --json
+    done
+    for host in $hosts; do
         printf '>>> %s\n' https://"$host".servo.org
     done
     ;;
@@ -67,7 +104,6 @@ case "$action" in
     mosh root@"$1".servo.org tmux new 'htop'
     ;;
 (*)
-    >&2 echo 'usage: ./do <deploy|read|write|restart-monitor|restart-queue|run|mosh|logs|htop> [args ...]'
-    exit 1
+    usage
     ;;
 esac
