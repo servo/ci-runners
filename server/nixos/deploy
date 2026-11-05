@@ -55,7 +55,7 @@ if [ $host = gemstone-labs-new-deploy-target ]
     sleep 10
 end
 
-nixos-rebuild --fast --use-remote-sudo --target-host root@$host --log-format internal-json -v --flake .#$argv[1] $cmd &| nom --json
+nixos-rebuild --no-reexec --use-remote-sudo --target-host root@$host --log-format internal-json -v --flake .#$argv[1] $cmd &| nom --json
 
 if [ $host = gsl-new-deploy-target ]
     ssh $NIX_SSHOPTS root@$host reboot
