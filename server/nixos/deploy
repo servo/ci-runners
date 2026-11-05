@@ -48,7 +48,7 @@ else
     set cmd switch
 end
 
-set -x NIX_SSHOPTS -t
+set -x NIX_SSHOPTS
 
 if [ $host = gemstone-labs-new-deploy-target ]
     set -a NIX_SSHOPTS "-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
