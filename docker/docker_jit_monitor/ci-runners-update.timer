@@ -1,0 +1,10 @@
+[Unit]
+Description=Keep the servo-ohos CI runners and their image up to date
+
+[Timer]
+OnCalendar=Sun,22:00
+RandomizedDelaySec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
