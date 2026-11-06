@@ -4,10 +4,30 @@ action=$1; shift
 
 case "$action" in
 (deploy)
-    for host; do
-        ./deploy -s "$host".servo.org "$host"
+    hosts=
+    for arg; do
+        case "$arg" in
+        (--)
+            shift
+            break
+            ;;
+        (*)
+            hosts="$hosts $arg"
+            shift
+            ;;
+        esac
     done
-    for host; do
+    # If no action is provided, default to using "switch".
+    if [ $# -eq 0 ]; then
+        set -- switch
+    fi
+    for host in $hosts; do
+        nixos-rebuild "$@" --no-reexec \
+            --flake .#"$host" \
+            --target-host root@"$host".servo.org \
+            -v --log-format internal-json 2>&1 | nom --json
+    done
+    for host in $hosts; do
         printf '>>> %s\n' https://"$host".servo.org
     done
     ;;
