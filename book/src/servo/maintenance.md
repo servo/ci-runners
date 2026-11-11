@@ -12,11 +12,11 @@ To deploy an updated config to any of the servers:
 
 ```
 $ cd server/nixos
-$ ./deploy -s ci0.servo.org ci0
-$ ./deploy -s ci1.servo.org ci1
-$ ./deploy -s ci2.servo.org ci2
-$ ./deploy -s ci3.servo.org ci3
-$ ./deploy -s ci4.servo.org ci4
+$ ./do deploy ci0
+$ ./do deploy ci1
+$ ./do deploy ci2
+$ ./do deploy ci3
+$ ./do deploy ci4
 ```
 
 To deploy, read monitor config, write monitor config, restart the monitor, or run a command on one or more servers:
