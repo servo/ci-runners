@@ -1,5 +1,5 @@
-#!/usr/bin/env zsh
-set -euo pipefail -o bsdecho -o shwordsplit
+#!/bin/sh
+set -euo pipefail
 
 usage() {
     >&2 printf '%s\n' \
@@ -51,12 +51,14 @@ case "$action" in
 (read)
     for host; do
         mkdir -p -- "$host"
-        rsync root@"$host".servo.org:/config/monitor/{.env,monitor.toml} "$host"/
+        rsync root@"$host".servo.org:/config/monitor/.env \
+              root@"$host".servo.org:/config/monitor/monitor.toml \
+        "$host"/
     done
     ;;
 (write)
     for host; do
-        rsync "$host"/{.env,monitor.toml} root@"$host".servo.org:/config/monitor/
+        rsync "$host"/.env "$host"/monitor.toml  root@"$host".servo.org:/config/monitor/
     done
     ;;
 (restart-monitor)
