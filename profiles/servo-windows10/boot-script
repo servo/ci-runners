@@ -26,6 +26,9 @@ function Update-SessionEnvironment {
 cd C:\ci
 
 if (!(Test-Path .\image-built)) {
+    # This disables the Windows Defender firewall, which cargo-binstall triggers.
+    Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
+
     # Install Mozilla’s root certificates, to avoid SSL errors in Python.
     # More details: <https://github.com/python/cpython/issues/80192>
     # Example error: `Error downloading moztools-4.0: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1016). The failing URL was: https://github.com/servo/servo-build-deps/releases/download/msvc-deps/moztools-4.0.zip`
@@ -124,6 +127,10 @@ if (!(Test-Path .\image-built)) {
         rustup toolchain install; Check
     }
 
+    # Disable cargo-binstall telemetry and installation confirmation, which avoids
+    # manual user input to finish the runner image build.
+    $env:BINSTALL_DISABLE_TELEMETRY = 'true'
+    $env:BINSTALL_NO_CONFIRM = 'true'
     .\mach bootstrap; Check
 
     # FIXME: workaround for servo/servo#46523 <https://github.com/servo/servo/issues/46523>
